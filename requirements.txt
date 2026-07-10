@@ -1,0 +1,11 @@
+# GeoAI Aquaculture Pond Identification — pinned for reproducibility.
+# Open-source only; no AutoML. Tested on Python 3.13.
+numpy==2.2.6
+pandas==2.3.3
+scikit-learn==1.8.0
+lightgbm==4.6.0
+xgboost==3.2.0
+catboost==1.2.10
+pyyaml==6.0.2
+# Temporal Transformer path only (run_pipeline.py --model seq). Preinstalled on Colab/Kaggle.
+torch>=2.0

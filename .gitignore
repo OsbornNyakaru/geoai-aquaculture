@@ -1,0 +1,28 @@
+# Data and caches (only supplied data allowed; keep raw out of VCS too)
+data/cache/
+data/raw/*.csv
+data/raw/*.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Experiment log is untracked (per autoresearch convention); keep the header via results.tsv.example if needed
+experiments/results.tsv
+
+# Submissions + preds bundles can be large / iterative (regenerated on Colab)
+submissions/*.csv
+submissions/preds/
+data/submissions/
+
+# Run log + retired code zip (superseded by git pull)
+logs_full.txt
+geoai-aquaculture-code.zip
+
+# OS
+.DS_Store
+Thumbs.db

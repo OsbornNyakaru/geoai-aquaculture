@@ -1,0 +1,150 @@
+# =====================================================================
+# GeoAI Aquaculture Pond Identification — pipeline configuration.
+# Single source of truth. run_pipeline.py reads this; every artifact
+# cache is keyed by a hash of the relevant sub-section (see src/utils.py).
+# =====================================================================
+
+seed: 42
+
+paths:
+  raw_dir: data/raw
+  cache_dir: data/cache
+  submissions_dir: submissions
+  results_tsv: experiments/results.tsv
+  train_csv: Train.csv
+  test_csv: Test.csv
+  sample_submission_csv: SampleSubmission.csv
+
+data:
+  sentinel: -9999          # sentinel value for masked bands (-> NaN)
+  id_col: ID
+  label_col: label
+  n_months: 12
+  drop_exact_duplicates: true   # 4 dup feature-rows in train (labels consistent)
+
+# ---- Training-time masking augmentation (the core train/test-shift fix) ----
+# Each train row (12 months observed) is expanded into K masked "views" whose
+# active window matches the empirically-measured test masking recipe.
+augment:
+  enable: true
+  K: 4                     # views per train row for FITTING
+  R: 3                     # independent views per held-out row for honest OOF
+  window_lengths: [4, 5, 6]        # measured test window lengths
+  match_test_distribution: true    # sample L / start from measured test p(L), p(start|L)
+  simulate_s2_dropout: true        # mask S2-only in some active months (cloud cover)
+  # Measured on Test.csv 2026-07-07 (fraction of active-in-window rows).
+  s2_dropout_rates:
+    "01": 0.005
+    "02": 0.06
+    "03": 0.008
+    "04": 0.003
+    "05": 0.003
+    "06": 0.115
+    "07": 0.003
+    "08": 0.025
+    "09": 0.008
+    "10": 0.28
+    "11": 0.02
+    "12": 0.0
+
+# ---- Feature engineering toggles ----
+features:
+  sar_units: auto          # auto | db | linear  (auto-detect from value range)
+  water_indices: true      # NDWI, MNDWI, AWEI_nsh, AWEI_sh, NDVI
+  evi: false               # Enhanced Vegetation Index (scaled reflectance); did not help LB
+  wif: false               # Water Inundation Frequency; strong on train (AUC .83) but no LB gain
+  sar_basic: true          # VH, VV, VV-VH
+  sdwi: true               # Sentinel-1 dual-pol water index (S1-only, cloud-robust)
+  sar_percentiles: true    # 10/25/50/75/90 pct of VH, VV (permanence discriminator)
+  raw_band_aggregates: true
+  window_meta: true        # n_active, start/end/center
+  asymmetry_flags: true    # S1-present-S2-masked counts + m06/m10 flags
+  epsilon: 1.0e-6
+  aggregates: [mean, median, min, max, std, range]
+
+cv:
+  n_splits: 5
+  n_repeats: 3
+  shuffle: true
+
+models:
+  use: [lightgbm, xgboost, catboost]
+  bag_seeds: [42, 7, 13]   # multi-seed bag per model family
+  blend: rank              # rank | mean  (rank-average across families)
+  scale_pos_weight: 1.0    # mild; calibration is the operating-point lever
+  lightgbm:
+    n_estimators: 600
+    learning_rate: 0.03
+    num_leaves: 31
+    max_depth: -1
+    min_child_samples: 30
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    reg_lambda: 1.0
+    deterministic: true
+    force_row_wise: true
+    num_threads: 4
+    verbose: -1
+  xgboost:
+    n_estimators: 600
+    learning_rate: 0.03
+    max_depth: 5
+    min_child_weight: 5
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_lambda: 1.0
+    tree_method: hist
+    nthread: 4
+  catboost:
+    iterations: 600
+    learning_rate: 0.03
+    depth: 6
+    l2_leaf_reg: 3.0
+    thread_count: 4
+    allow_writing_files: false
+    verbose: false
+
+calibration:
+  method: logit_shift      # logit_shift | isotonic
+  t_grid_lo: 0.05
+  t_grid_hi: 0.95
+  t_grid_step: 0.005
+  prior_adjust: true       # base-rate correction for TargetF1 (test is more positive than train)
+  estimate_prior: false    # BBSE-estimate the test prior from unlabeled test; overrides assumed_test_prior
+  assumed_test_prior: 0.65 # LB-verified peak of the F1-vs-prior curve (0.65->0.8260; falls either side)
+  prevalence_target: null  # if set (e.g. 0.65), hit EXACT test pos-rate via logit shift (overrides prior_adjust); null=off
+
+  prior_sweep: []          # e.g. [0.45,0.50,0.55,0.60] -> one extra submission per prior, no retrain
+  prior_sensitivity: [0.40, 0.45, 0.50, 0.55, 0.60]
+
+# ---- Temporal Transformer (rules-safe non-GBDT model; run via --model seq) ----
+seq:
+  device: auto             # auto | cuda | cpu  (use a GPU Colab runtime)
+  d_model: 64
+  nhead: 4
+  layers: 2
+  dropout: 0.2
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  batch_size: 256
+  epochs: 60
+  n_splits: 5
+  n_repeats: 1             # NN training is costly; 1 repeat by default
+  K: 2                     # masked training views per row
+  R: 2                     # masked OOF views per held-out row
+  # ---- Transfer-oriented input channels (Step 3). All default OFF => the model
+  # sees only standardized bands + missing-indicators (current 2B behaviour).
+  # Enable ONE per LB probe; each removes absolute per-series level differently. ----
+  channels:
+    per_cell_detrend: false  # subtract each cell's own per-band temporal mean (level removal)
+    deltas: false            # month-to-month differences per band (additive-offset invariant)
+    indices: false           # per-month NDWI/MNDWI/NDVI/VV-VH/SDWI (ratios cancel offset)
+    rank: false              # within-series rank per band over observed months (monotone-invariant)
+
+run:
+  smoke_subsample: 300     # rows used in --smoke
+  smoke_trees: 100         # trees per model in --smoke
+  smoke_splits: 2
+  smoke_K: 1
+  smoke_R: 1
