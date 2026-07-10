@@ -64,6 +64,10 @@ files.download('/content/geoai/submissions/submission_colab.csv')
 
 ## Option B — Kaggle Notebooks
 
+> **Preferred:** use the git pull-run loop instead — see **`RUN_ON_KAGGLE.md`**
+> (private repo + `git pull` + Kaggle Secrets + a private data Dataset). The
+> zip-based steps below are the offline fallback.
+
 Kaggle notebooks have no internet by default, so attach code + data as
 **Datasets** instead of `pip install`-ing.
 
