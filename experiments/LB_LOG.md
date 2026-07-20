@@ -13,7 +13,12 @@ discard. Best-so-far is the max LB in the `keep?` = ✅ rows.
 | — | 2026-07-09 | baseline: temporal Transformer | submission_seq (realized 0.649) | 0.649 | **0.8780** | ✅ (best) |
 | 2 | 2026-07-20 | Step 2: GBDT+seq blend (ρ=0.849; best of prior63/65/67) | submission_seq_gbdt_prior63.csv | 0.646 | 0.8705 | ❌ (−0.0075; GBDT dilutes seq transfer despite higher OOF AUC) |
 | 3 | 2026-07-20 | Step 3: seq + per_cell_detrend @ prevalence_target 0.649 | submission_seq_detrend.csv | 0.649 | 0.8266 | ❌ (−0.0514; adding channels overfits source, wrecks transfer. OOF blind: −0.004 only) |
-| 4 | _pending_ | Robustness: seq K 2→4 (more masking augmentation, no added dims) | submission_seq_k4.csv | 0.649 | _awaiting Zindi_ | |
+| 4 | 2026-07-20 | Robustness: seq K 2→4 (more masking augmentation) | submission_seq_k4.csv | 0.649 | 0.8665 | ❌ (−0.0115; highest OOF 0.9840 → 2nd-worst LB. Even the winning lever overshoots. K=2 is a sharp optimum) |
+
+**Loop paused → research round.** Three straight misses (blend, detrend, K=4). Escalated
+to `gemini_loop/UPDATE_04.md` for fresh sourced ideas. Champion remains **seq K=2 @ 0.649
+= 0.8780**. Key new concern: public LB ≈309 rows → ~±0.01 noise → single-probe A/B can't
+resolve small (+0.005) gains; only large effects or breakages are detectable.
 
 **Current best: 0.8780** (temporal Transformer, realized pos-rate 0.649).
 

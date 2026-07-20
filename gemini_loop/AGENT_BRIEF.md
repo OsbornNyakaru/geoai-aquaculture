@@ -50,33 +50,38 @@ BBSE/EM prior estimation · WIF / fixed-threshold water-index features · TabPFN
 adversarial AUC 0.99) · OOF meta-stacking (Ridge on OOF) · group-KFold / "it's leakage"
 (the gap is designed covariate shift, proven leak-free).
 
-## META-LESSON (2026-07-20, after 2 failed probes)
+## META-LESSON (2026-07-20, after THREE failed probes → loop paused for research)
 
-**This problem PUNISHES added capacity, and OOF is blind to it.** Two "add complexity"
-bets both lost on the LB while OOF barely moved:
+Three consecutive blind toggles all LOST on the LB while OOF stayed flat/high:
 - Iter2 GBDT+seq blend → 0.8705 (adding a model class dilutes seq transfer).
 - Iter3 per_cell_detrend → 0.8266, −0.0514 (adding input channels overfits source).
+- Iter4 seq K=2→4 → 0.8665, −0.0115 (even MORE of the winning lever overshoots).
 
-⇒ Prefer **data-side** (more masking augmentation) and **weight-space** robustness
-(EMA/SWA, seed-bagging, label smoothing) over anything that adds inputs or parameters.
-The additive-channel family (`deltas`/`indices`/`rank`) is now **low-prior** — don't
-spend submissions on it unless a research round gives a specific reason.
+Three hard conclusions:
+1. **Added capacity hurts** (extra model / extra channels / extra augmentation all lost).
+   The additive-channel family (`deltas`/`indices`/`rank`) is now **low-prior**.
+2. **OOF is anti-correlated**, not merely blind: highest-OOF run (K=4, 0.984) = 2nd-worst LB.
+3. **Measurement resolution is the binding constraint.** Public LB ≈309 rows → ~±0.01 noise.
+   Single-submission A/B **cannot resolve small (+0.005) gains** — only large effects
+   (GBDT→seq was +0.05) or breakages (detrend −0.05). Stop hunting incremental toggles.
 
-## EXPERIMENT QUEUE (what has NOT been tested on the LB), in order
+**Champion (unchanged): seq K=2 @ realized 0.649 = 0.8780.** Standing operating-point tool:
+`prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-- ~~Iter2 GBDT+seq blend~~ **DISCARDED** 0.8705. ~~Iter3 per_cell_detrend~~ **DISCARDED** 0.8266.
-1. **Iter4 — more masking augmentation `seq.K 2→4`** *(current)*. Data-side, no added dims;
-   strengthens the lever that beat GBDT. Held at `prevalence_target 0.649`. Gate vs 0.8780.
-2. **If iter4 fails → ESCALATE to the research loop.** Three failed toggles = stop guessing;
-   write `gemini_loop/UPDATE_04.md` (report all 3 negatives + the meta-lesson) for fresh
-   sourced ideas before spending more submissions.
-3. **Weight-space robustness (needs small code):** EMA/SWA weight averaging, label smoothing
-   (targets the seq net's known overconfidence), seed-bagging `n_repeats 1→3`. No added dims.
-4. **Third learner** — only a *from-scratch seq-family* variant (1D-CNN/TCN, masked GRU);
-   GBDT is ruled out (iter2). Diversity within the better-transfer class.
+## CURRENT STATE: loop paused — awaiting Deep Research on `gemini_loop/UPDATE_04.md`
 
-`prevalence_target 0.649` is now the standing operating-point tool (verified working iter3):
-it holds every probe at the exact 0.8780 pos-rate, so each change is cleanly isolated.
+Do NOT stage another single-toggle probe. Next move is to run UPDATE_04.md through Gemini/Claude
+Deep Research and paste findings back; only then queue a LARGE-effect, rule-legal experiment.
+
+## EXPERIMENT QUEUE (post-research candidates — NONE yet LB-justified)
+
+- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665.
+1. **Inference-side changes (no added capacity)** — e.g. test-time masking augmentation
+   (predict each test row under several resampled masks, average), single-model-on-all-data vs
+   5-fold, alternate pooling. See UPDATE_04.md Q3. Candidates only until research confirms.
+2. **Weight-space robustness (small code, no added dims):** EMA/SWA, label smoothing, seed-bagging.
+3. **A structurally different LARGE-effect approach** if research surfaces one (UPDATE_04.md Q2).
+4. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4).
 
 ## Per-iteration protocol
 

@@ -131,7 +131,7 @@ seq:
   epochs: 60
   n_splits: 5
   n_repeats: 1             # NN training is costly; 1 repeat by default
-  K: 4                     # Iter4: 2->4 masked training views/row — more test-like masking augmentation (the lever that beat GBDT), data-side not capacity-side
+  K: 2                     # champion value. Iter4 tested K=4 -> 0.8665 (−0.0115); K=2 is a sharp optimum, reverted
   R: 2                     # masked OOF views per held-out row
   # ---- Transfer-oriented input channels (Step 3). All default OFF => the model
   # sees only standardized bands + missing-indicators (current 2B behaviour).
