@@ -6,6 +6,10 @@ agent session reads THIS file first, picks the next experiment, edits
 it on Colab/Kaggle and pastes the leaderboard score into `experiments/LB_LOG.md`.
 Update this file whenever a result changes the queue.*
 
+> **`../PROJECT_STATE.md` is the MASTER, portable, single-source-of-truth doc** (the one the
+> user carries to any new cloud account). **Every session, update it** — §3 status, §4 ledger,
+> §5 narrative, §6 lessons, and the "Last updated" line — alongside `LB_LOG.md` and this file.
+
 **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU).
 **Best public LB:** 0.8780 (from-scratch temporal Transformer). **Deadline:** 2026-08-16.
 **Target:** ~+0.05 (top-5 ≈ 0.928+).
