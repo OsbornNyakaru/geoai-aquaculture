@@ -4,21 +4,25 @@
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file,
 # so the notebook never changes; the experiment is version-controlled here.
 #
-# ITERATION: Step 2 — GBDT + seq rank-average blend (fill empty preds/, probe).
-# Config operating point is assumed_test_prior 0.65 (realized ~0.65 peak).
-# After it runs, read the "OOF rank correlation" line from tools/blend.py:
-#   < ~0.90  -> GBDT adds decorrelated signal -> upload submission_seq_gbdt*.csv
-#              (pick the sweep file whose logged pos-rate is closest to 0.65),
-#              gate vs current best LB 0.8780.
-#   ~1.0     -> skip the blend, next push moves to Step 3 (invariant inputs).
+# ITERATION 3 — Step 3: seq + per_cell_detrend (level-invariant channel).
+#   Step 2 (GBDT+seq blend) was DISCARDED: best blend 0.8705 < baseline 0.8780
+#   (GBDT dilutes seq transfer despite higher OOF AUC — see experiments/LB_LOG.md).
+#
+#   Hypothesis: the domain shift is a per-series LEVEL offset (adversarial AUC
+#   0.99 -> 0.94 on region-normalized indices). `per_cell_detrend` subtracts each
+#   cell's own per-band temporal mean, removing that level, so the seq model should
+#   transfer better. config.yaml sets seq.channels.per_cell_detrend=true and
+#   calibration.prevalence_target=0.649 to hold the operating point at the EXACT
+#   realized pos-rate that scored 0.8780 — so detrend is the ONLY variable vs the
+#   0.8780 reference (clean isolation). This is also the first live test of the
+#   Step-1 prevalence_target mechanism.
+#
+#   DECISION RULE: upload submission_seq_detrend.csv, gate vs 0.8780.
+#     > 0.8780  -> detrend transfers -> KEEP the channel; next probe adds `deltas`.
+#     <=0.8780  -> DISCARD detrend; next push tries `deltas` alone instead.
 # =====================================================================
 set -euo pipefail
 
-python run_pipeline.py --full --model gbdt --name gbdt_p65
-python run_pipeline.py --full --model seq  --name seq_v3
+python run_pipeline.py --full --model seq --name seq_detrend
 
-python tools/blend.py \
-  --preds submissions/preds/preds_seq_v3.npz submissions/preds/preds_gbdt_p65.npz \
-  --weights 0.7 0.3 --name seq_gbdt --sweep 0.63 0.65 0.67
-
-echo "=== done. Upload the submission_seq_gbdt*.csv nearest realized pos-rate 0.65 ==="
+echo "=== done. Upload submissions/submission_seq_detrend.csv (realized pos-rate 0.649) and paste the LB score ==="

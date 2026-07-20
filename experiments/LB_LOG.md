@@ -11,7 +11,8 @@ discard. Best-so-far is the max LB in the `keep?` = ✅ rows.
 | # | Date | Experiment | Submission file | pos-rate | Public LB | keep? |
 |---|------|------------|-----------------|----------|-----------|-------|
 | — | 2026-07-09 | baseline: temporal Transformer | submission_seq (realized 0.649) | 0.649 | **0.8780** | ✅ (best) |
-| 2 | _pending_ | Step 2: GBDT+seq blend | submission_seq_gbdt_priorXX.csv | | | |
+| 2 | 2026-07-20 | Step 2: GBDT+seq blend (ρ=0.849; best of prior63/65/67) | submission_seq_gbdt_prior63.csv | 0.646 | 0.8705 | ❌ (−0.0075; GBDT dilutes seq transfer despite higher OOF AUC) |
+| 3 | _pending_ | Step 3: seq + per_cell_detrend @ prevalence_target 0.649 | submission_seq_detrend.csv | 0.649 | _awaiting Zindi_ | |
 
 **Current best: 0.8780** (temporal Transformer, realized pos-rate 0.649).
 
@@ -22,6 +23,7 @@ discard. Best-so-far is the max LB in the `keep?` = ✅ rows.
    - ρ < ~0.90 → the blend adds decorrelated signal → upload the
      `submission_seq_gbdt_priorXX.csv` whose logged pos-rate is nearest **0.65**.
    - ρ ≈ 1.0 → skip the blend (record it as discarded); advance to Step 3.
-2. Optional: also upload `submission_seq_v3.csv` to re-confirm the 0.8780 anchor
-   (its `final_oof` should print ≈ 0.88046 — reproducibility check).
+2. Optional: also upload `submission_seq_v3.csv` to re-confirm the 0.8780 anchor.
+   Reproducibility check: the **full** seq run prints `final_oof ≈ 0.9827` (the
+   `0.88046` in results.tsv is the `--smoke` fingerprint, not the full run).
 3. Paste the Zindi score into the table; mark ✅ only if it beats 0.8780.

@@ -113,7 +113,7 @@ calibration:
   prior_adjust: true       # base-rate correction for TargetF1 (test is more positive than train)
   estimate_prior: false    # BBSE-estimate the test prior from unlabeled test; overrides assumed_test_prior
   assumed_test_prior: 0.65 # LB-verified peak of the F1-vs-prior curve (0.65->0.8260; falls either side)
-  prevalence_target: null  # if set (e.g. 0.65), hit EXACT test pos-rate via logit shift (overrides prior_adjust); null=off
+  prevalence_target: 0.649 # Iter3: hold seq at the exact realized 0.649 that scored 0.8780, so per_cell_detrend is the only variable. null=off
 
   prior_sweep: []          # e.g. [0.45,0.50,0.55,0.60] -> one extra submission per prior, no retrain
   prior_sensitivity: [0.40, 0.45, 0.50, 0.55, 0.60]
@@ -137,7 +137,7 @@ seq:
   # sees only standardized bands + missing-indicators (current 2B behaviour).
   # Enable ONE per LB probe; each removes absolute per-series level differently. ----
   channels:
-    per_cell_detrend: false  # subtract each cell's own per-band temporal mean (level removal)
+    per_cell_detrend: true   # Iter3 LB probe: subtract each cell's own per-band temporal mean (level removal)
     deltas: false            # month-to-month differences per band (additive-offset invariant)
     indices: false           # per-month NDWI/MNDWI/NDVI/VV-VH/SDWI (ratios cancel offset)
     rank: false              # within-series rank per band over observed months (monotone-invariant)

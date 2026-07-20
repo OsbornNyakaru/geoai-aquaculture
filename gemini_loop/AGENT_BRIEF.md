@@ -52,16 +52,20 @@ adversarial AUC 0.99) · OOF meta-stacking (Ridge on OOF) · group-KFold / "it's
 
 ## EXPERIMENT QUEUE (what has NOT been tested on the LB), in order
 
-1. **Step 2 — GBDT+seq rank-average blend.** `run_current.sh` as staged. Gate on the
-   `OOF rank correlation ρ` line: ρ<~0.90 → upload blend file nearest pos-rate 0.65;
-   ρ≈1.0 → skip. *(current iteration)*
-2. **Step 3 — invariant channels**, ONE LB probe each, `seq.channels.*`, `--model seq`,
-   order `per_cell_detrend → deltas → indices → rank`. Keep any that beat 0.8780.
-3. **Step 1 — `prevalence_target`** (e.g. 0.65): exact pos-rate on the overconfident net;
-   A/B vs `assumed_test_prior` at the same operating point.
-4. **Seq robustness (unbuilt):** EMA/SWA, label smoothing, more seed-bagging, AUC-margin
+- ~~**Step 2 — GBDT+seq rank-average blend.**~~ **DONE → DISCARDED (2026-07-20).** ρ=0.849
+  (decorrelated), yet best blend **0.8705 < 0.8780**. GBDT dilutes seq's transfer despite
+  higher OOF AUC. Lesson: don't blend in other model *classes*; improve the seq model
+  itself. (Also confirmed the Colab env is faithful — blend landed between components.)
+1. **Step 3 — invariant channels**, ONE LB probe each, `seq.channels.*`, `--model seq`,
+   held at `prevalence_target 0.649` so the channel is the only variable vs the 0.8780
+   reference. Order `per_cell_detrend → deltas → indices → rank`. Keep any that beat 0.8780.
+   *(current: per_cell_detrend → submission_seq_detrend.csv)*
+2. **Step 1 — `prevalence_target`** is now being exercised as the operating-point tool for
+   Step 3; once a channel is chosen, A/B its exact-0.649 vs `assumed_test_prior` if useful.
+3. **Seq robustness (unbuilt):** EMA/SWA, label smoothing, more seed-bagging, AUC-margin
    pairwise loss — behind config flags.
-5. **Third learner** for the blend (1D-CNN/TCN or masked GRU) — only if Step 2 helps.
+4. **Third learner** — only a *from-scratch seq-family* variant (1D-CNN/TCN, masked GRU) is
+   worth blending; GBDT is ruled out (Step 2). Diversity within the better-transfer class.
 
 ## Per-iteration protocol
 
