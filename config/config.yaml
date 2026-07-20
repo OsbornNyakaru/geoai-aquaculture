@@ -131,13 +131,13 @@ seq:
   epochs: 60
   n_splits: 5
   n_repeats: 1             # NN training is costly; 1 repeat by default
-  K: 2                     # masked training views per row
+  K: 4                     # Iter4: 2->4 masked training views/row — more test-like masking augmentation (the lever that beat GBDT), data-side not capacity-side
   R: 2                     # masked OOF views per held-out row
   # ---- Transfer-oriented input channels (Step 3). All default OFF => the model
   # sees only standardized bands + missing-indicators (current 2B behaviour).
   # Enable ONE per LB probe; each removes absolute per-series level differently. ----
   channels:
-    per_cell_detrend: true   # Iter3 LB probe: subtract each cell's own per-band temporal mean (level removal)
+    per_cell_detrend: false  # Iter3 tested ON -> 0.8266 (−0.0514). Adding channels overfits source; reverted. Whole additive-channel family now low-prior.
     deltas: false            # month-to-month differences per band (additive-offset invariant)
     indices: false           # per-month NDWI/MNDWI/NDVI/VV-VH/SDWI (ratios cancel offset)
     rank: false              # within-series rank per band over observed months (monotone-invariant)

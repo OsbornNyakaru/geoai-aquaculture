@@ -50,22 +50,33 @@ BBSE/EM prior estimation · WIF / fixed-threshold water-index features · TabPFN
 adversarial AUC 0.99) · OOF meta-stacking (Ridge on OOF) · group-KFold / "it's leakage"
 (the gap is designed covariate shift, proven leak-free).
 
+## META-LESSON (2026-07-20, after 2 failed probes)
+
+**This problem PUNISHES added capacity, and OOF is blind to it.** Two "add complexity"
+bets both lost on the LB while OOF barely moved:
+- Iter2 GBDT+seq blend → 0.8705 (adding a model class dilutes seq transfer).
+- Iter3 per_cell_detrend → 0.8266, −0.0514 (adding input channels overfits source).
+
+⇒ Prefer **data-side** (more masking augmentation) and **weight-space** robustness
+(EMA/SWA, seed-bagging, label smoothing) over anything that adds inputs or parameters.
+The additive-channel family (`deltas`/`indices`/`rank`) is now **low-prior** — don't
+spend submissions on it unless a research round gives a specific reason.
+
 ## EXPERIMENT QUEUE (what has NOT been tested on the LB), in order
 
-- ~~**Step 2 — GBDT+seq rank-average blend.**~~ **DONE → DISCARDED (2026-07-20).** ρ=0.849
-  (decorrelated), yet best blend **0.8705 < 0.8780**. GBDT dilutes seq's transfer despite
-  higher OOF AUC. Lesson: don't blend in other model *classes*; improve the seq model
-  itself. (Also confirmed the Colab env is faithful — blend landed between components.)
-1. **Step 3 — invariant channels**, ONE LB probe each, `seq.channels.*`, `--model seq`,
-   held at `prevalence_target 0.649` so the channel is the only variable vs the 0.8780
-   reference. Order `per_cell_detrend → deltas → indices → rank`. Keep any that beat 0.8780.
-   *(current: per_cell_detrend → submission_seq_detrend.csv)*
-2. **Step 1 — `prevalence_target`** is now being exercised as the operating-point tool for
-   Step 3; once a channel is chosen, A/B its exact-0.649 vs `assumed_test_prior` if useful.
-3. **Seq robustness (unbuilt):** EMA/SWA, label smoothing, more seed-bagging, AUC-margin
-   pairwise loss — behind config flags.
-4. **Third learner** — only a *from-scratch seq-family* variant (1D-CNN/TCN, masked GRU) is
-   worth blending; GBDT is ruled out (Step 2). Diversity within the better-transfer class.
+- ~~Iter2 GBDT+seq blend~~ **DISCARDED** 0.8705. ~~Iter3 per_cell_detrend~~ **DISCARDED** 0.8266.
+1. **Iter4 — more masking augmentation `seq.K 2→4`** *(current)*. Data-side, no added dims;
+   strengthens the lever that beat GBDT. Held at `prevalence_target 0.649`. Gate vs 0.8780.
+2. **If iter4 fails → ESCALATE to the research loop.** Three failed toggles = stop guessing;
+   write `gemini_loop/UPDATE_04.md` (report all 3 negatives + the meta-lesson) for fresh
+   sourced ideas before spending more submissions.
+3. **Weight-space robustness (needs small code):** EMA/SWA weight averaging, label smoothing
+   (targets the seq net's known overconfidence), seed-bagging `n_repeats 1→3`. No added dims.
+4. **Third learner** — only a *from-scratch seq-family* variant (1D-CNN/TCN, masked GRU);
+   GBDT is ruled out (iter2). Diversity within the better-transfer class.
+
+`prevalence_target 0.649` is now the standing operating-point tool (verified working iter3):
+it holds every probe at the exact 0.8780 pos-rate, so each change is cleanly isolated.
 
 ## Per-iteration protocol
 
