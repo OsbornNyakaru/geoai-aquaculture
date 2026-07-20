@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-20 · **Champion public LB: 0.8780** · **Loop state: PAUSED for research**
+- **Last updated:** 2026-07-20 · **Champion public LB: 0.8780** · **Loop state: ACTIVE — iter5 relative-time probe staged**
 
 ---
 
@@ -21,11 +21,12 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** run `gemini_loop/UPDATE_04.md` through Gemini/Claude Deep Research,
-   save the reply as `gemini_loop/RESPONSE_04.md`, paste it to the coding agent. The loop is
-   paused on purpose — three straight single-toggle probes lost, so we're thinking, not guessing.
-4. Champion is safe: `experiments/run_current.sh` currently only **regenerates the champion**
-   (`submission_seq_champion_k2.csv`) — running it changes nothing, it's a clean known-good file.
+3. **Current next action:** **Run all** on Colab/Kaggle → upload `submission_seq_reltime.csv` →
+   paste the LB score back. This is iteration 5: relative-time reframing (idea A from round-04
+   research, `gemini_loop/RESPONSE_04.md`) — capacity-neutral, held at 0.649, isolated vs champion.
+4. Champion is safe: `seq.relative_time` defaults false (reproduces 0.8780 bit-for-bit); this
+   probe flips it true. If iter5 fails, next probes are MC temporal-dropout TTA then multi-seed
+   bagging (both capacity-neutral).
 
 ---
 
@@ -111,6 +112,15 @@ anti-correlated** — never used for selection). "LB" = Zindi public (~309 rows)
 Also verified this session: **Step-1 `prevalence_target 0.649` mechanism works** (holds any run
 at the exact champion pos-rate → clean isolation); the Colab env **reproduces faithfully** (blend
 landed exactly between its components).
+
+### Phase 4 — capacity-CONSTRAINT direction (round-04 research, in progress)
+Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven dead-ends
+(Saerens-EM prior; Zou-threshold/EVI index projection). Shifting from capacity *expansion* to
+*constraint*: test capacity-neutral, structural changes one at a time.
+| # | Experiment (only variable vs champion) | OOF | LB | Verdict |
+|---|---|---|---|---|
+| 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | _pending_ | _pending_ | staged |
+| — | queued: MC temporal-dropout TTA (inference-only); multi-seed bagging | | | not yet run |
 
 ---
 

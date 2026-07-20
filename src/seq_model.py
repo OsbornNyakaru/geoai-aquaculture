@@ -43,18 +43,44 @@ def band_stats(train_cube: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return mean, std
 
 
+def _left_align(cube: np.ndarray) -> np.ndarray:
+    """Relative-time reframing (Step A): roll each row so its first observed month
+    sits at index 0. Test windows are a consecutive 4-6 month block at a random
+    calendar start; under absolute positions the learned positional embedding can
+    memorize calendar-specific spectral patterns (region overfit). Left-aligning
+    makes the encoder see relative step index (duration/transition dynamics) instead
+    of calendar month, without adding any capacity. Padding (post-window NaN) is
+    preserved, so the src_key_padding_mask and masked-mean-pool are unaffected.
+    """
+    n, M, _ = cube.shape
+    out = np.full_like(cube, np.nan)
+    fully = np.isnan(cube).all(axis=2)                  # [n, M] True=month fully masked
+    for i in range(n):
+        active = np.where(~fully[i])[0]
+        if active.size == 0:
+            continue
+        s = int(active[0])
+        out[i, : M - s] = cube[i, s:]                   # window -> front; tail stays NaN
+    return out
+
+
 def to_inputs(cube: np.ndarray, mean: np.ndarray, std: np.ndarray,
               schema: "Schema | None" = None, channels_cfg: dict | None = None,
-              ex_mean: np.ndarray | None = None, ex_std: np.ndarray | None = None):
+              ex_mean: np.ndarray | None = None, ex_std: np.ndarray | None = None,
+              relative_time: bool = False):
     """cube [n, M, B] -> (x [n, M, D], pad_mask [n, M] True=masked month).
 
     Base x = standardized band values (NaN->0) concatenated with per-band missing
     indicators, so the model sees both the value and whether it was observed
     (D = 2B). If ``channels_cfg`` enables transfer-oriented channels (per-series
     detrend / deltas / indices / rank) and ``ex_mean/ex_std`` (train-derived) are
-    supplied, they are standardized and appended (D = 2B + C). Defaults reproduce
-    the original 2B behaviour bit-for-bit.
+    supplied, they are standardized and appended (D = 2B + C). If ``relative_time``
+    the observed window is left-aligned to index 0 first (per-band stats are
+    position-invariant, so standardization is unaffected). Defaults (relative_time
+    off, no channels) reproduce the original 2B behaviour bit-for-bit.
     """
+    if relative_time:
+        cube = _left_align(cube)
     miss = np.isnan(cube).astype(np.float32)            # [n, M, B]
     vals = (cube - mean) / std
     vals = np.where(np.isnan(vals), 0.0, vals).astype(np.float32)
@@ -293,12 +319,16 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
 
     mean, std = band_stats(train_cube)
     channels_cfg = s.get("channels") or {}
+    rel = bool(s.get("relative_time", False))
+    if rel:
+        log.info("seq relative_time ON: observed window left-aligned to t_rel=0")
     ex_mean, ex_std = (extra_channel_stats(train_cube, schema, channels_cfg)
                        if channels_cfg else (None, None))
     if ex_mean is not None:
         log.info("seq transfer channels enabled: %s (+%d channels)",
                  [k for k, v in channels_cfg.items() if v], ex_mean.shape[0])
-    Xte, pad_te = to_inputs(test_cube, mean, std, schema, channels_cfg, ex_mean, ex_std)
+    Xte, pad_te = to_inputs(test_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
+                            relative_time=rel)
 
     n = len(y)
     oof_sum = np.zeros(n); oof_cnt = np.zeros(n)
@@ -315,14 +345,16 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
             tr_cube, tr_owner = _mask_views(train_cube, tr, schema, wd, cfg,
                                             K, cfg["seed"] + rep, oof=False)
             ytr = y[tr_owner]
-            Xtr, pad_tr = to_inputs(tr_cube, mean, std, schema, channels_cfg, ex_mean, ex_std)
+            Xtr, pad_tr = to_inputs(tr_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
+                                    relative_time=rel)
 
             model = _build_model(schema.n_months, Xtr.shape[2], cfg)
             model = _train(model, Xtr, pad_tr, ytr, cfg, device)
 
             va_cube, va_owner = _mask_views(train_cube, va, schema, wd, cfg,
                                             R, cfg["seed"] + rep, oof=True)
-            Xva, pad_va = to_inputs(va_cube, mean, std, schema, channels_cfg, ex_mean, ex_std)
+            Xva, pad_va = to_inputs(va_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
+                                    relative_time=rel)
             pv = _predict(model, Xva, pad_va, device)
             # average R views per held-out row
             prob_rows = np.zeros(len(va))

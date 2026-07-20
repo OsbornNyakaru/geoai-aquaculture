@@ -72,19 +72,22 @@ Three hard conclusions:
 **Champion (unchanged): seq K=2 @ realized 0.649 = 0.8780.** Standing operating-point tool:
 `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: loop paused — awaiting Deep Research on `gemini_loop/UPDATE_04.md`
+## CURRENT STATE: round-04 research triaged (`RESPONSE_04.md`); testing idea A
 
-Do NOT stage another single-toggle probe. Next move is to run UPDATE_04.md through Gemini/Claude
-Deep Research and paste findings back; only then queue a LARGE-effect, rule-legal experiment.
+Rejected from the round-04 report as proven dead-ends/rule-illegal: **Saerens-EM prior**
+(covariate≠label shift; `prevalence_target 0.649` already optimal) and **Zou-threshold / EVI
+index projection** (hardcoded-threshold class, non-transferable; EVI already failed). Do NOT
+big-bang refactor. Test ONE capacity-neutral idea at a time, held at prevalence_target 0.649.
 
-## EXPERIMENT QUEUE (post-research candidates — NONE yet LB-justified)
+## EXPERIMENT QUEUE
 
 - ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665.
-1. **Inference-side changes (no added capacity)** — e.g. test-time masking augmentation
-   (predict each test row under several resampled masks, average), single-model-on-all-data vs
-   5-fold, alternate pooling. See UPDATE_04.md Q3. Candidates only until research confirms.
-2. **Weight-space robustness (small code, no added dims):** EMA/SWA, label smoothing, seed-bagging.
-3. **A structurally different LARGE-effect approach** if research surfaces one (UPDATE_04.md Q2).
+1. **Iter5 — relative-time reframing** *(current)*: `seq.relative_time=true` left-aligns each
+   observed window to t_rel=0 (positional emb sees relative step, not calendar month). Capacity-
+   neutral, plausibly LARGE effect. `submission_seq_reltime.csv`. Gate vs 0.8780.
+2. **MC temporal-dropout TTA** (inference-only, no added capacity): mask 1–2 active months per
+   test row, soft-vote N views. Safest next probe if iter5 fails.
+3. **Multi-seed bagging** (`n_repeats↑`, no added dims): variance reduction for the noise floor.
 4. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4).
 
 ## Per-iteration protocol

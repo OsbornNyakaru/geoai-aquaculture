@@ -3,22 +3,28 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# LOOP PAUSED FOR RESEARCH (2026-07-20). Three straight blind toggles lost:
-#     Iter2 GBDT+seq blend 0.8705 · Iter3 per_cell_detrend 0.8266 · Iter4 K=4 0.8665.
-#   Champion is UNCHANGED: seq K=2 @ realized 0.649 = 0.8780. See:
-#     - gemini_loop/UPDATE_04.md  (research brief — paste into Gemini/Claude Deep Research)
-#     - experiments/LB_LOG.md     (the three negatives + the noise-floor finding)
-#     - gemini_loop/AGENT_BRIEF.md(meta-lesson: added capacity hurts; OOF is anti-correlated)
+# ITERATION 5 — Relative-time reframing (RESPONSE_04 idea A), CAPACITY-NEUTRAL.
+#   Round-04 Deep Research proposed 5 ideas; triaged in gemini_loop/RESPONSE_04.md.
+#   REJECTED as proven dead-ends: Saerens-EM prior (label-shift assumption broken by
+#   our covariate shift; prevalence_target already hits the LB-verified 0.649), and
+#   the Zou-et-al hardcoded-threshold water tree + EVI (non-transferable / already
+#   failed). ACCEPTED & queued: MC temporal-dropout TTA + multi-seed bagging (both
+#   capacity-neutral, banked for after a keeper).
 #
-#   Do NOT spend more single-toggle submissions until a research round returns a
-#   LARGE-effect, rule-legal idea. This script now only REGENERATES the champion
-#   submission (config reverted to K=2, channels off, prevalence_target 0.649) so
-#   there is a clean known-good file to submit if needed. Running it is safe/cheap
-#   and re-confirms the 0.8780 anchor; it does not test anything new.
+#   Testing idea A FIRST because it's the only NEW capacity-neutral idea with a
+#   plausible LARGE effect (only large effects clear the ~±0.01 public-LB noise):
+#   left-align each observed 4-6mo window to t_rel=0 so the Transformer's positional
+#   embeddings encode RELATIVE step, not calendar month — removing the calendar-
+#   specific spectral memorization that the domain shift punishes. No added dims/params.
+#   seq.relative_time=true; held at prevalence_target 0.649 so it's the ONLY variable
+#   vs the 0.8780 champion. (relative_time=false reproduces champion bit-for-bit — verified.)
+#
+#   DECISION RULE: upload submission_seq_reltime.csv, gate vs 0.8780.
+#     > 0.8780  -> relative-time transfers -> KEEP; then bank TTA + multi-seed bagging.
+#     <=0.8780  -> revert; next probe = MC temporal-dropout TTA (inference-only, safest).
 # =====================================================================
 set -euo pipefail
 
-python run_pipeline.py --full --model seq --name seq_champion_k2
+python run_pipeline.py --full --model seq --name seq_reltime
 
-echo "=== champion regenerated: submissions/submission_seq_champion_k2.csv (realized 0.649). ==="
-echo "=== Next real move: run gemini_loop/UPDATE_04.md through Deep Research; paste findings back. ==="
+echo "=== done. Upload submissions/submission_seq_reltime.csv (realized pos-rate 0.649) and paste the LB score ==="

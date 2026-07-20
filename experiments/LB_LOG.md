@@ -20,6 +20,12 @@ to `gemini_loop/UPDATE_04.md` for fresh sourced ideas. Champion remains **seq K=
 = 0.8780**. Key new concern: public LB ≈309 rows → ~±0.01 noise → single-probe A/B can't
 resolve small (+0.005) gains; only large effects or breakages are detectable.
 
+**Round-04 research triaged** (`gemini_loop/RESPONSE_04.md`): rejected Saerens-EM (proven
+dead-end, covariate≠label shift) and Zou-threshold/EVI indices (non-transferable). Accepted
+capacity-neutral ideas; testing relative-time reframing first, banking TTA + multi-seed bagging.
+
+| 5 | _pending_ | Relative-time reframing (left-align window to t_rel=0; capacity-neutral) | submission_seq_reltime.csv | 0.649 | _awaiting Zindi_ | |
+
 **Current best: 0.8780** (temporal Transformer, realized pos-rate 0.649).
 
 ---
