@@ -55,7 +55,15 @@ Two reframes now < +0.003 → stop-rule. The other big shift channel (per-series
 touch (detrend −0.051). Budget shifts to the OBJECTIVE lever (iter9) then endgame (prevalence + finalists).
 
 | 9 | 2026-07-21 | Cross-view invariance objective (L=BCE+λ·Var_k(logit) across K=2 views; λ=1.0) | submission_seq_xview.csv | 0.649 | **0.8955** | ✅ **NEW BEST** (+0.0047 vs 0.8908; best public score yet). Reduced overconfidence (oof_auc 0.9936→0.9894, prevalence delta 2.03→1.30) — hit the model's diagnosed weakness. At edge of noise, so iter10 probes λ=3.0 to test if the lever scales. |
-| 10 | _pending_ | Cross-view invariance strength probe (λ 1.0→3.0) | submission_seq_xview_l3.csv | 0.649 | _awaiting Zindi_ | |
+| 10 | 2026-07-21 | Cross-view invariance strength probe (λ 1.0→3.0) | submission_seq_xview_l3.csv | 0.649 | 0.8921 | ❌ (−0.0034; did not beat champion. REVERTED to λ=1.0.) |
+
+**Objective lane CLOSED at λ=1.0.** iter10 shows λ=1.0 is an *interior optimum*, not a floor.
+λ=3.0 pushed de-saturation further (t\* 0.4450→0.3400, prevalence delta 1.30→0.725, raw test
+pos-rate 0.553→0.583) while `oof_auc` HELD at 0.9896 — so the drop is **not** ranker collapse;
+de-saturation simply stops paying past λ=1. Both structural lanes are now measured closed
+(positional: dnorm −0.006 / NoPE +0.001; objective: λ=3 −0.003). **Loop PAUSED → research round 06**
+(`gemini_loop/UPDATE_06.md`), briefing lanes never explored: LB-predictive local validation,
+sequence-level feature engineering, untried mathematical techniques, and CV design.
 
 **BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
 "added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same

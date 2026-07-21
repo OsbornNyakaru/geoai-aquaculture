@@ -158,10 +158,14 @@ seq:
   # 0.0 = original champion (relative-time only); only active when seq.K>1.
   # Iter9 RESULT (lambda=1.0): 0.8955 — NEW BEST (+0.0047 vs 0.8908; best public score yet). It
   # reduced overconfidence (oof_auc 0.9936->0.9894, prevalence delta 2.03->1.30) — hitting the model's
-  # diagnosed weakness. NEW CHAMPION = relative-time + consistency_lambda:1.0 (reproduce by setting 1.0).
-  # Iter10 (current) probes lambda=3.0: does pushing the invariance HARDER give a clearly larger,
-  # noise-resolvable gain, or does it over-regularize the ranker? Only variable vs the 0.8955 champion.
-  consistency_lambda: 3.0
+  # diagnosed weakness. CHAMPION = relative-time + consistency_lambda:1.0.
+  # Iter10 RESULT (lambda=3.0): 0.8921 (−0.0034 vs 0.8955) -> REVERTED to 1.0. Reading: lambda=1.0 is
+  # an INTERIOR OPTIMUM, not a floor. lambda=3 pushed de-saturation FURTHER (t_star 0.4450->0.3400,
+  # prevalence delta 1.30->0.725, raw test pos-rate 0.553->0.583) while oof_auc HELD at 0.9896 — so the
+  # loss is NOT ranker collapse; de-saturation simply stops paying past lambda=1. LANE CLOSED: do not
+  # sweep lambda again (1.0 vs 3.0 differ by 0.0034, inside the ±0.01 noise — further A/B here is
+  # measuring noise, which our own design law forbids).
+  consistency_lambda: 1.0
   # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
   # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
   # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->

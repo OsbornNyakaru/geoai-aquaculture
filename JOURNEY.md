@@ -90,6 +90,7 @@ We have spent 10 experiments. **Six lost, one tied, three won.** This is the hon
 | Test-time augmentation | Average predictions over 8 masked views | 0.8885 | ❌ −0.0023 — no harm, no help |
 | Duration-normalised positions | Squeeze every window onto a shared 0→1 timeline | 0.8844 | ❌ −0.0064 — deleted useful info |
 | NoPE (no position at all) | Treat the months as an unordered bag | 0.8917 | ➖ tie — **kept as a backup model** |
+| Stronger cross-view penalty | Turn our newest win up 3× | 0.8921 | ❌ −0.0034 — we had already found the sweet spot |
 
 **Also permanently rejected** (researched, argued, and ruled out): EM/Saerens prior estimation
 (rejected 3 separate times), water-index threshold features, self-training on the test set,
@@ -188,28 +189,49 @@ on *different rows*. That is insurance for the private leaderboard.
 ## 8. What's in the pipeline
 
 ```mermaid
-flowchart LR
-    N1["NOW: iteration 10<br/>Push the cross-view penalty<br/>harder (1.0 → 3.0)<br/>Awaiting LB score"] --> D{Result?}
-    D -->|Clearly better| S1["Fine-tune the strength<br/>with a small sweep"]
-    D -->|Tie or worse| S2["Revert to 1.0<br/>→ go to endgame"]
-    S1 --> E1
-    S2 --> E1["ENDGAME<br/>near the deadline"]
-    E1 --> E2["1. One-time prevalence sweep<br/>free, no retraining<br/>tunes the 60%-weighted F1 lever"]
-    E1 --> E3["2. Lock the two final picks:<br/>champion + NoPE backup"]
+flowchart TD
+    N1["Iteration 10 result:<br/>stronger penalty LOST (0.8921)<br/>→ reverted to the champion"] --> N2["Both idea-lanes now CLOSED<br/>position: exhausted<br/>objective: at its optimum"]
+    N2 --> N3["NOW: research round 06<br/>a deep-research brief asking for<br/>ideas in 4 unexplored lanes"]
+    N3 --> R1["1. A local score that<br/>PREDICTS the leaderboard"]
+    N3 --> R2["2. Feature engineering inside<br/>the Transformer"]
+    N3 --> R3["3. Maths we've never tried"]
+    N3 --> R4["4. CV design + the<br/>pond-science literature"]
+    R1 --> E["Then: triage → next experiment"]
+    R2 --> E
+    R3 --> E
+    R4 --> E
+    E --> Z["ENDGAME near the deadline<br/>· measure the seed noise (2 subs)<br/>· prevalence sweep (4 subs)<br/>· lock champion + NoPE"]
 ```
 
-**Right now:** iteration 10 is staged and pushed. It pushes the cross-view invariance penalty
-from strength 1.0 to 3.0, asking a simple question — *if a little of this helped, does more help
-more, or does it start blurring the model's ability to rank?* The decision rule was written
-before the run, so the result cannot be rationalised after the fact.
+**What just happened:** iteration 10 turned the cross-view penalty up 3× and *lost* (0.8921). The
+useful part is *why*. It de-saturated the model even further than the winning setting did — yet
+its ranking ability was completely untouched (AUC held at 0.9896). So the loss isn't the model
+breaking; it's simply that **a little of this medicine helps and more does not.** We had already
+found the sweet spot. That lane is now closed at its optimum.
 
-**Then the endgame, close to the deadline:**
+**Where that leaves us:** both of our productive lanes are measured closed, and we are out of
+queued ideas big enough to clear the ±0.01 noise. Importantly, **submissions are no longer the
+constraint** — we have ~130 left over ~26 days. *Ideas* are the constraint, and so is our ability
+to *measure* small ones.
 
-1. **A one-time prevalence sweep.** Our pond-rate of 0.649 was tuned for a much older model.
-   Re-checking it costs no retraining at all, and 60% of the competition metric hangs on it.
-   We will pick the centre of the flat region, not the single best number — that avoids fitting
-   the public leaderboard's noise.
-2. **Lock the two finalists:** the champion, plus the structurally different NoPE model.
+**So the next move is research, not another guess.** `gemini_loop/UPDATE_06.md` is a deep-research
+brief going to Claude Fable, asking for depth in four lanes we have never explored:
+
+1. **A local score that predicts the leaderboard.** The single highest-value thing available. Right
+   now we cannot tell a real +0.005 from noise without spending a submission — our champion's own
+   margin sits at that edge. If we could screen ideas offline, our 130 spare submissions suddenly
+   become useful instead of unusable.
+2. **Feature engineering inside the Transformer.** An admitted blind spot: our champion sees only
+   24 raw channels. Every richer feature we ever built lives in the abandoned GBDT branch.
+3. **Mathematics we've never touched** — robust optimization, optimal transport, ranking losses
+   (worth noting: AUC is 40% of the score and we optimise plain cross-entropy).
+4. **CV design and the actual pond-science literature** — is there a physical signature of
+   aquaculture ponds our architecture simply cannot represent?
+
+**Then the endgame, close to the deadline:** measure the true seed-to-seed spread (2 submissions —
+we have always *assumed* ±0.01 from theory but never actually measured it), run the one-time
+prevalence sweep (4 submissions — our 0.649 was tuned for a much older model), and lock the two
+finalists.
 
 **One open question for you:** we still need to confirm on the Zindi rules page whether the
 private leaderboard **auto-selects your best public submission**, or lets you **nominate two

@@ -11,8 +11,8 @@ Update this file whenever a result changes the queue.*
 > §5 narrative, §6 lessons, and the "Last updated" line — alongside `LB_LOG.md` and this file.
 
 **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU).
-**Best public LB:** 0.8908 (temporal Transformer + relative-time reframing). **Deadline:** 2026-08-16.
-**Target:** ~+0.037 to top-5 (≈ 0.928+). Prev champion 0.8780 held 10 days; relative-time added +0.0128.
+**Best public LB:** 0.8955 (temporal Transformer + relative-time + cross-view invariance λ=1.0).
+**Deadline:** 2026-08-16. **Target:** ~+0.033 to top-5 (≈ 0.928+).
 
 ---
 
@@ -74,24 +74,34 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: cross-view invariance WON (0.8955, new best); iter10 = λ-strength probe
+## CURRENT STATE: LOOP PAUSED → research round 06. Champion 0.8955. Both lanes CLOSED.
 
-Champion = relative-time + **cross-view invariance λ=1.0**, **0.8955** (new best). **iter9 scored 0.8955
-(+0.0047 vs the 0.8908 relative-time model)** — our highest public score. Mechanism: the consistency
-penalty (L=BCE+λ·Var_k(logit) across a row's K=2 views) REDUCED OVERCONFIDENCE (oof_auc 0.9936→0.9894,
-prevalence delta 2.03→1.30, t*=0.445), hitting the model's diagnosed weakness ("strong ranker, poor
-probabilities"). Another anti-correlation confirm: OOF fell (0.9753), LB rose. +0.0047 is at the EDGE of
-the ±0.01 noise, so iter10 pushes λ=3.0 to test if the lever scales past the floor or over-regularizes.
-Positional lane stays EXHAUSTED (dnorm −0.006, NoPE +0.001). Amplitude stays toxic (detrend −0.051).
+Champion = relative-time + **cross-view invariance λ=1.0**, **0.8955**. **iter10 (λ=3.0) LOST: 0.8921
+(−0.0034) → reverted.** Reading: λ=1.0 is an **interior optimum**, not a floor — λ=3 de-saturated
+FURTHER (t\* 0.4450→0.3400, prevalence delta 1.30→0.725, raw pos-rate 0.553→0.583) while `oof_auc`
+HELD at 0.9896, so the drop is **not** ranker collapse; de-saturation just stops paying past λ=1.
+
+**Both structural lanes are now measured closed:** positional (dnorm −0.006, NoPE +0.001) and
+objective (λ=3 −0.003). Amplitude stays toxic (detrend −0.051). We are OUT of queued ideas plausibly
+large enough to clear ±0.01. **Budget is no longer the constraint** (~130 submissions over ~26 days) —
+**idea quality and measurement resolution are.** Hence the pause.
 
 ## EXPERIMENT QUEUE
 
-- …~~Iter5 relative-time~~ ✅0.8908 · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (FINALIST) · ~~Iter9 xview λ=1.0~~ ✅**0.8955 CHAMPION**.
-1. **Iter10 — cross-view invariance strength probe** *(current)*: `seq.consistency_lambda=3.0` (up from 1.0).
-   `submission_seq_xview_l3.csv`. Gate vs 0.8955: clearly > → lever scales, consider a tight λ sweep; ~tie
-   or drop → revert to λ=1.0, go ENDGAME.
-2. **ENDGAME — one-time prevalence sweep** on the champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned
-   for the OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE, near deadline.
+- …~~Iter5 relative-time~~ ✅0.8908 · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (FINALIST) · ~~Iter9 xview λ=1.0~~ ✅**0.8955 CHAMPION** · ~~Iter10 λ=3.0~~ ❌0.8921 (reverted).
+1. **RESEARCH ROUND 06** *(current — no run staged)*: `gemini_loop/UPDATE_06.md` → **Claude Fable Deep
+   Research only** this round. Briefs four never-explored lanes: (a) an **LB-predictive local validation**
+   (the highest-value ask — it would dissolve the noise-floor constraint); (b) **sequence-level feature
+   engineering** (the champion sees only 24 channels; all rich features live in the dead GBDT lane);
+   (c) **untried mathematics** (DRO, optimal transport, spectral, ranking objectives, conformal);
+   (d) **CV design + the domain literature**. Triage output → `RESPONSE_06.md`, then stage iter11.
+2. **Queued regardless of research outcome** (cheap, do before the deadline):
+   - **Seed-replication of the champion** (2 subs) — measures the seed spread we have always *assumed*
+     (±0.01 from row-count theory) but never measured. Needs a `--seed` CLI override in `run_pipeline.py`.
+   - **One-time prevalence sweep** (4 subs) — 0.649 was tuned for the 0.8780-era model; champion's raw
+     pos-rate is now 0.553. Needs a `calibration.prevalence_sweep` list mirroring the `prior_sweep` block
+     but calling `target_prevalence_shift()`. Self-check: the 0.649 entry must be byte-identical to the
+     main submission. Pick plateau CENTER, not argmax.
 - **Private-LB finalists:** xview λ=1.0 (0.8955) + NoPE (0.8917) — diverse (xview = position+consistency;
   NoPE = no position). NOT the TTA variant (too correlated). Verify Zindi's finalist mechanism (auto
   best-public vs designate two) before deadline 2026-08-16.

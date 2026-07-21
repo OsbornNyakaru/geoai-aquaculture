@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8955** · **Loop state: ACTIVE — iter9 cross-view invariance WON (0.8955, new best); iter10 λ-strength probe staged**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8955** · **Loop state: PAUSED for research round 06 — iter10 λ=3.0 LOST (0.8921), reverted to λ=1.0; both structural lanes now measured closed**
 
 ---
 
@@ -21,12 +21,18 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** → upload `submission_seq_xview_l3.csv` → paste the LB score.
-   This is iteration 10: cross-view invariance STRENGTH probe (`seq.consistency_lambda: 3.0`, up from
-   the winning 1.0) — does pushing the invariance harder scale the +0.0047 gain past the noise floor,
-   or over-regularize the ranker? Isolated vs the 0.8955 champion. iter9 λ=1.0 WON (0.8955, new best).
-4. Champion = relative-time + `consistency_lambda: 1.0` (reproduce by setting 1.0); iter10 probes 3.0.
-   If iter10 ≤ 0.8955 → revert to 1.0 and ENDGAME: one-time prevalence sweep + finalize xview + NoPE.
+3. **Current next action: NO RUN IS STAGED — the loop is paused for research round 06.**
+   The config is reverted to the exact 0.8955 champion and `experiments/run_current.sh` is a
+   champion-reproduction run (costs no submission; use it as a free environment check).
+   **The live task is:** paste `gemini_loop/UPDATE_06.md` into Claude Fable Deep Research, then give
+   the report back to the agent for triage into `gemini_loop/RESPONSE_06.md`.
+4. **Why paused:** iter10 (λ=3.0) scored 0.8921 (−0.0034) → reverted. Both structural lanes are now
+   measured closed (positional: dnorm −0.006, NoPE +0.001; objective: λ=3 −0.003). We are out of
+   queued ideas big enough to clear the ±0.01 noise. Budget is NOT the constraint (~130 submissions
+   left over ~26 days) — **idea quality and measurement resolution are.**
+5. **Queued regardless of the research outcome** (cheap, do before the deadline): (a) seed-replication
+   of the champion, 2 subs — measures the seed spread we have always *assumed* but never measured;
+   (b) one-time prevalence sweep, 4 subs — 0.649 was tuned for the 0.8780-era model.
 
 ---
 
@@ -71,13 +77,14 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   `src_key_padding_mask`, per-band missing-indicator channels, masked-mean-pool), **K=2**
   masking-augmented training views, **relative-time reframing ON**, **cross-view invariance objective
   (λ=1.0)**, operating point held at **realized pos-rate 0.649**.
-- **Champion config** (`config/config.yaml`): `seq.K: 2`, `seq.relative_time: true`,
-  `seq.pos_encoding: learned`, `seq.consistency_lambda: 1.0` (iter10 probes 3.0), all
-  `seq.channels.*: false`, `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
+- **Champion config** (`config/config.yaml`, LIVE — this is the reverted, exact 0.8955 state):
+  `seq.K: 2`, `seq.relative_time: true`, `seq.pos_encoding: learned`, `seq.consistency_lambda: 1.0`,
+  all `seq.channels.*: false`, `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
 - **Best public LB: 0.8955** (0.8780 → +0.0128 relative-time → 0.8908 → +0.0047 cross-view invariance).
   Field: top ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.033**.
-- **Loop state: ACTIVE.** Positional lane exhausted; the objective lever (cross-view invariance) gave
-  the latest gain. Diverse finalist (NoPE 0.8917) locked. iter10 tests if the invariance lever scales.
+- **Loop state: PAUSED for research round 06.** Both structural lanes measured closed — positional
+  (dnorm −0.006, NoPE +0.001) and objective (λ=3 −0.003, so λ=1 is an interior optimum). Diverse
+  finalist (NoPE 0.8917) locked. No experiment is staged; `UPDATE_06.md` is the live deliverable.
 
 ---
 
@@ -127,8 +134,10 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | 0.9789 | 0.8844 | ❌ −0.0064 (length already matched → no shift to remove; reverted) |
 | 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | 0.9789 | 0.8917 | ➖ TIE +0.0009 (position is neutral; LOCKED as diverse finalist) |
 | 9 | cross-view invariance objective (`seq.consistency_lambda: 1.0`; penalize logit var across K views) | 0.9753 | **0.8955** | ✅ **NEW BEST** +0.0047 (reduced overconfidence; edge of noise) |
-| 10 | cross-view invariance strength probe (`consistency_lambda: 3.0`) | _pending_ | _pending_ | staged |
-| — | endgame: one-time prevalence sweep (plateau center); finalists = xview λ=1.0 + NoPE | | | not yet run |
+| 10 | cross-view invariance strength probe (`consistency_lambda: 3.0`) | 0.9727 | 0.8921 | ❌ −0.0034 (λ=1.0 is an interior optimum; reverted; objective lane CLOSED) |
+| — | **research round 06** (`gemini_loop/UPDATE_06.md`) — Claude Fable only | | | **in flight** |
+| — | queued: seed-replication of the champion (2 subs; measures the assumed ±0.01) | | | not yet run |
+| — | queued: one-time prevalence sweep (plateau center); finalists = xview λ=1.0 + NoPE | | | not yet run |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
 capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A
@@ -152,7 +161,10 @@ identity entirely — a bigger, two-tailed bet, and the diverse finalist regardl
    specific spectral memorization the covariate shift punishes. Capacity-neutral; broke a 10-day plateau.
 4. **Cross-view invariance objective** (+0.005 to 0.8955, 2026-07-21): penalize logit variance across
    a row's K=2 masked views (L=BCE+λ·Var). Reduced the model's overconfidence (its diagnosed weakness)
-   and improved transfer. Objective-level, capacity-neutral. At the edge of noise — iter10 tests if it scales.
+   and improved transfer. Objective-level, capacity-neutral. **iter10 then showed λ=1.0 is an INTERIOR
+   OPTIMUM** — λ=3.0 de-saturated further (t\* 0.4450→0.3400, delta 1.30→0.725) with `oof_auc` intact
+   at 0.9896, yet scored 0.8921. So the mechanism is real but bounded: *some* de-saturation transfers,
+   more does not, and the failure is not ranker collapse. Lane closed at λ=1.0.
 
 **What DECLINED (Phase 3 — everything we tried after 0.878):**
 - Blend −0.0075, detrend −0.0514, K=4 −0.0115. Pattern: **every attempt that ADDED something
@@ -201,7 +213,8 @@ reproducible; ≤5 submissions/day.
 | **`PROJECT_STATE.md`** | ← this file. Master state, portable across accounts. Updated every session. |
 | `experiments/LB_LOG.md` | Reward ledger — paste each submission's Zindi LB here. |
 | `gemini_loop/AGENT_BRIEF.md` | Standing directive for the coding agent (rules, queue, meta-lessons). |
-| `gemini_loop/UPDATE_05.md` | **Current** research brief → paste into Deep Research (UPDATE_04 = prior round). |
+| `gemini_loop/UPDATE_06.md` | **Current** research brief → paste into Claude Fable Deep Research (05/04 = prior rounds). |
+| `JOURNEY.md` / `JOURNEY.docx` | Plain-English story of the whole project (regenerate the docx via `tools/make_journey_docx.py`). |
 | `experiments/run_current.sh` | The one experiment the notebook runs each iteration (agent edits + pushes). |
 | `config/config.yaml` | Single source of truth for all pipeline settings. |
 | `colab_run.ipynb` / `RUN_ON_KAGGLE.md` | The pull-run loop for Colab / Kaggle. |

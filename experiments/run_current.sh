@@ -3,29 +3,33 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 10 — Cross-view invariance strength probe (lambda 1.0 -> 3.0), CAPACITY-NEUTRAL.
+# LOOP PAUSED -> RESEARCH ROUND 06. This is the CHAMPION REPRODUCTION run.
 #
-#   *** ITER9 WON (soft). *** consistency_lambda=1.0 scored 0.8955 — NEW BEST (+0.0047 vs the
-#   0.8908 relative-time champion; our highest public score). Mechanism: the invariance penalty
-#   REDUCED OVERCONFIDENCE (oof_auc 0.9936->0.9894, prevalence delta 2.03->1.30, t*=0.445) — it
-#   hit the model's diagnosed weakness ("strong ranker, poor probabilities"). +0.0047 is at the
-#   edge of the +-0.01 noise band, so this probe tests whether the lever is REAL and has MORE to give.
+#   *** ITER10 LOST. *** consistency_lambda=3.0 scored 0.8921 vs the 0.8955 champion (-0.0034).
+#   Per the pre-committed decision rule ("~tie or drop -> revert to lambda=1.0"), config is
+#   reverted. Reading: lambda=1.0 is an INTERIOR OPTIMUM. lambda=3 de-saturated FURTHER
+#   (t_star 0.4450->0.3400, prevalence delta 1.30->0.725) while oof_auc HELD at 0.9896 — the
+#   ranker did NOT collapse; de-saturation just stops paying past lambda=1. Objective lane CLOSED.
 #
-#   Push the invariance harder: lambda=3.0. Hypothesis: if reduced overconfidence is genuinely
-#   improving transfer, more invariance -> a clearer, noise-resolvable gain. Risk: too much pull
-#   collapses the ranker (AUC is 40% of the metric). consistency_lambda=3.0 is the ONLY variable
-#   vs the 0.8955 champion (relative-time + lambda=1.0); held at prevalence_target 0.649.
+#   Both structural lanes are now measured closed (positional: dnorm -0.006, NoPE +0.001;
+#   objective: lambda=3 -0.003), so we are OUT of queued ideas that plausibly clear the +-0.01
+#   noise floor. Budget is NOT the constraint (~130 submissions left over ~26 days) — IDEAS are.
+#   Loop paused for Deep Research round 06 (gemini_loop/UPDATE_06.md).
 #
-#   NoPE (submission_seq_nope.csv, 0.8917) stays LOCKED as the diverse private-LB finalist.
+#   THIS RUN COSTS NO SUBMISSION. It re-runs the exact 0.8955 champion so that a "Run all"
+#   during the research pause reproduces the champion instead of a rejected probe, and doubles
+#   as a free environment-consistency check.
 #
-#   DECISION RULE: upload submission_seq_xview_l3.csv, gate vs 0.8955.
-#     clearly > 0.8955 (>= +0.005) -> lever is real & scales -> KEEP; consider a tight lambda sweep.
-#     ~tie (within noise)          -> lambda=1.0 is the setting -> revert to 1.0; go to ENDGAME.
-#     drop                         -> over-regularized -> revert to 1.0 (champion); go to ENDGAME.
-#   ENDGAME = one-time prevalence sweep (plateau center) + finalize picks (xview lambda=1.0 + NoPE).
+#   EXPECTED LOG (must match the iter9 champion run, or the revert was incomplete):
+#     seq relative_time ON  |  seq cross-view invariance ON: lambda=1
+#     final_oof ~ 0.97528   |  oof_auc ~ 0.98943  |  t_star ~ 0.4450
+#     Prevalence target ON: test pos-rate 0.553 -> 0.649
+#
+#   NO NEED TO UPLOAD submission_seq_champion.csv (it is the 0.8955 file we already scored).
+#   Only submit it if you want to re-confirm the anchor on a fresh account/environment.
 # =====================================================================
 set -euo pipefail
 
-python run_pipeline.py --full --model seq --name seq_xview_l3
+python run_pipeline.py --full --model seq --name seq_champion
 
-echo "=== done. Upload submissions/submission_seq_xview_l3.csv (realized pos-rate 0.649) and paste the LB score ==="
+echo "=== done. Champion reproduction; no submission needed. Awaiting research round 06 output. ==="
