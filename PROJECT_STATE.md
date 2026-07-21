@@ -33,6 +33,11 @@
 5. **Queued regardless of the research outcome** (cheap, do before the deadline): (a) seed-replication
    of the champion, 2 subs — measures the seed spread we have always *assumed* but never measured;
    (b) one-time prevalence sweep, 4 subs — 0.649 was tuned for the 0.8780-era model.
+6. **RULE FACTS CONFIRMED (2026-07-21, Zindi page — see `gemini_loop/RESEARCH_06_CLAUDE.md` §0):**
+   (a) we **designate 2 finalist submissions** (default = 2 best public) → the NoPE hedge is usable;
+   designate champion + NoPE manually before close. (b) **100-total-submission cap**: ≈20 used, ≈80
+   left. (c) final score = **65% LB + 35% rubric** (top-5, reproducibility/innovation) → prep a
+   reproduction README at endgame.
 
 ---
 

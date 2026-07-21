@@ -102,9 +102,14 @@ large enough to clear ±0.01. **Budget is no longer the constraint** (~130 submi
      pos-rate is now 0.553. Needs a `calibration.prevalence_sweep` list mirroring the `prior_sweep` block
      but calling `target_prevalence_shift()`. Self-check: the 0.649 entry must be byte-identical to the
      main submission. Pick plateau CENTER, not argmax.
-- **Private-LB finalists:** xview λ=1.0 (0.8955) + NoPE (0.8917) — diverse (xview = position+consistency;
-  NoPE = no position). NOT the TTA variant (too correlated). Verify Zindi's finalist mechanism (auto
-  best-public vs designate two) before deadline 2026-08-16.
+- **Private-LB finalists — mechanism CONFIRMED (2026-07-21, Zindi rules page):** you **choose 2
+  submissions** before close; if you don't, Zindi defaults to your 2 best *public* scores. So the
+  hedge is USABLE: **manually designate xview λ=1.0 (0.8955) + NoPE (0.8917)** — do NOT rely on the
+  default (a lucky noise-rider from the prevalence sweep could displace NoPE). NOT the TTA variant
+  (too correlated).
+- **Budget correction (same source):** cap is **100 total submissions**, not 5/day×days. ≈20 used →
+  **≈80 remain.** Also: final ranking = **65% LB + 35% top-5 rubric** (reproducibility/innovation) —
+  our seeded, LB-logged loop is strong there; queue a reproduction README for the endgame.
 
 ## REJECTED in round 05 (do not re-propose — see RESPONSE_05.md)
 
