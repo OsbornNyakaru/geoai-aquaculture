@@ -271,6 +271,52 @@ def _predict(model, x, pad, device):
         return torch.sigmoid(logits).cpu().numpy()
 
 
+def _tta_predict(model, test_cube, mean, std, schema, channels_cfg,
+                 ex_mean, ex_std, rel, cfg, device, seed):
+    """Inference-only MC temporal-dropout TTA (Iter6, RESPONSE_04 idea C).
+
+    Predict the clean test view PLUS N views in each of which 1-2 randomly chosen
+    ACTIVE months per row are fully masked (set NaN across all bands), then soft-vote
+    (mean of sigmoid). Masking happens on the raw cube in calendar space, so it flows
+    through `to_inputs` exactly like a real test window: left-align (if relative_time),
+    missing-indicators, src_key_padding_mask and masked-mean-pool all handle the extra
+    gaps. Capacity-NEUTRAL (no new params/dims) — it only smooths over WHICH specific
+    months a short test window happens to observe, the axis the covariate shift rides on.
+    OOF is deliberately left untouched (blind/diagnostic only); this changes test preds
+    only. `enable:false` reproduces the champion bit-for-bit.
+    """
+    from .utils import rng_for
+
+    tcfg = cfg["seq"].get("tta") or {}
+    n_views = int(tcfg.get("n_views", 8))
+    sizes = list(tcfg.get("mask_months", [1, 2]))
+
+    Xc, padc = to_inputs(test_cube, mean, std, schema, channels_cfg,
+                         ex_mean, ex_std, relative_time=rel)
+    acc = _predict(model, Xc, padc, device)
+    cnt = 1
+    fully = np.isnan(test_cube).all(axis=2)             # [n, M] True=month fully masked
+    n = test_cube.shape[0]
+    for v in range(n_views):
+        cube_v = test_cube.copy()
+        for i in range(n):
+            active = np.where(~fully[i])[0]
+            if active.size <= 1:                        # never blank a row entirely
+                continue
+            rng = rng_for(seed, int(i), 20000 + v)
+            m = int(rng.choice(sizes))
+            m = min(m, active.size - 1)                 # always leave >=1 observed month
+            if m <= 0:
+                continue
+            drop = rng.choice(active, size=m, replace=False)
+            cube_v[i, drop, :] = np.nan
+        Xv, padv = to_inputs(cube_v, mean, std, schema, channels_cfg,
+                             ex_mean, ex_std, relative_time=rel)
+        acc += _predict(model, Xv, padv, device)
+        cnt += 1
+    return acc / cnt
+
+
 # --------------------------------------------------------------------------- #
 # Masking-augmented view builders (reuse the GBDT masking recipe)
 # --------------------------------------------------------------------------- #
@@ -322,6 +368,11 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     rel = bool(s.get("relative_time", False))
     if rel:
         log.info("seq relative_time ON: observed window left-aligned to t_rel=0")
+    tta_on = bool((s.get("tta") or {}).get("enable", False))
+    if tta_on:
+        _t = s["tta"]
+        log.info("seq MC temporal-dropout TTA ON: n_views=%d mask_months=%s (inference-only)",
+                 int(_t.get("n_views", 8)), _t.get("mask_months", [1, 2]))
     ex_mean, ex_std = (extra_channel_stats(train_cube, schema, channels_cfg)
                        if channels_cfg else (None, None))
     if ex_mean is not None:
@@ -362,7 +413,13 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                 prob_rows[pos] = pv[va_owner == i].mean()
             oof_sum[va] += prob_rows; oof_cnt[va] += 1
 
-            test_accum += _predict(model, Xte, pad_te, device); n_models += 1
+            if tta_on:
+                test_accum += _tta_predict(model, test_cube, mean, std, schema,
+                                           channels_cfg, ex_mean, ex_std, rel, cfg,
+                                           device, seed=cfg["seed"] + rep * 100 + fold)
+            else:
+                test_accum += _predict(model, Xte, pad_te, device)
+            n_models += 1
 
             fs = combined_score(f1_at(y[va], prob_rows, 0.5), roc_auc(y[va], prob_rows))
             fold_scores.append(fs)

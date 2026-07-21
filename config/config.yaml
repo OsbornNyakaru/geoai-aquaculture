@@ -134,9 +134,18 @@ seq:
   K: 2                     # champion value. Iter4 tested K=4 -> 0.8665 (−0.0115); K=2 is a sharp optimum, reverted
   R: 2                     # masked OOF views per held-out row
   # Iter5 (relative-time reframing, capacity-neutral): left-align each observed window to
-  # t_rel=0 so positional embeddings see relative step, not calendar month. Default false =
-  # champion. See gemini_loop/RESPONSE_04.md (idea A). Held at prevalence_target 0.649.
+  # t_rel=0 so positional embeddings see relative step, not calendar month. WON on LB:
+  # 0.8908 vs 0.8780 (+0.0128, clears the ±0.01 noise). Now CHAMPION. false=old champion.
+  # See gemini_loop/RESPONSE_04.md (idea A). Held at prevalence_target 0.649.
   relative_time: true
+  # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): at test time,
+  # predict the clean view + n_views views each masking 1-2 random active months, soft-vote.
+  # Smooths over WHICH months a short window observes (the covariate-shift axis). RESPONSE_04
+  # idea C. Stacks on relative_time; gated vs the 0.8908 champion. enable:false = champion.
+  tta:
+    enable: true
+    n_views: 8
+    mask_months: [1, 2]
   # ---- Transfer-oriented input channels (Step 3). All default OFF => the model
   # sees only standardized bands + missing-indicators (current 2B behaviour).
   # Enable ONE per LB probe; each removes absolute per-series level differently. ----

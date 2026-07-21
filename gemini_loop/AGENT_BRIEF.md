@@ -11,8 +11,8 @@ Update this file whenever a result changes the queue.*
 > §5 narrative, §6 lessons, and the "Last updated" line — alongside `LB_LOG.md` and this file.
 
 **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU).
-**Best public LB:** 0.8780 (from-scratch temporal Transformer). **Deadline:** 2026-08-16.
-**Target:** ~+0.05 (top-5 ≈ 0.928+).
+**Best public LB:** 0.8908 (temporal Transformer + relative-time reframing). **Deadline:** 2026-08-16.
+**Target:** ~+0.037 to top-5 (≈ 0.928+). Prev champion 0.8780 held 10 days; relative-time added +0.0128.
 
 ---
 
@@ -40,10 +40,10 @@ LB**. So:
 
 ## State of play
 
-- **Levers exhausted:** (1) prior/base-rate correction (+0.11 total, saturated at
-  realized pos-rate ~0.65); (2) GBDT → temporal Transformer swap (+0.05 at identical
-  OOF). Transformer = base model at **0.8780**; it is a strong ranker but **overconfident**
-  (saturated probs).
+- **Levers used:** (1) prior/base-rate correction (+0.11 total, saturated at realized pos-rate
+  ~0.65); (2) GBDT → temporal Transformer swap (+0.05 at identical OOF); (3) relative-time
+  reframing (+0.013, capacity-neutral structural reframe). Champion = **0.8908**. The net is a
+  strong but **overconfident** ranker (saturated probs).
 - **Verified inert-by-default & ready to probe:** Step 1 `prevalence_target`
   (`src/calibration.py`), Step 3 `seq.channels.*` (`src/seq_model.py`).
 
@@ -54,40 +54,44 @@ BBSE/EM prior estimation · WIF / fixed-threshold water-index features · TabPFN
 adversarial AUC 0.99) · OOF meta-stacking (Ridge on OOF) · group-KFold / "it's leakage"
 (the gap is designed covariate shift, proven leak-free).
 
-## META-LESSON (2026-07-20, after THREE failed probes → loop paused for research)
+## META-LESSON (2026-07-20, REFINED 2026-07-21 after iter5 WON)
 
-Three consecutive blind toggles all LOST on the LB while OOF stayed flat/high:
-- Iter2 GBDT+seq blend → 0.8705 (adding a model class dilutes seq transfer).
-- Iter3 per_cell_detrend → 0.8266, −0.0514 (adding input channels overfits source).
-- Iter4 seq K=2→4 → 0.8665, −0.0115 (even MORE of the winning lever overshoots).
+Round-03: three consecutive blind toggles all LOST while OOF stayed flat/high —
+blend 0.8705, per_cell_detrend 0.8266, K=4 0.8665. Round-04: after a research pause,
+**iter5 relative-time reframing WON, 0.8908 (+0.0128), breaking a 10-day plateau.**
 
-Three hard conclusions:
-1. **Added capacity hurts** (extra model / extra channels / extra augmentation all lost).
-   The additive-channel family (`deltas`/`indices`/`rank`) is now **low-prior**.
-2. **OOF is anti-correlated**, not merely blind: highest-OOF run (K=4, 0.984) = 2nd-worst LB.
-3. **Measurement resolution is the binding constraint.** Public LB ≈309 rows → ~±0.01 noise.
-   Single-submission A/B **cannot resolve small (+0.005) gains** — only large effects
-   (GBDT→seq was +0.05) or breakages (detrend −0.05). Stop hunting incremental toggles.
+The refined law (this is the compass now):
+1. **Added *capacity* hurts; capacity-neutral *structure* helps.** Extra model / channels /
+   augmentation all lost. But reframing the *coordinate system* (calendar→relative time), same
+   params, WON. Propose changes to the model's inductive bias / coordinate frame that DELETE a
+   covariate-shift memorization channel — never changes that add parameters, models, or channels.
+   The additive-channel family (`deltas`/`indices`/`rank`) stays **dead** (adds capacity).
+2. **OOF is anti-correlated**, not merely blind: the 0.8908 winner's OOF (0.9811) was *lower*
+   than the old champion's (0.9827); highest-OOF run (K=4, 0.984) = 2nd-worst LB.
+3. **Measurement resolution is binding.** Public LB ≈309 rows → ~±0.01 noise. Only probe changes
+   plausibly large enough to clear it (relative-time was +0.013); don't A/B inside the noise band.
 
-**Champion (unchanged): seq K=2 @ realized 0.649 = 0.8780.** Standing operating-point tool:
-`prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
+**Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
+tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: round-04 research triaged (`RESPONSE_04.md`); testing idea A
+## CURRENT STATE: iter5 WON; banking robustness on the new champion (iter6 TTA)
 
-Rejected from the round-04 report as proven dead-ends/rule-illegal: **Saerens-EM prior**
-(covariate≠label shift; `prevalence_target 0.649` already optimal) and **Zou-threshold / EVI
-index projection** (hardcoded-threshold class, non-transferable; EVI already failed). Do NOT
-big-bang refactor. Test ONE capacity-neutral idea at a time, held at prevalence_target 0.649.
+Relative-time is now the champion (`seq.relative_time: true`). Per the post-win plan, bank the two
+capacity-neutral robustness moves on top, one LB probe each: MC temporal-dropout TTA (iter6, now),
+then multi-seed bagging (iter7). Both are variance/private-LB insurance and may land within public
+noise — gate for "no real regression," keep as standing defaults. Still: ONE variable per probe,
+held at prevalence_target 0.649. Do NOT big-bang refactor; rejected dead-ends stay rejected.
 
 ## EXPERIMENT QUEUE
 
-- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665.
-1. **Iter5 — relative-time reframing** *(current)*: `seq.relative_time=true` left-aligns each
-   observed window to t_rel=0 (positional emb sees relative step, not calendar month). Capacity-
-   neutral, plausibly LARGE effect. `submission_seq_reltime.csv`. Gate vs 0.8780.
-2. **MC temporal-dropout TTA** (inference-only, no added capacity): mask 1–2 active months per
-   test row, soft-vote N views. Safest next probe if iter5 fails.
-3. **Multi-seed bagging** (`n_repeats↑`, no added dims): variance reduction for the noise floor.
+- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION**.
+1. **Iter6 — MC temporal-dropout TTA** *(current)*: `seq.tta.enable=true`, inference-only — mask
+   1–2 active months per test row, soft-vote 8 views + clean. No added capacity. `submission_seq_reltime_tta.csv`.
+   Gate vs 0.8908 (keep if no real regression; it's private-split insurance).
+2. **Multi-seed bagging** (`seq.n_repeats↑`, no added dims): variance reduction for the noise floor.
+3. **Next structural reframe** (extend the iter5 win): other capacity-neutral inductive-bias changes
+   that delete a covariate-shift channel (e.g. per-window feature standardization, duration-invariant
+   pooling). Highest-value direction — hunt large effects, not toggles.
 4. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4).
 
 ## Per-iteration protocol

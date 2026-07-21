@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-20 · **Champion public LB: 0.8780** · **Loop state: ACTIVE — iter5 relative-time probe staged**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter5 relative-time WON (+0.0128); iter6 TTA staged**
 
 ---
 
@@ -21,12 +21,13 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** on Colab/Kaggle → upload `submission_seq_reltime.csv` →
-   paste the LB score back. This is iteration 5: relative-time reframing (idea A from round-04
-   research, `gemini_loop/RESPONSE_04.md`) — capacity-neutral, held at 0.649, isolated vs champion.
-4. Champion is safe: `seq.relative_time` defaults false (reproduces 0.8780 bit-for-bit); this
-   probe flips it true. If iter5 fails, next probes are MC temporal-dropout TTA then multi-seed
-   bagging (both capacity-neutral).
+3. **Current next action:** **Run all** on Colab/Kaggle → upload `submission_seq_reltime_tta.csv`
+   → paste the LB score back. This is iteration 6: MC temporal-dropout TTA (idea C from round-04
+   research, `gemini_loop/RESPONSE_04.md`) — inference-only, capacity-neutral, stacked on the new
+   champion, held at 0.649, isolated vs 0.8908.
+4. Champion is safe: it is now **relative-time ON** (`seq.relative_time: true`, LB 0.8908). `seq.tta.enable`
+   defaults such that `false` reproduces the champion bit-for-bit; iter6 flips it true. If iter6 is a
+   clear regression, revert and go to iter7 = multi-seed bagging (also capacity-neutral).
 
 ---
 
@@ -69,12 +70,14 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
 
 - **Champion model:** from-scratch temporal Transformer (attention over observed months via
   `src_key_padding_mask`, per-band missing-indicator channels, masked-mean-pool), **K=2**
-  masking-augmented training views, operating point held at **realized pos-rate 0.649**.
-- **Champion config** (`config/config.yaml`): `seq.K: 2`, all `seq.channels.*: false`,
-  `calibration.prevalence_target: 0.649`. Regenerate via `run_current.sh` → `submission_seq_champion_k2.csv`.
-- **Best public LB: 0.8780.** Field: top ≈0.9452, top-5 ≈0.928–0.945, rank-50 ≈0.876 (~180
-  competitors). Real gap to top-5 ≈ **+0.05** — likely needs a different approach, not tuning.
-- **Loop state: PAUSED** pending Deep Research on `gemini_loop/UPDATE_04.md`.
+  masking-augmented training views, **relative-time reframing ON** (observed window left-aligned
+  to t_rel=0), operating point held at **realized pos-rate 0.649**.
+- **Champion config** (`config/config.yaml`): `seq.K: 2`, `seq.relative_time: true`, all
+  `seq.channels.*: false`, `seq.tta.enable: false` (iter6 probe sets it true), `calibration.prevalence_target: 0.649`.
+- **Best public LB: 0.8908** (was 0.8780 for 10 days; relative-time added +0.0128). Field: top
+  ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.037**.
+- **Loop state: ACTIVE.** First win since the plateau. Now banking capacity-neutral robustness
+  moves (TTA → multi-seed bagging) on the new champion.
 
 ---
 
@@ -119,36 +122,52 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 *constraint*: test capacity-neutral, structural changes one at a time.
 | # | Experiment (only variable vs champion) | OOF | LB | Verdict |
 |---|---|---|---|---|
-| 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | _pending_ | _pending_ | staged |
-| — | queued: MC temporal-dropout TTA (inference-only); multi-seed bagging | | | not yet run |
+| 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | 0.9811 | **0.8908** | ✅ **NEW CHAMPION** (+0.0128; first win, capacity-neutral structural reframe) |
+| 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | _pending_ | _pending_ | staged |
+| — | queued: multi-seed bagging (`seq.n_repeats↑`, capacity-neutral) | | | not yet run |
+
+**The 0.8908 win reframes the meta-lesson:** it is not "never change the model" — it is *added
+capacity* (extra model, extra channels, extra augmentation) that hurts. A capacity-**neutral**
+structural reframe (same params, relative instead of calendar coordinates) that directly removes a
+covariate-shift memorization channel transfers. That is now the design compass for iter6+.
 
 ---
 
 ## 5. Progress & declines — the narrative
 
-**What moved us UP (0.714 → 0.878, +0.164 total):**
+**What moved us UP (0.714 → 0.891, +0.177 total):**
 1. **Prior/base-rate correction** (+0.11 to the GBDT peak 0.826): the test set is far more
    positive (~65%) than train (~40%). Now saturated.
 2. **GBDT → from-scratch Transformer** (+0.05 to 0.878): attention over *only observed months*
    transfers across the designed domain shift where flattened GBDT aggregates over-fit the source.
+3. **Relative-time reframing** (+0.013 to 0.891, 2026-07-21): left-align each observed window to
+   t_rel=0 so positional embeddings encode relative step, not calendar month — kills the calendar-
+   specific spectral memorization the covariate shift punishes. Capacity-neutral; broke a 10-day plateau.
 
 **What DECLINED (Phase 3 — everything we tried after 0.878):**
 - Blend −0.0075, detrend −0.0514, K=4 −0.0115. Pattern: **every attempt that ADDED something
   (a model, input channels, more augmentation) lost.** The detrend result specifically
   **disproves** the "remove per-series level → better transfer" thesis for this model.
 
-**Why we stopped:** public LB ≈309 rows → **~±0.01 noise**. Single-submission A/B **cannot
-resolve** the small (+0.005) gains we were chasing; only large effects (like the +0.05 swap) or
-breakages (detrend −0.05) are detectable. Guessing more toggles = testing inside the noise band.
+**Why we paused (then resumed):** public LB ≈309 rows → **~±0.01 noise**. Single-submission A/B
+**cannot resolve** small (+0.005) gains; only large effects or breakages are detectable. So we
+stopped guessing toggles inside the noise band and ran a research round. The output — relative-time
+reframing — was a *large* effect (+0.013, above noise), which is exactly the class of change worth a
+submission. Lesson: don't probe inside the noise; hunt changes big enough to clear it.
 
 ---
 
 ## 6. Lessons & DEAD ENDS (do not retry)
 
-**Three hard lessons (2026-07-20):**
-1. **Added capacity hurts** — extra model / extra channels / extra augmentation all lost.
-2. **OOF is anti-correlated**, not merely blind — highest-OOF run (0.984) = 2nd-worst LB.
-3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise.
+**Hard lessons (2026-07-20, refined 2026-07-21):**
+1. **Added *capacity* hurts; capacity-neutral *structure* helps.** Extra model / channels /
+   augmentation all lost (−0.008 to −0.051). But relative-time reframing — same params, reframed
+   coordinates — WON +0.013. The compass: change the model's *coordinate frame / inductive bias*
+   to remove a covariate-shift channel, never its capacity.
+2. **OOF is anti-correlated**, not merely blind — highest-OOF run (K=4, 0.984) = 2nd-worst LB;
+   the 0.8908 winner's OOF (0.9811) was *lower* than the old champion's (0.9827).
+3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise. Only
+   probe changes plausibly large enough to clear it; don't A/B inside the noise band.
 
 **Do not re-propose (tried & failed, or rule-illegal):** GBDT+seq blend · `per_cell_detrend` and
 the additive-channel family (`deltas`/`indices`/`rank`, now low-prior) · K>2 augmentation · BBSE/EM

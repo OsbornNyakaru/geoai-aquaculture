@@ -24,9 +24,15 @@ resolve small (+0.005) gains; only large effects or breakages are detectable.
 dead-end, covariate≠label shift) and Zou-threshold/EVI indices (non-transferable). Accepted
 capacity-neutral ideas; testing relative-time reframing first, banking TTA + multi-seed bagging.
 
-| 5 | _pending_ | Relative-time reframing (left-align window to t_rel=0; capacity-neutral) | submission_seq_reltime.csv | 0.649 | _awaiting Zindi_ | |
+| 5 | 2026-07-21 | Relative-time reframing (left-align window to t_rel=0; capacity-neutral) | submission_seq_reltime.csv | 0.649 | **0.8908** | ✅ **NEW BEST** (+0.0128; clears ±0.01 noise. First win since champion — capacity-NEUTRAL structural reframe transfers where every capacity-ADDING change lost. Attacks calendar-month memorization.) |
+| 6 | _pending_ | MC temporal-dropout TTA on champion (inference-only; mask 1-2 active months, soft-vote 8 views) | submission_seq_reltime_tta.csv | 0.649 | _awaiting Zindi_ | |
 
-**Current best: 0.8780** (temporal Transformer, realized pos-rate 0.649).
+**Current best: 0.8908** (temporal Transformer + relative-time reframing, realized pos-rate 0.649).
+
+**BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
+"added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same
+params, reframed coordinates) is the direction that transfers. Iter6+ bank robustness moves (TTA,
+multi-seed bagging) on top; both capacity-neutral, gated vs 0.8908.
 
 ---
 
