@@ -138,12 +138,13 @@ seq:
   # 0.8908 vs 0.8780 (+0.0128, clears the ±0.01 noise). Now CHAMPION. false=old champion.
   # See gemini_loop/RESPONSE_04.md (idea A). Held at prevalence_target 0.649.
   relative_time: true
-  # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): at test time,
-  # predict the clean view + n_views views each masking 1-2 random active months, soft-vote.
-  # Smooths over WHICH months a short window observes (the covariate-shift axis). RESPONSE_04
-  # idea C. Stacks on relative_time; gated vs the 0.8908 champion. enable:false = champion.
+  # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
+  # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
+  # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->
+  # DISCARDED (enable:false). Robustness moves keep landing within-noise; gains are in
+  # structural reframes, not variance reduction. Code kept for a possible private-LB hedge.
   tta:
-    enable: true
+    enable: false
     n_views: 8
     mask_months: [1, 2]
   # ---- Transfer-oriented input channels (Step 3). All default OFF => the model

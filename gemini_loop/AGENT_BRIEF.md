@@ -74,25 +74,25 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: iter5 WON; banking robustness on the new champion (iter6 TTA)
+## CURRENT STATE: iter5 WON (0.8908); iter6 TTA discarded; deciding iter7 direction
 
-Relative-time is now the champion (`seq.relative_time: true`). Per the post-win plan, bank the two
-capacity-neutral robustness moves on top, one LB probe each: MC temporal-dropout TTA (iter6, now),
-then multi-seed bagging (iter7). Both are variance/private-LB insurance and may land within public
-noise — gate for "no real regression," keep as standing defaults. Still: ONE variable per probe,
-held at prevalence_target 0.649. Do NOT big-bang refactor; rejected dead-ends stay rejected.
+Relative-time is champion (`seq.relative_time: true`, `seq.tta.enable: false` = clean 0.8908).
+**iter6 TTA landed 0.8885 (−0.0023, within noise, did NOT beat champion) → discarded.** That is the
+SECOND capacity-neutral *robustness* move to land within-noise. Emerging read: variance reduction
+(TTA, and likely multi-seed bagging) can't be validated on the 309-row public LB and isn't lifting
+rank; the only changes that moved LB were *structural* reframes (GBDT→seq +0.05; relative-time
++0.013). CAUTION for the next structural idea: relative-time removed calendar *position* memorization
+and WON, but per_cell_detrend removed per-series *amplitude/level* and LOST hard (0.8266). So the
+transferable axis is temporal/positional, NOT amplitude — keep amplitude-normalization ideas low-prior.
 
 ## EXPERIMENT QUEUE
 
-- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION**.
-1. **Iter6 — MC temporal-dropout TTA** *(current)*: `seq.tta.enable=true`, inference-only — mask
-   1–2 active months per test row, soft-vote 8 views + clean. No added capacity. `submission_seq_reltime_tta.csv`.
-   Gate vs 0.8908 (keep if no real regression; it's private-split insurance).
-2. **Multi-seed bagging** (`seq.n_repeats↑`, no added dims): variance reduction for the noise floor.
-3. **Next structural reframe** (extend the iter5 win): other capacity-neutral inductive-bias changes
-   that delete a covariate-shift channel (e.g. per-window feature standardization, duration-invariant
-   pooling). Highest-value direction — hunt large effects, not toggles.
-4. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4).
+- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885.
+1. **Iter7 (deciding)** — fork: (a) **multi-seed bagging** (`seq.n_repeats↑`, capacity-neutral) = last
+   banked robustness move, low-info on public but private-split insurance; vs (b) **next structural
+   reframe** (positional-family, capacity-neutral) via a research round — the proven-productive lane.
+2. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4). TTA file (0.8885) is a
+   candidate hedge, though it's a low-diversity variant of the champion.
 
 ## Per-iteration protocol
 

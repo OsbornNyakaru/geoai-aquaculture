@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter5 relative-time WON (+0.0128); iter6 TTA staged**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter5 relative-time WON (+0.0128); iter6 TTA discarded (0.8885); deciding iter7**
 
 ---
 
@@ -21,13 +21,13 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** on Colab/Kaggle → upload `submission_seq_reltime_tta.csv`
-   → paste the LB score back. This is iteration 6: MC temporal-dropout TTA (idea C from round-04
-   research, `gemini_loop/RESPONSE_04.md`) — inference-only, capacity-neutral, stacked on the new
-   champion, held at 0.649, isolated vs 0.8908.
-4. Champion is safe: it is now **relative-time ON** (`seq.relative_time: true`, LB 0.8908). `seq.tta.enable`
-   defaults such that `false` reproduces the champion bit-for-bit; iter6 flips it true. If iter6 is a
-   clear regression, revert and go to iter7 = multi-seed bagging (also capacity-neutral).
+3. **Current next action:** iter7 direction is being decided (see below). Champion = clean
+   relative-time net (`seq.relative_time: true`, `seq.tta.enable: false`), LB **0.8908** — running
+   `run_current.sh` as-is reproduces it. Fork: (a) multi-seed bagging = last banked robustness move
+   (likely within-noise, private-split insurance) vs (b) research round for the next STRUCTURAL
+   reframe (the only direction that has moved LB). iter6 TTA discarded (0.8885, within noise).
+4. Champion is safe & isolated: `seq.relative_time: true` is the champion; `seq.tta.enable: false`
+   reproduces it bit-for-bit. Every probe flips exactly one flag, held at prevalence_target 0.649.
 
 ---
 
@@ -123,8 +123,8 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | # | Experiment (only variable vs champion) | OOF | LB | Verdict |
 |---|---|---|---|---|
 | 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | 0.9811 | **0.8908** | ✅ **NEW CHAMPION** (+0.0128; first win, capacity-neutral structural reframe) |
-| 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | _pending_ | _pending_ | staged |
-| — | queued: multi-seed bagging (`seq.n_repeats↑`, capacity-neutral) | | | not yet run |
+| 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | — | 0.8885 | ❌ −0.0023 (within noise, did not beat champion; reverted) |
+| — | queued: multi-seed bagging (capacity-neutral robustness) OR next structural reframe | | | deciding |
 
 **The 0.8908 win reframes the meta-lesson:** it is not "never change the model" — it is *added
 capacity* (extra model, extra channels, extra augmentation) that hurts. A capacity-**neutral**
