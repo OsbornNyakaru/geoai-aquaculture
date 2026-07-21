@@ -207,11 +207,17 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
 
     s = cfg["seq"]
     d = s["d_model"]
+    pos_mode = s.get("pos_encoding", "learned")           # learned | dnorm | none
 
     class PondTransformer(nn.Module):
         def __init__(self):
             super().__init__()
             self.proj = nn.Linear(in_dim, d)
+            self.pos_mode = pos_mode
+            self.n_months = n_months
+            # Always allocate the learned length-M table: "learned" uses it directly;
+            # "dnorm" interpolates it at fractional indices (parameter-neutral); "none"
+            # (NoPE) leaves it unused. Kept so a saved champion state_dict still loads.
             self.pos = nn.Parameter(torch.zeros(1, n_months, d))
             nn.init.normal_(self.pos, std=0.02)
             layer = nn.TransformerEncoderLayer(
@@ -224,8 +230,36 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
                 nn.Linear(d // 2, 1),
             )
 
+        def _dnorm_pos(self, pad):
+            """Duration-normalized positional encoding (iter7, RESPONSE_05 idea #1).
+
+            Assumes relative_time left-alignment (observed months at relative offsets
+            0..L-1). Re-index each observed position by the fractional coordinate
+            p = offset/(L-1) in [0,1] so every window length L shares ONE frame, then read
+            the positional vector by linearly interpolating the learned length-M table at
+            table-index j = p*(M-1). Removes the residual window-LENGTH memorization channel
+            with NO new parameters; identical to the learned champion when L = M.
+            """
+            n, M = pad.shape
+            obs = (~pad).float()                          # [n, M] 1=observed month
+            L = obs.sum(1, keepdim=True)                  # [n, 1] window length
+            idx = torch.arange(M, device=pad.device).unsqueeze(0).to(obs.dtype)  # [1, M]
+            idx = idx.expand(n, M)                        # relative offset (left-aligned)
+            p = (idx / (L - 1.0).clamp(min=1.0)).clamp(0.0, 1.0)   # [n, M] frac position
+            j = p * (M - 1)                               # [n, M] fractional table index
+            j0 = torch.floor(j).long().clamp(0, M - 1)
+            j1 = (j0 + 1).clamp(0, M - 1)
+            w = (j - j0.to(j.dtype)).unsqueeze(-1)        # [n, M, 1]
+            table = self.pos.squeeze(0)                   # [M, d]
+            return (1.0 - w) * table[j0] + w * table[j1]  # [n, M, d]
+
         def forward(self, x, pad):
-            h = self.proj(x) + self.pos
+            if self.pos_mode == "dnorm":
+                h = self.proj(x) + self._dnorm_pos(pad)
+            elif self.pos_mode == "none":
+                h = self.proj(x)                          # NoPE / set encoder
+            else:
+                h = self.proj(x) + self.pos
             h = self.enc(h, src_key_padding_mask=pad)     # ignore masked months
             keep = (~pad).unsqueeze(-1).float()           # [n, M, 1]
             pooled = (h * keep).sum(1) / keep.sum(1).clamp(min=1.0)
@@ -368,6 +402,11 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     rel = bool(s.get("relative_time", False))
     if rel:
         log.info("seq relative_time ON: observed window left-aligned to t_rel=0")
+    pos_mode = s.get("pos_encoding", "learned")
+    if pos_mode != "learned":
+        log.info("seq pos_encoding=%s (%s)", pos_mode,
+                 "duration-normalized fractional positions" if pos_mode == "dnorm"
+                 else "NoPE / permutation-invariant set encoder")
     tta_on = bool((s.get("tta") or {}).get("enable", False))
     if tta_on:
         _t = s["tta"]

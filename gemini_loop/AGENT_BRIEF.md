@@ -74,27 +74,36 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: iter5 WON (0.8908); iter6 TTA discarded; deciding iter7 direction
+## CURRENT STATE: round-05 triaged; iter7 = duration-normalized positions (both reports' #1)
 
-Relative-time is champion (`seq.relative_time: true`, `seq.tta.enable: false` = clean 0.8908).
-**iter6 TTA landed 0.8885 (−0.0023, within noise, did NOT beat champion) → discarded.** That is the
-SECOND capacity-neutral *robustness* move to land within-noise. Emerging read: variance reduction
-(TTA, and likely multi-seed bagging) can't be validated on the 309-row public LB and isn't lifting
-rank; the only changes that moved LB were *structural* reframes (GBDT→seq +0.05; relative-time
-+0.013). CAUTION for the next structural idea: relative-time removed calendar *position* memorization
-and WON, but per_cell_detrend removed per-series *amplitude/level* and LOST hard (0.8266). So the
-transferable axis is temporal/positional, NOT amplitude — keep amplitude-normalization ideas low-prior.
+Champion = relative-time net (`pos_encoding: learned`, 0.8908). Round-05 Deep Research (Gemini +
+Claude) BOTH independently ranked **duration-normalized fractional positions** #1 → staged as iter7
+(`seq.pos_encoding: dnorm`): re-index each observed position by p=offset/(L-1)∈[0,1] so all window
+lengths share one frame (interpolate the learned length-12 table at j=p*11). Parameter-neutral;
+removes window-LENGTH memorization on top of relative-time's start-alignment. The transferable axis
+stays temporal/positional; amplitude-normalization remains toxic (detrend −0.051) and robustness
+moves remain within-noise (TTA −0.0023). Full triage: `gemini_loop/RESPONSE_05.md`.
 
 ## EXPERIMENT QUEUE
 
 - ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885.
-- **LOOP PAUSED for research (round 05).** User chose the research lane over banking robustness.
-  Brief = `gemini_loop/UPDATE_05.md` → paste into Deep Research. Ask: the next capacity-neutral
-  POSITIONAL-family structural reframe (duration-normalized positions, center/anchor alignment,
-  order/permutation reframing). NO amplitude-normalization (detrend −0.051), NO robustness moves
-  (TTA within-noise). Triage the reply in RESPONSE_05.md, then stage iter7 = the chosen reframe.
-- **Private-LB submission selection** as deadline nears (UPDATE_05.md Q4). TTA file (0.8885) is a
-  low-diversity hedge; prefer two diverse structural picks.
+1. **Iter7 — duration-normalized positions** *(current)*: `seq.pos_encoding=dnorm`. `submission_seq_dnorm.csv`.
+   Gate vs 0.8908 (keep if ≥ champion, esp. ≥ +0.005; diversity candidate if within noise; revert if clear drop).
+2. **NoPE / set encoder** (`seq.pos_encoding=none`, ALREADY CODED): drop positional embedding → permutation-
+   invariant set encoder. Two-tailed/high-variance but the ideal DIVERSE second finalist. iter8.
+3. **Cross-view invariance objective** across the K=2 views (`L=BCE+λ‖logit(v1)−logit(v2)‖²`): objective-level
+   capacity-neutral lever, structurally like the winning reframe (not a robustness add-on). iter9.
+4. **One-time prevalence sweep** on the new champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned for the
+   OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE.
+- **Private-LB finalists:** champion + one structurally DISTINCT reframe (dnorm or NoPE), NOT the TTA
+  variant (too correlated). Verify Zindi's finalist mechanism (auto best-public vs designate two).
+
+## REJECTED in round 05 (do not re-propose — see RESPONSE_05.md)
+
+Saerens-EM/MLLS prior (3rd rejection; label-shift assumption, BBSE gave 0.44 vs true 0.649) · Zou
+water-tree / WIF / EVI indices (dead-end + toxic amplitude axis) · CAST self-training (OOD/ESS-collapse
+family under adversarial AUC 0.99) · CropNet-blend + big-bang bundle (unattributable; blend already −0.0075)
+· learned relative-position bias / ALiBi (adds capacity). CropNet as a standalone diverse finalist = low prior, never blended.
 
 ## Per-iteration protocol
 

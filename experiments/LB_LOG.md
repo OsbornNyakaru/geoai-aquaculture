@@ -34,6 +34,13 @@ bagging) land within the ±0.01 noise — they can't be validated on public and 
 only changes that moved LB were *structural* (GBDT→seq +0.05; relative-time reframe +0.013). Next
 high-value direction = the next structural reframe, not more variance reduction.
 
+**Round-05 research triaged** (`gemini_loop/RESPONSE_05.md`): BOTH Deep Research reports (Gemini +
+Claude) independently ranked **duration-normalized positions** #1 → staged as iter7. Re-rejected
+Saerens-EM (3rd time), Zou/WIF/EVI, CAST self-training, CropNet-blend big-bang. Banked: NoPE set
+encoder (iter8), cross-view invariance objective (iter9), one-time prevalence sweep.
+
+| 7 | _pending_ | Duration-normalized fractional positions (share one [0,1] frame across window lengths; parameter-neutral) | submission_seq_dnorm.csv | 0.649 | _awaiting Zindi_ | |
+
 **BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
 "added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same
 params, reframed coordinates) is the direction that transfers. Iter6+ bank robustness moves (TTA,

@@ -3,22 +3,34 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# LOOP PAUSED for research round 05. Champion = clean relative-time net (LB 0.8908):
-#   seq.relative_time=true, seq.tta.enable=false, held at prevalence_target 0.649.
-#   Running this file as-is REGENERATES the champion submission_seq_reltime.csv (0.8908) —
-#   safe to re-run to re-confirm the anchor; nothing new to submit until iter7 is staged.
+# ITERATION 7 — Duration-normalized fractional positional encoding, CAPACITY-NEUTRAL.
+#   Round-05 Deep Research (Gemini + Claude, both independent) ranked THIS idea #1 —
+#   triaged in gemini_loop/RESPONSE_05.md. It is the literal next deletion on the axis
+#   that just won: iter5 relative-time removed absolute window START (+0.0128); this
+#   removes absolute window LENGTH.
 #
-#   STATUS: iter5 relative-time WON 0.8908 (+0.0128, broke the 0.8780 plateau). iter6 MC
-#   temporal-dropout TTA DISCARDED (0.8885, within noise, did not beat champion). The user
-#   chose a research round over banking more robustness — because the ONLY changes that have
-#   moved this LB are capacity-neutral STRUCTURAL reframes, and the transferable axis is
-#   temporal/POSITIONAL (relative-time +0.013), NOT amplitude (detrend −0.051).
+#   Mechanism: after relative_time left-aligns the observed window to offsets 0..L-1,
+#   re-index each position by the fractional coordinate p = offset/(L-1) in [0,1] so a
+#   4-, 5-, and 6-month window all share ONE relative frame; read the positional vector
+#   by linearly interpolating the existing learned length-12 table at index j = p*11.
+#   PARAMETER-NEUTRAL (reuses the champion's table; reduces to the champion exactly when
+#   L=12). Touches only the TIME coordinate — stays off the toxic amplitude axis
+#   (detrend was -0.0514). seq.pos_encoding=dnorm is the ONLY variable vs the 0.8908
+#   champion; pos_encoding=learned reproduces it bit-for-bit. Held at prevalence_target 0.649.
 #
-#   NEXT: paste gemini_loop/UPDATE_05.md into Deep Research → the coding agent triages the
-#   reply into RESPONSE_05.md and stages iter7 = the next positional-family reframe here.
+#   Rejected re-treads from round 05 (see RESPONSE_05.md): Saerens-EM/MLLS prior (3rd
+#   rejection; label-shift assumption), Zou water-tree / WIF / EVI indices (dead-end +
+#   toxic amplitude axis), CAST self-training (ESS-collapse family), CropNet blend + big-bang
+#   bundle. Banked for later: NoPE set encoder (iter8, seq.pos_encoding=none, already coded),
+#   cross-view invariance objective (iter9), one-time prevalence sweep.
+#
+#   DECISION RULE: upload submission_seq_dnorm.csv, gate vs 0.8908.
+#     >= 0.8908 (esp. >= +0.005) -> length reframe transfers -> KEEP; bank NoPE (iter8).
+#     within noise            -> keep as a diversity candidate, don't iterate; go to NoPE.
+#     clear drop              -> revert (pos_encoding:learned); go to NoPE.
 # =====================================================================
 set -euo pipefail
 
-python run_pipeline.py --full --model seq --name seq_reltime
+python run_pipeline.py --full --model seq --name seq_dnorm
 
-echo "=== champion regen. submissions/submission_seq_reltime.csv should reproduce LB 0.8908. Loop paused pending UPDATE_05 research. ==="
+echo "=== done. Upload submissions/submission_seq_dnorm.csv (realized pos-rate 0.649) and paste the LB score ==="

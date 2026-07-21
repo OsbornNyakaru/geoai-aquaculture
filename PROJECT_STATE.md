@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter5 relative-time WON (+0.0128); iter6 TTA discarded (0.8885); deciding iter7**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — round-05 research triaged; iter7 duration-normalized positions staged (both reports' #1)**
 
 ---
 
@@ -21,12 +21,13 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **loop PAUSED for a research round.** Paste `gemini_loop/UPDATE_05.md`
-   into Deep Research (Gemini + Claude) to source the next capacity-neutral POSITIONAL-family
-   structural reframe — the only direction that has moved the LB. Running `run_current.sh` as-is
-   regenerates the champion `submission_seq_reltime.csv` (0.8908). iter6 TTA discarded (0.8885).
-4. Champion is safe & isolated: `seq.relative_time: true` is the champion; `seq.tta.enable: false`
-   reproduces it bit-for-bit. Every probe flips exactly one flag, held at prevalence_target 0.649.
+3. **Current next action:** **Run all** → upload `submission_seq_dnorm.csv` → paste the LB score.
+   This is iteration 7: duration-normalized fractional positions (`seq.pos_encoding: dnorm`) — BOTH
+   round-05 Deep Research reports ranked it #1 (`gemini_loop/RESPONSE_05.md`). Removes window-LENGTH
+   memorization on top of relative-time's start-alignment; parameter-neutral, held at 0.649, isolated
+   vs 0.8908. iter6 TTA discarded (0.8885).
+4. Champion is safe & isolated: `seq.pos_encoding: learned` reproduces the champion bit-for-bit;
+   iter7 sets it `dnorm`. NoPE set encoder (`none`) is coded and banked for iter8. One flag per probe.
 
 ---
 
@@ -71,8 +72,9 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   `src_key_padding_mask`, per-band missing-indicator channels, masked-mean-pool), **K=2**
   masking-augmented training views, **relative-time reframing ON** (observed window left-aligned
   to t_rel=0), operating point held at **realized pos-rate 0.649**.
-- **Champion config** (`config/config.yaml`): `seq.K: 2`, `seq.relative_time: true`, all
-  `seq.channels.*: false`, `seq.tta.enable: false` (iter6 probe sets it true), `calibration.prevalence_target: 0.649`.
+- **Champion config** (`config/config.yaml`): `seq.K: 2`, `seq.relative_time: true`,
+  `seq.pos_encoding: learned` (iter7 probe sets it `dnorm`), all `seq.channels.*: false`,
+  `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
 - **Best public LB: 0.8908** (was 0.8780 for 10 days; relative-time added +0.0128). Field: top
   ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.037**.
 - **Loop state: ACTIVE.** First win since the plateau. Now banking capacity-neutral robustness
@@ -123,7 +125,8 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 |---|---|---|---|---|
 | 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | 0.9811 | **0.8908** | ✅ **NEW CHAMPION** (+0.0128; first win, capacity-neutral structural reframe) |
 | 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | — | 0.8885 | ❌ −0.0023 (within noise, did not beat champion; reverted) |
-| — | queued: multi-seed bagging (capacity-neutral robustness) OR next structural reframe | | | deciding |
+| 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | _pending_ | _pending_ | staged (both round-05 reports' #1) |
+| — | queued: NoPE set encoder (`pos_encoding: none`, iter8, coded); cross-view invariance objective (iter9); one-time prevalence sweep | | | not yet run |
 
 **The 0.8908 win reframes the meta-lesson:** it is not "never change the model" — it is *added
 capacity* (extra model, extra channels, extra augmentation) that hurts. A capacity-**neutral**

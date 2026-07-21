@@ -138,6 +138,12 @@ seq:
   # 0.8908 vs 0.8780 (+0.0128, clears the ±0.01 noise). Now CHAMPION. false=old champion.
   # See gemini_loop/RESPONSE_04.md (idea A). Held at prevalence_target 0.649.
   relative_time: true
+  # Iter7 (duration-normalized positions, RESPONSE_05 #1 — BOTH Deep Research reports ranked it
+  # first). Re-index each observed position by fractional p=offset/(L-1) in [0,1] so all window
+  # lengths (4/5/6) share one frame; reads the learned length-12 table by interpolation at j=p*11.
+  # Parameter-NEUTRAL; removes residual window-LENGTH memorization on top of relative_time's
+  # start-alignment. learned=champion (bit-for-bit); none=NoPE set encoder (iter8, banked).
+  pos_encoding: dnorm
   # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
   # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
   # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->
