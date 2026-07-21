@@ -39,7 +39,14 @@ Claude) independently ranked **duration-normalized positions** #1 → staged as 
 Saerens-EM (3rd time), Zou/WIF/EVI, CAST self-training, CropNet-blend big-bang. Banked: NoPE set
 encoder (iter8), cross-view invariance objective (iter9), one-time prevalence sweep.
 
-| 7 | _pending_ | Duration-normalized fractional positions (share one [0,1] frame across window lengths; parameter-neutral) | submission_seq_dnorm.csv | 0.649 | _awaiting Zindi_ | |
+| 7 | 2026-07-21 | Duration-normalized fractional positions (share one [0,1] frame across window lengths; parameter-neutral) | submission_seq_dnorm.csv | 0.649 | 0.8844 | ❌ (−0.0064; did not beat champion. Diagnosis: window LENGTH is already train/test distribution-matched by the masking augmentation → no length-shift to remove; dnorm only normalized away possibly-informative length signal. Also confound: interpolation read untrained table indices 6-11. REVERTED.) |
+
+**Refined positional lesson (iter5 vs iter7):** relative-time removed window START (calendar month,
+which IS shifted train-vs-test) → +0.0128 WON. dnorm removed window LENGTH (already matched by
+augmentation, NOT shifted) → −0.0064 LOST. **Positional reframes help ONLY when they delete a channel
+that is actually shifted between train and test.** iter8 NoPE tests removing positional identity entirely.
+
+| 8 | _pending_ | NoPE / permutation-invariant SET encoder (drop positional embedding; pos_encoding=none) | submission_seq_nope.csv | 0.649 | _awaiting Zindi_ | |
 
 **BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
 "added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same

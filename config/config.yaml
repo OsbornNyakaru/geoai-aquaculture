@@ -138,12 +138,20 @@ seq:
   # 0.8908 vs 0.8780 (+0.0128, clears the ±0.01 noise). Now CHAMPION. false=old champion.
   # See gemini_loop/RESPONSE_04.md (idea A). Held at prevalence_target 0.649.
   relative_time: true
-  # Iter7 (duration-normalized positions, RESPONSE_05 #1 — BOTH Deep Research reports ranked it
-  # first). Re-index each observed position by fractional p=offset/(L-1) in [0,1] so all window
-  # lengths (4/5/6) share one frame; reads the learned length-12 table by interpolation at j=p*11.
-  # Parameter-NEUTRAL; removes residual window-LENGTH memorization on top of relative_time's
-  # start-alignment. learned=champion (bit-for-bit); none=NoPE set encoder (iter8, banked).
-  pos_encoding: dnorm
+  # pos_encoding: learned=champion (0.8908) | dnorm=duration-normalized | none=NoPE set encoder.
+  # Iter7 dnorm RESULT: 0.8844 (−0.0064, did NOT beat champion) -> DISCARDED. Two reasons, both
+  # a priori: (1) window LENGTH is already train/test distribution-matched by the masking
+  # augmentation, so there was no length covariate-shift to remove — dnorm only normalized away
+  # possibly-informative length signal; (2) under relative_time (windows ≤6mo) only table indices
+  # 0-5 are trained, but interpolation reads indices up to 11 (untrained). Lesson: positional
+  # reframes help ONLY when they delete a channel actually SHIFTED train-vs-test (start=shifted YES;
+  # length=matched NO).
+  # Iter8 (current) = NoPE: drop the positional embedding entirely -> the encoder + masked-mean-pool
+  # becomes a permutation-invariant SET encoder over observed months. Removes ALL positional
+  # memorization; the SAR aquaculture signature (persistent low backscatter) is a set statistic.
+  # Two-tailed / high-variance (order also carries pond-vs-rice fill/drain timing) but the ideal
+  # DIVERSE private-LB finalist. Parameter-REMOVING. RESPONSE_05 #2.
+  pos_encoding: none
   # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
   # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
   # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->

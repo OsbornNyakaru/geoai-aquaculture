@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — round-05 research triaged; iter7 duration-normalized positions staged (both reports' #1)**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter7 dnorm discarded (0.8844); iter8 NoPE set-encoder staged**
 
 ---
 
@@ -21,13 +21,12 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** → upload `submission_seq_dnorm.csv` → paste the LB score.
-   This is iteration 7: duration-normalized fractional positions (`seq.pos_encoding: dnorm`) — BOTH
-   round-05 Deep Research reports ranked it #1 (`gemini_loop/RESPONSE_05.md`). Removes window-LENGTH
-   memorization on top of relative-time's start-alignment; parameter-neutral, held at 0.649, isolated
-   vs 0.8908. iter6 TTA discarded (0.8885).
+3. **Current next action:** **Run all** → upload `submission_seq_nope.csv` → paste the LB score. This
+   is iteration 8: NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`) — drop the
+   positional embedding entirely (`gemini_loop/RESPONSE_05.md` #2). Two-tailed but the ideal DIVERSE
+   private-LB finalist; parameter-removing, held at 0.649, isolated vs 0.8908. iter7 dnorm discarded (0.8844).
 4. Champion is safe & isolated: `seq.pos_encoding: learned` reproduces the champion bit-for-bit;
-   iter7 sets it `dnorm`. NoPE set encoder (`none`) is coded and banked for iter8. One flag per probe.
+   iter8 sets it `none`. One flag per probe. Cross-view invariance objective is queued for iter9.
 
 ---
 
@@ -125,13 +124,17 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 |---|---|---|---|---|
 | 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | 0.9811 | **0.8908** | ✅ **NEW CHAMPION** (+0.0128; first win, capacity-neutral structural reframe) |
 | 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | — | 0.8885 | ❌ −0.0023 (within noise, did not beat champion; reverted) |
-| 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | _pending_ | _pending_ | staged (both round-05 reports' #1) |
-| — | queued: NoPE set encoder (`pos_encoding: none`, iter8, coded); cross-view invariance objective (iter9); one-time prevalence sweep | | | not yet run |
+| 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | 0.9789 | 0.8844 | ❌ −0.0064 (length already matched → no shift to remove; reverted) |
+| 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | _pending_ | _pending_ | staged (RESPONSE_05 #2) |
+| — | queued: cross-view invariance objective (iter9); one-time prevalence sweep on new champion | | | not yet run |
 
-**The 0.8908 win reframes the meta-lesson:** it is not "never change the model" — it is *added
-capacity* (extra model, extra channels, extra augmentation) that hurts. A capacity-**neutral**
-structural reframe (same params, relative instead of calendar coordinates) that directly removes a
-covariate-shift memorization channel transfers. That is now the design compass for iter6+.
+**The design compass (refined through iter7):** it is not "never change the model" — it is *added
+capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A
+capacity-neutral structural reframe helps **only when it deletes a channel that is actually SHIFTED
+train-vs-test.** Relative-time removed window START (calendar month = shifted) → +0.0128 WON.
+Duration-norm removed window LENGTH (matched by augmentation = NOT shifted) → −0.0064 LOST. Before
+proposing any reframe, ask first: *is this channel actually shifted?* NoPE (iter8) removes positional
+identity entirely — a bigger, two-tailed bet, and the diverse finalist regardless of its public score.
 
 ---
 
@@ -162,10 +165,12 @@ submission. Lesson: don't probe inside the noise; hunt changes big enough to cle
 ## 6. Lessons & DEAD ENDS (do not retry)
 
 **Hard lessons (2026-07-20, refined 2026-07-21):**
-1. **Added *capacity* hurts; capacity-neutral *structure* helps.** Extra model / channels /
-   augmentation all lost (−0.008 to −0.051). But relative-time reframing — same params, reframed
-   coordinates — WON +0.013. The compass: change the model's *coordinate frame / inductive bias*
-   to remove a covariate-shift channel, never its capacity.
+1. **Added *capacity* hurts; capacity-neutral *structure* helps — but ONLY if it deletes a SHIFTED
+   channel.** Extra model / channels / augmentation all lost (−0.008 to −0.051); robustness moves
+   (TTA) land within noise. Relative-time reframing (remove window START = calendar month, which is
+   shifted train-vs-test) WON +0.013. Duration-norm (remove window LENGTH, which augmentation already
+   distribution-matches → NOT shifted) LOST −0.006. Compass: reframe the coordinate/inductive-bias to
+   delete a channel that is *actually shifted*, never its capacity, never a matched/informative channel.
 2. **OOF is anti-correlated**, not merely blind — highest-OOF run (K=4, 0.984) = 2nd-worst LB;
    the 0.8908 winner's OOF (0.9811) was *lower* than the old champion's (0.9827).
 3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise. Only

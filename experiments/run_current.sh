@@ -3,34 +3,30 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 7 — Duration-normalized fractional positional encoding, CAPACITY-NEUTRAL.
-#   Round-05 Deep Research (Gemini + Claude, both independent) ranked THIS idea #1 —
-#   triaged in gemini_loop/RESPONSE_05.md. It is the literal next deletion on the axis
-#   that just won: iter5 relative-time removed absolute window START (+0.0128); this
-#   removes absolute window LENGTH.
+# ITERATION 8 — NoPE / permutation-invariant SET encoder, CAPACITY-REMOVING.
+#   RESPONSE_05 idea #2. Drop the positional embedding entirely (seq.pos_encoding=none):
+#   with bidirectional attention + masked-mean-pool the network becomes a permutation-
+#   invariant SET encoder over the observed monthly band-vectors. It can no longer memorize
+#   WHICH slot a value sat in — the ultimate deletion of the position channel. The Sentinel-1
+#   aquaculture signature (persistent low VH/VV backscatter; temporal median) is a set
+#   statistic, so most real signal should survive.
 #
-#   Mechanism: after relative_time left-aligns the observed window to offsets 0..L-1,
-#   re-index each position by the fractional coordinate p = offset/(L-1) in [0,1] so a
-#   4-, 5-, and 6-month window all share ONE relative frame; read the positional vector
-#   by linearly interpolating the existing learned length-12 table at index j = p*11.
-#   PARAMETER-NEUTRAL (reuses the champion's table; reduces to the champion exactly when
-#   L=12). Touches only the TIME coordinate — stays off the toxic amplitude axis
-#   (detrend was -0.0514). seq.pos_encoding=dnorm is the ONLY variable vs the 0.8908
-#   champion; pos_encoding=learned reproduces it bit-for-bit. Held at prevalence_target 0.649.
+#   Context: iter5 relative-time (remove start) WON +0.0128 — start IS shifted train-vs-test.
+#   iter7 duration-norm (remove length) LOST −0.0064 — length is already distribution-matched,
+#   so there was no shift to remove. NoPE tests the strongest form: remove positional identity
+#   ALTOGETHER. Two-tailed — order also carries pond-vs-rice fill/drain timing, so this can go
+#   either way — but regardless of public score it is the ideal DIVERSE second private-LB finalist
+#   (fails on different rows than the champion). pos_encoding=none is the ONLY variable vs the
+#   0.8908 champion; pos_encoding=learned reproduces it bit-for-bit. Held at prevalence_target 0.649.
 #
-#   Rejected re-treads from round 05 (see RESPONSE_05.md): Saerens-EM/MLLS prior (3rd
-#   rejection; label-shift assumption), Zou water-tree / WIF / EVI indices (dead-end +
-#   toxic amplitude axis), CAST self-training (ESS-collapse family), CropNet blend + big-bang
-#   bundle. Banked for later: NoPE set encoder (iter8, seq.pos_encoding=none, already coded),
-#   cross-view invariance objective (iter9), one-time prevalence sweep.
-#
-#   DECISION RULE: upload submission_seq_dnorm.csv, gate vs 0.8908.
-#     >= 0.8908 (esp. >= +0.005) -> length reframe transfers -> KEEP; bank NoPE (iter8).
-#     within noise            -> keep as a diversity candidate, don't iterate; go to NoPE.
-#     clear drop              -> revert (pos_encoding:learned); go to NoPE.
+#   DECISION RULE: upload submission_seq_nope.csv, gate vs 0.8908.
+#     > 0.8908           -> order was pure nuisance -> NEW CHAMPION; re-baseline.
+#     within ~0.01       -> lock as the DIVERSE finalist; next = cross-view invariance objective (iter9).
+#     craters (< ~0.87)  -> order carries real signal -> abandon pure NoPE; try the middle ground
+#                           (set + a single explicit "duration=L" token) OR go to iter9.
 # =====================================================================
 set -euo pipefail
 
-python run_pipeline.py --full --model seq --name seq_dnorm
+python run_pipeline.py --full --model seq --name seq_nope
 
-echo "=== done. Upload submissions/submission_seq_dnorm.csv (realized pos-rate 0.649) and paste the LB score ==="
+echo "=== done. Upload submissions/submission_seq_nope.csv (realized pos-rate 0.649) and paste the LB score ==="

@@ -74,29 +74,32 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: round-05 triaged; iter7 = duration-normalized positions (both reports' #1)
+## CURRENT STATE: iter7 dnorm DISCARDED (0.8844); iter8 = NoPE set encoder
 
-Champion = relative-time net (`pos_encoding: learned`, 0.8908). Round-05 Deep Research (Gemini +
-Claude) BOTH independently ranked **duration-normalized fractional positions** #1 → staged as iter7
-(`seq.pos_encoding: dnorm`): re-index each observed position by p=offset/(L-1)∈[0,1] so all window
-lengths share one frame (interpolate the learned length-12 table at j=p*11). Parameter-neutral;
-removes window-LENGTH memorization on top of relative-time's start-alignment. The transferable axis
-stays temporal/positional; amplitude-normalization remains toxic (detrend −0.051) and robustness
-moves remain within-noise (TTA −0.0023). Full triage: `gemini_loop/RESPONSE_05.md`.
+Champion = relative-time net (`pos_encoding: learned`, 0.8908). **iter7 duration-norm scored 0.8844
+(−0.0064) → discarded.** Diagnosis (a priori, not post-hoc): window LENGTH is already train/test
+distribution-matched by the masking augmentation (p(L)≈{4:.335,5:.333,6:.332}), so there was NO
+length covariate-shift to remove — dnorm only normalized away possibly-informative length signal.
+(Secondary confound: under relative_time, windows ≤6mo train only table indices 0-5, but interpolation
+read untrained indices 6-11.) **KEY REFINED LAW: a positional reframe helps ONLY when it deletes a
+channel that is actually SHIFTED train-vs-test.** START (calendar month) is shifted → relative-time
+WON. LENGTH is matched → dnorm LOST. Ask "is this channel shifted?" before proposing any reframe.
+iter8 NoPE removes positional identity entirely. Full triage: `gemini_loop/RESPONSE_05.md`.
 
 ## EXPERIMENT QUEUE
 
-- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885.
-1. **Iter7 — duration-normalized positions** *(current)*: `seq.pos_encoding=dnorm`. `submission_seq_dnorm.csv`.
-   Gate vs 0.8908 (keep if ≥ champion, esp. ≥ +0.005; diversity candidate if within noise; revert if clear drop).
-2. **NoPE / set encoder** (`seq.pos_encoding=none`, ALREADY CODED): drop positional embedding → permutation-
-   invariant set encoder. Two-tailed/high-variance but the ideal DIVERSE second finalist. iter8.
-3. **Cross-view invariance objective** across the K=2 views (`L=BCE+λ‖logit(v1)−logit(v2)‖²`): objective-level
+- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844.
+1. **Iter8 — NoPE / set encoder** *(current)*: `seq.pos_encoding=none` (ALREADY CODED). Drop positional
+   embedding → permutation-invariant set encoder over observed months. `submission_seq_nope.csv`.
+   Two-tailed: > 0.8908 = new champion; within ~0.01 = lock as DIVERSE finalist; craters (<0.87) =
+   order carries real signal → try set + explicit "duration=L" token middle ground, else go to iter9.
+2. **Cross-view invariance objective** across the K=2 views (`L=BCE+λ‖logit(v1)−logit(v2)‖²`): objective-level
    capacity-neutral lever, structurally like the winning reframe (not a robustness add-on). iter9.
-4. **One-time prevalence sweep** on the new champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned for the
+3. **One-time prevalence sweep** on the champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned for the
    OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE.
-- **Private-LB finalists:** champion + one structurally DISTINCT reframe (dnorm or NoPE), NOT the TTA
-  variant (too correlated). Verify Zindi's finalist mechanism (auto best-public vs designate two).
+- **Private-LB finalists:** champion + one structurally DISTINCT reframe (NoPE is the prime candidate;
+  dnorm is below champion + only mildly diverse), NOT the TTA variant (too correlated). Verify Zindi's
+  finalist mechanism (auto best-public vs designate two).
 
 ## REJECTED in round 05 (do not re-propose — see RESPONSE_05.md)
 
