@@ -88,11 +88,13 @@ transferable axis is temporal/positional, NOT amplitude — keep amplitude-norma
 ## EXPERIMENT QUEUE
 
 - ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885.
-1. **Iter7 (deciding)** — fork: (a) **multi-seed bagging** (`seq.n_repeats↑`, capacity-neutral) = last
-   banked robustness move, low-info on public but private-split insurance; vs (b) **next structural
-   reframe** (positional-family, capacity-neutral) via a research round — the proven-productive lane.
-2. **Private-LB submission selection** as deadline nears (UPDATE_04.md Q4). TTA file (0.8885) is a
-   candidate hedge, though it's a low-diversity variant of the champion.
+- **LOOP PAUSED for research (round 05).** User chose the research lane over banking robustness.
+  Brief = `gemini_loop/UPDATE_05.md` → paste into Deep Research. Ask: the next capacity-neutral
+  POSITIONAL-family structural reframe (duration-normalized positions, center/anchor alignment,
+  order/permutation reframing). NO amplitude-normalization (detrend −0.051), NO robustness moves
+  (TTA within-noise). Triage the reply in RESPONSE_05.md, then stage iter7 = the chosen reframe.
+- **Private-LB submission selection** as deadline nears (UPDATE_05.md Q4). TTA file (0.8885) is a
+  low-diversity hedge; prefer two diverse structural picks.
 
 ## Per-iteration protocol
 

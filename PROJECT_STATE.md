@@ -21,11 +21,10 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** iter7 direction is being decided (see below). Champion = clean
-   relative-time net (`seq.relative_time: true`, `seq.tta.enable: false`), LB **0.8908** — running
-   `run_current.sh` as-is reproduces it. Fork: (a) multi-seed bagging = last banked robustness move
-   (likely within-noise, private-split insurance) vs (b) research round for the next STRUCTURAL
-   reframe (the only direction that has moved LB). iter6 TTA discarded (0.8885, within noise).
+3. **Current next action:** **loop PAUSED for a research round.** Paste `gemini_loop/UPDATE_05.md`
+   into Deep Research (Gemini + Claude) to source the next capacity-neutral POSITIONAL-family
+   structural reframe — the only direction that has moved the LB. Running `run_current.sh` as-is
+   regenerates the champion `submission_seq_reltime.csv` (0.8908). iter6 TTA discarded (0.8885).
 4. Champion is safe & isolated: `seq.relative_time: true` is the champion; `seq.tta.enable: false`
    reproduces it bit-for-bit. Every probe flips exactly one flag, held at prevalence_target 0.649.
 
@@ -189,7 +188,7 @@ reproducible; ≤5 submissions/day.
 | **`PROJECT_STATE.md`** | ← this file. Master state, portable across accounts. Updated every session. |
 | `experiments/LB_LOG.md` | Reward ledger — paste each submission's Zindi LB here. |
 | `gemini_loop/AGENT_BRIEF.md` | Standing directive for the coding agent (rules, queue, meta-lessons). |
-| `gemini_loop/UPDATE_04.md` | Current research brief → paste into Deep Research. |
+| `gemini_loop/UPDATE_05.md` | **Current** research brief → paste into Deep Research (UPDATE_04 = prior round). |
 | `experiments/run_current.sh` | The one experiment the notebook runs each iteration (agent edits + pushes). |
 | `config/config.yaml` | Single source of truth for all pipeline settings. |
 | `colab_run.ipynb` / `RUN_ON_KAGGLE.md` | The pull-run loop for Colab / Kaggle. |
