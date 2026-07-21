@@ -21,11 +21,12 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: NO RUN IS STAGED — the loop is paused for research round 06.**
-   The config is reverted to the exact 0.8955 champion and `experiments/run_current.sh` is a
-   champion-reproduction run (costs no submission; use it as a free environment check).
-   **The live task is:** paste `gemini_loop/UPDATE_06.md` into Claude Fable Deep Research, then give
-   the report back to the agent for triage into `gemini_loop/RESPONSE_06.md`.
+3. **Current next action: `Run all` → iter11, then paste back the RETRO-FIT + GATE lines.
+   NO ZINDI UPLOAD.** Research round 06 is complete (both reports triaged in `RESPONSE_06.md`).
+   iter11 builds an **offline LB-predicting validator**: it regenerates 7 variants whose public LB we
+   already know, estimates each from the 1030 *unlabeled* test rows (ATC / two-seed disagreement /
+   naive control), and checks whether the ranking matches reality. ~8×7 min, **zero submissions**.
+   The committed config stays the exact champion — every variant comes from `--set` overrides.
 4. **Why paused:** iter10 (λ=3.0) scored 0.8921 (−0.0034) → reverted. Both structural lanes are now
    measured closed (positional: dnorm −0.006, NoPE +0.001; objective: λ=3 −0.003). We are out of
    queued ideas big enough to clear the ±0.01 noise. Budget is NOT the constraint (~130 submissions
@@ -140,9 +141,12 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | 0.9789 | 0.8917 | ➖ TIE +0.0009 (position is neutral; LOCKED as diverse finalist) |
 | 9 | cross-view invariance objective (`seq.consistency_lambda: 1.0`; penalize logit var across K views) | 0.9753 | **0.8955** | ✅ **NEW BEST** +0.0047 (reduced overconfidence; edge of noise) |
 | 10 | cross-view invariance strength probe (`consistency_lambda: 3.0`) | 0.9727 | 0.8921 | ❌ −0.0034 (λ=1.0 is an interior optimum; reverted; objective lane CLOSED) |
-| — | **research round 06** (`gemini_loop/UPDATE_06.md`) — Claude Fable only | | | **in flight** |
-| — | queued: seed-replication of the champion (2 subs; measures the assumed ±0.01) | | | not yet run |
-| — | queued: one-time prevalence sweep (plateau center); finalists = xview λ=1.0 + NoPE | | | not yet run |
+| — | research round 06 → `RESPONSE_06.md` (both reports triaged) | | | ✅ done |
+| 11 | **offline LB-predicting validator** (ATC · seed-disagreement · control) retro-fit to 7 known-LB anchors | | **0 subs** | **staged** |
+| 12 | queued: dispersion pooling `mean ⊕ std` (Ottinger permanence/low-std physics) | | | not yet run |
+| 13 | queued: focal loss γ=3 / FLSD-53, keep λ=1, refit δ | | | not yet run |
+| — | gated on iter11 PASS: fold-ensemble deletion → group-DRO → VH−VV → AUC surrogate | | | gated |
+| — | endgame: prevalence sweep · designate finalists (xview + NoPE) · reproduction README | | | not yet run |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
 capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A

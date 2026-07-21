@@ -1,0 +1,13 @@
+# Ground truth for the offline-validator retro-fit (tools/offline_validate.py).
+# Each row: a historical experiment whose PUBLIC LB we already know, and which is
+# reproducible from the current code via `--set` config overrides (see run_current.sh).
+# An estimator is only trustworthy if it ranks THESE correctly.
+#
+# variant<TAB>public_LB
+seq_a_detrend	0.8266
+seq_a_k4	0.8665
+seq_a_base	0.8780
+seq_a_reltime	0.8908
+seq_a_nope	0.8917
+seq_a_l3	0.8921
+seq_a_xview	0.8955

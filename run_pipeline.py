@@ -31,6 +31,32 @@ from src.validation import run_cv
 log = get_logger()
 
 
+def apply_overrides(cfg: dict, overrides) -> None:
+    """Apply `--set dotted.key=value` overrides onto the loaded config, in place.
+
+    Values are parsed as YAML so `false`, `0`, `1.0`, `none` and `[4,5,6]` all keep their
+    natural types. The key must already exist — a typo should fail loudly rather than
+    silently create a dead config entry that the pipeline then ignores.
+    """
+    import yaml as _yaml
+
+    for item in overrides or []:
+        if "=" not in item:
+            raise SystemExit(f"--set expects KEY=VALUE, got: {item!r}")
+        dotted, raw = item.split("=", 1)
+        parts = dotted.strip().split(".")
+        node = cfg
+        for p in parts[:-1]:
+            if not isinstance(node, dict) or p not in node:
+                raise SystemExit(f"--set: unknown config path {dotted!r}")
+            node = node[p]
+        leaf = parts[-1]
+        if not isinstance(node, dict) or leaf not in node:
+            raise SystemExit(f"--set: unknown config path {dotted!r}")
+        node[leaf] = _yaml.safe_load(raw)
+        log.info("config override: %s = %r", dotted, node[leaf])
+
+
 def validate_submission(df: pd.DataFrame, sample: pd.DataFrame) -> None:
     """Assert the submission matches the required schema exactly."""
     assert list(df.columns) == ["ID", "TargetF1", "TargetRAUC"], f"bad cols: {list(df.columns)}"
@@ -51,10 +77,16 @@ def main() -> None:
     ap.add_argument("--no-cache", action="store_true", help="ignore data cache")
     ap.add_argument("--model", default="gbdt", choices=["gbdt", "seq"],
                     help="gbdt = LGBM/XGB/CatBoost ensemble; seq = temporal Transformer")
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="override a config entry by dotted path, e.g. "
+                         "--set seq.consistency_lambda=0 --set seq.relative_time=false. "
+                         "Repeatable. Lets one run reproduce any historical variant without "
+                         "editing config.yaml (used by the offline-validator retro-fit).")
     args = ap.parse_args()
     smoke = args.smoke and not args.full
 
     cfg = load_config()
+    apply_overrides(cfg, args.set)
     set_global_seeds(cfg["seed"])
     name = args.name or ("smoke" if smoke else "full")
 

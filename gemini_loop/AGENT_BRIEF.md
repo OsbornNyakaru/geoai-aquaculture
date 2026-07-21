@@ -89,19 +89,25 @@ large enough to clear ±0.01. **Budget is no longer the constraint** (~130 submi
 ## EXPERIMENT QUEUE
 
 - …~~Iter5 relative-time~~ ✅0.8908 · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (FINALIST) · ~~Iter9 xview λ=1.0~~ ✅**0.8955 CHAMPION** · ~~Iter10 λ=3.0~~ ❌0.8921 (reverted).
-1. **RESEARCH ROUND 06** *(current — no run staged)*: `gemini_loop/UPDATE_06.md` → **Claude Fable Deep
-   Research only** this round. Briefs four never-explored lanes: (a) an **LB-predictive local validation**
-   (the highest-value ask — it would dissolve the noise-floor constraint); (b) **sequence-level feature
-   engineering** (the champion sees only 24 channels; all rich features live in the dead GBDT lane);
-   (c) **untried mathematics** (DRO, optimal transport, spectral, ranking objectives, conformal);
-   (d) **CV design + the domain literature**. Triage output → `RESPONSE_06.md`, then stage iter11.
-2. **Queued regardless of research outcome** (cheap, do before the deadline):
-   - **Seed-replication of the champion** (2 subs) — measures the seed spread we have always *assumed*
-     (±0.01 from row-count theory) but never measured. Needs a `--seed` CLI override in `run_pipeline.py`.
-   - **One-time prevalence sweep** (4 subs) — 0.649 was tuned for the 0.8780-era model; champion's raw
-     pos-rate is now 0.553. Needs a `calibration.prevalence_sweep` list mirroring the `prior_sweep` block
-     but calling `target_prevalence_shift()`. Self-check: the 0.649 entry must be byte-identical to the
-     main submission. Pick plateau CENTER, not argmax.
+~~Research round 06~~ DONE — both reports triaged in `RESPONSE_06.md`. Queue that came out of it:
+1. **Iter11 — OFFLINE LB-PREDICTING VALIDATOR** *(current, staged, **0 submissions**)*. Both reports
+   ranked this #1 independently. Regenerate 7 known-LB variants via the new `--set` overrides, estimate
+   each from the 1030 **unlabeled** test rows (ATC · two-seed disagreement · a naive margin control),
+   and check the ranking against `experiments/anchors.tsv`. **Gate:** detrend+K4 must fall below
+   reltime+xview with ρ>0.7. PASS → screen the backlog offline, ~80 subs become a real search budget.
+   FAIL → costs nothing; revert to funding only ≥+0.013 ideas.
+2. **Iter12 — dispersion pooling** `mean ⊕ std` over observed months (Fable's R3; Ottinger's
+   permanence/low-std physics). Fallback if within noise: split-pool (mean d/2 ⊕ std d/2) = exactly
+   capacity-neutral. **NOT** mean⊕max — the drain event is an outlier the literature suppresses.
+3. **Iter13 — focal loss** (γ=3 or FLSD-53, **not** γ=2), keeping λ=1; refit the prevalence δ.
+   Non-redundant with cross-view (entropy reg vs variance penalty). Moderate prior: iter10 showed
+   de-saturation is near-exhausted, and focal targets the same weakness by another route.
+4. **Gated on iter11 passing:** fold-ensemble deletion (train-on-all; kills OOF so it is unshippable
+   without a validator) → group-DRO over window-length groups → VH−VV replacement channel → pairwise
+   AUC surrogate (demoted: in-domain AUC already ≈0.99).
+5. **Endgame:** one-time prevalence sweep (4 subs; needs a `calibration.prevalence_sweep` list mirroring
+   `prior_sweep` but calling `target_prevalence_shift()`; the 0.649 entry must come out byte-identical
+   to the main submission — pick the plateau CENTRE) · designate the 2 finalists · reproduction README.
 - **Private-LB finalists — mechanism CONFIRMED (2026-07-21, Zindi rules page):** you **choose 2
   submissions** before close; if you don't, Zindi defaults to your 2 best *public* scores. So the
   hedge is USABLE: **manually designate xview λ=1.0 (0.8955) + NoPE (0.8917)** — do NOT rely on the
