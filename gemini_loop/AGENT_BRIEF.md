@@ -74,30 +74,27 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: positional lane EXHAUSTED; iter9 = cross-view invariance objective
+## CURRENT STATE: cross-view invariance WON (0.8955, new best); iter10 = λ-strength probe
 
-Champion = relative-time net (`pos_encoding: learned`, 0.8908). **iter8 NoPE scored 0.8917 (+0.0009 =
-TIE).** Removing ALL positional info costs nothing → order is nuisance-or-neutral here (confirms the
-SAR set-statistic physics). `submission_seq_nope.csv` is **LOCKED as the diverse private-LB finalist**
-(max-different model, ties public → fails on different rows). The arc — absolute-calendar 0.8780 →
-relative-time 0.8908 (+0.013) → NoPE 0.8917 (tie) — shows ALL the gain was deleting calendar-START
-memorization; residual position is neutral. Two reframes now < +0.003 → **stop-rule: positional lane
-done.** The other big shift channel (per-series AMPLITUDE) is toxic to touch (detrend −0.051, it IS
-signal). So "delete a shifted channel" is largely exhausted; budget shifts to the OBJECTIVE lever.
-REFINED LAW (keep): a reframe helps ONLY when it deletes a channel actually SHIFTED train-vs-test
-(START shifted → won; LENGTH matched → lost; POSITION-as-a-whole neutral → tie).
+Champion = relative-time + **cross-view invariance λ=1.0**, **0.8955** (new best). **iter9 scored 0.8955
+(+0.0047 vs the 0.8908 relative-time model)** — our highest public score. Mechanism: the consistency
+penalty (L=BCE+λ·Var_k(logit) across a row's K=2 views) REDUCED OVERCONFIDENCE (oof_auc 0.9936→0.9894,
+prevalence delta 2.03→1.30, t*=0.445), hitting the model's diagnosed weakness ("strong ranker, poor
+probabilities"). Another anti-correlation confirm: OOF fell (0.9753), LB rose. +0.0047 is at the EDGE of
+the ±0.01 noise, so iter10 pushes λ=3.0 to test if the lever scales past the floor or over-regularizes.
+Positional lane stays EXHAUSTED (dnorm −0.006, NoPE +0.001). Amplitude stays toxic (detrend −0.051).
 
 ## EXPERIMENT QUEUE
 
-- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (tie, FINALIST).
-1. **Iter9 — cross-view invariance objective** *(current)*: `seq.consistency_lambda=1.0`. Penalize logit
-   variance across a row's K=2 masked views: L=BCE+λ·Var_k(logit). Objective-level, capacity-neutral,
-   built on the champion base. `submission_seq_xview.csv`. Gate vs 0.8908; if ≤ champion → ENDGAME.
+- …~~Iter5 relative-time~~ ✅0.8908 · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (FINALIST) · ~~Iter9 xview λ=1.0~~ ✅**0.8955 CHAMPION**.
+1. **Iter10 — cross-view invariance strength probe** *(current)*: `seq.consistency_lambda=3.0` (up from 1.0).
+   `submission_seq_xview_l3.csv`. Gate vs 0.8955: clearly > → lever scales, consider a tight λ sweep; ~tie
+   or drop → revert to λ=1.0, go ENDGAME.
 2. **ENDGAME — one-time prevalence sweep** on the champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned
    for the OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE, near deadline.
-- **Private-LB finalists (SECURED-ish):** champion relative-time (0.8908) + NoPE (0.8917). Both diverse,
-  both ~0.891. NOT the TTA variant (too correlated). Verify Zindi's finalist mechanism (auto best-public
-  vs designate two) before deadline 2026-08-16.
+- **Private-LB finalists:** xview λ=1.0 (0.8955) + NoPE (0.8917) — diverse (xview = position+consistency;
+  NoPE = no position). NOT the TTA variant (too correlated). Verify Zindi's finalist mechanism (auto
+  best-public vs designate two) before deadline 2026-08-16.
 
 ## REJECTED in round 05 (do not re-propose — see RESPONSE_05.md)
 

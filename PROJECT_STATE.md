@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter8 NoPE tied (0.8917, locked as diverse finalist); positional lane exhausted; iter9 cross-view invariance staged**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8955** · **Loop state: ACTIVE — iter9 cross-view invariance WON (0.8955, new best); iter10 λ-strength probe staged**
 
 ---
 
@@ -21,12 +21,12 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** → upload `submission_seq_xview.csv` → paste the LB score. This
-   is iteration 9: cross-view invariance objective (`seq.consistency_lambda: 1.0`) — penalize the logit
-   variance across a row's K=2 masked views (`gemini_loop/RESPONSE_05.md` #4). Objective-level,
-   capacity-neutral, held at 0.649, isolated vs 0.8908. iter8 NoPE tied (0.8917) → locked as finalist.
-4. Champion is safe & isolated: `seq.consistency_lambda: 0` reproduces the champion bit-for-bit; iter9
-   sets it 1.0. If iter9 ≤ champion → ENDGAME: one-time prevalence sweep + finalize champion + NoPE picks.
+3. **Current next action:** **Run all** → upload `submission_seq_xview_l3.csv` → paste the LB score.
+   This is iteration 10: cross-view invariance STRENGTH probe (`seq.consistency_lambda: 3.0`, up from
+   the winning 1.0) — does pushing the invariance harder scale the +0.0047 gain past the noise floor,
+   or over-regularize the ranker? Isolated vs the 0.8955 champion. iter9 λ=1.0 WON (0.8955, new best).
+4. Champion = relative-time + `consistency_lambda: 1.0` (reproduce by setting 1.0); iter10 probes 3.0.
+   If iter10 ≤ 0.8955 → revert to 1.0 and ENDGAME: one-time prevalence sweep + finalize xview + NoPE.
 
 ---
 
@@ -69,15 +69,15 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
 
 - **Champion model:** from-scratch temporal Transformer (attention over observed months via
   `src_key_padding_mask`, per-band missing-indicator channels, masked-mean-pool), **K=2**
-  masking-augmented training views, **relative-time reframing ON** (observed window left-aligned
-  to t_rel=0), operating point held at **realized pos-rate 0.649**.
+  masking-augmented training views, **relative-time reframing ON**, **cross-view invariance objective
+  (λ=1.0)**, operating point held at **realized pos-rate 0.649**.
 - **Champion config** (`config/config.yaml`): `seq.K: 2`, `seq.relative_time: true`,
-  `seq.pos_encoding: learned` (iter7 probe sets it `dnorm`), all `seq.channels.*: false`,
-  `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
-- **Best public LB: 0.8908** (was 0.8780 for 10 days; relative-time added +0.0128). Field: top
-  ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.037**.
-- **Loop state: ACTIVE.** First win since the plateau. Now banking capacity-neutral robustness
-  moves (TTA → multi-seed bagging) on the new champion.
+  `seq.pos_encoding: learned`, `seq.consistency_lambda: 1.0` (iter10 probes 3.0), all
+  `seq.channels.*: false`, `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
+- **Best public LB: 0.8955** (0.8780 → +0.0128 relative-time → 0.8908 → +0.0047 cross-view invariance).
+  Field: top ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.033**.
+- **Loop state: ACTIVE.** Positional lane exhausted; the objective lever (cross-view invariance) gave
+  the latest gain. Diverse finalist (NoPE 0.8917) locked. iter10 tests if the invariance lever scales.
 
 ---
 
@@ -126,8 +126,9 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | — | 0.8885 | ❌ −0.0023 (within noise, did not beat champion; reverted) |
 | 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | 0.9789 | 0.8844 | ❌ −0.0064 (length already matched → no shift to remove; reverted) |
 | 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | 0.9789 | 0.8917 | ➖ TIE +0.0009 (position is neutral; LOCKED as diverse finalist) |
-| 9 | cross-view invariance objective (`seq.consistency_lambda: 1.0`; penalize logit var across K views) | _pending_ | _pending_ | staged (RESPONSE_05 #4) |
-| — | endgame: one-time prevalence sweep (plateau center); finalists = champion + NoPE | | | not yet run |
+| 9 | cross-view invariance objective (`seq.consistency_lambda: 1.0`; penalize logit var across K views) | 0.9753 | **0.8955** | ✅ **NEW BEST** +0.0047 (reduced overconfidence; edge of noise) |
+| 10 | cross-view invariance strength probe (`consistency_lambda: 3.0`) | _pending_ | _pending_ | staged |
+| — | endgame: one-time prevalence sweep (plateau center); finalists = xview λ=1.0 + NoPE | | | not yet run |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
 capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A
@@ -149,6 +150,9 @@ identity entirely — a bigger, two-tailed bet, and the diverse finalist regardl
 3. **Relative-time reframing** (+0.013 to 0.891, 2026-07-21): left-align each observed window to
    t_rel=0 so positional embeddings encode relative step, not calendar month — kills the calendar-
    specific spectral memorization the covariate shift punishes. Capacity-neutral; broke a 10-day plateau.
+4. **Cross-view invariance objective** (+0.005 to 0.8955, 2026-07-21): penalize logit variance across
+   a row's K=2 masked views (L=BCE+λ·Var). Reduced the model's overconfidence (its diagnosed weakness)
+   and improved transfer. Objective-level, capacity-neutral. At the edge of noise — iter10 tests if it scales.
 
 **What DECLINED (Phase 3 — everything we tried after 0.878):**
 - Blend −0.0075, detrend −0.0514, K=4 −0.0115. Pattern: **every attempt that ADDED something

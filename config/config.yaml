@@ -152,12 +152,16 @@ seq:
   # ties on public -> fails on different rows). Positional lane EXHAUSTED (dnorm −0.006, NoPE +0.001,
   # both < +0.003 -> stop-rule). Champion stays learned; budget shifted to the objective lever.
   pos_encoding: learned
-  # Iter9 (current) = cross-view invariance objective (RESPONSE_05 #4). During training, each row's
-  # K=2 masked views get a consistency penalty: L = BCE + lambda*mean((logit_v1 - logit_v2)^2). Teaches
-  # label-invariance to WHICH window is observed — an objective/inductive-bias change (structurally like
-  # the winning reframe, NOT an inference robustness add-on like TTA). Capacity-neutral, no new params.
-  # 0.0 = champion (bit-for-bit). Only active when seq.K>1 (needs >=2 views/row).
-  consistency_lambda: 1.0
+  # Cross-view invariance objective (RESPONSE_05 #4): each row's K=2 masked views get a consistency
+  # penalty L = BCE + lambda*mean((logit_v1 - logit_v2)^2), teaching label-invariance to WHICH window
+  # is observed. Objective/inductive-bias change (like the winning reframe), NOT an inference add-on.
+  # 0.0 = original champion (relative-time only); only active when seq.K>1.
+  # Iter9 RESULT (lambda=1.0): 0.8955 — NEW BEST (+0.0047 vs 0.8908; best public score yet). It
+  # reduced overconfidence (oof_auc 0.9936->0.9894, prevalence delta 2.03->1.30) — hitting the model's
+  # diagnosed weakness. NEW CHAMPION = relative-time + consistency_lambda:1.0 (reproduce by setting 1.0).
+  # Iter10 (current) probes lambda=3.0: does pushing the invariance HARDER give a clearly larger,
+  # noise-resolvable gain, or does it over-regularize the ranker? Only variable vs the 0.8955 champion.
+  consistency_lambda: 3.0
   # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
   # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
   # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->

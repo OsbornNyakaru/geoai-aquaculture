@@ -27,7 +27,8 @@ capacity-neutral ideas; testing relative-time reframing first, banking TTA + mul
 | 5 | 2026-07-21 | Relative-time reframing (left-align window to t_rel=0; capacity-neutral) | submission_seq_reltime.csv | 0.649 | **0.8908** | ✅ **NEW BEST** (+0.0128; clears ±0.01 noise. First win since champion — capacity-NEUTRAL structural reframe transfers where every capacity-ADDING change lost. Attacks calendar-month memorization.) |
 | 6 | 2026-07-21 | MC temporal-dropout TTA on champion (inference-only; mask 1-2 active months, soft-vote 8 views) | submission_seq_reltime_tta.csv | 0.649 | 0.8885 | ❌ (−0.0023; within noise but did NOT beat champion. 2nd robustness move to land within-noise — variance reduction isn't the lever here. Reverted; kept as a private-LB hedge candidate.) |
 
-**Current best: 0.8908** (temporal Transformer + relative-time reframing, realized pos-rate 0.649).
+**Current best: 0.8955** (temporal Transformer + relative-time + cross-view invariance λ=1.0, realized
+pos-rate 0.649). Prior anchor 0.8908 = relative-time alone.
 
 **Pattern after iter6:** capacity-neutral *robustness* moves (TTA now, and by extension multi-seed
 bagging) land within the ±0.01 noise — they can't be validated on public and don't lift rank. The
@@ -53,7 +54,8 @@ that is actually shifted between train and test.** iter8 NoPE tests removing pos
 Two reframes now < +0.003 → stop-rule. The other big shift channel (per-series amplitude) is toxic to
 touch (detrend −0.051). Budget shifts to the OBJECTIVE lever (iter9) then endgame (prevalence + finalists).
 
-| 9 | _pending_ | Cross-view invariance objective (L=BCE+λ·Var_k(logit) across K=2 views; λ=1.0) | submission_seq_xview.csv | 0.649 | _awaiting Zindi_ | |
+| 9 | 2026-07-21 | Cross-view invariance objective (L=BCE+λ·Var_k(logit) across K=2 views; λ=1.0) | submission_seq_xview.csv | 0.649 | **0.8955** | ✅ **NEW BEST** (+0.0047 vs 0.8908; best public score yet). Reduced overconfidence (oof_auc 0.9936→0.9894, prevalence delta 2.03→1.30) — hit the model's diagnosed weakness. At edge of noise, so iter10 probes λ=3.0 to test if the lever scales. |
+| 10 | _pending_ | Cross-view invariance strength probe (λ 1.0→3.0) | submission_seq_xview_l3.csv | 0.649 | _awaiting Zindi_ | |
 
 **BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
 "added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same
