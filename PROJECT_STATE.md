@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter7 dnorm discarded (0.8844); iter8 NoPE set-encoder staged**
+- **Last updated:** 2026-07-21 · **Champion public LB: 0.8908** · **Loop state: ACTIVE — iter8 NoPE tied (0.8917, locked as diverse finalist); positional lane exhausted; iter9 cross-view invariance staged**
 
 ---
 
@@ -21,12 +21,12 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action:** **Run all** → upload `submission_seq_nope.csv` → paste the LB score. This
-   is iteration 8: NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`) — drop the
-   positional embedding entirely (`gemini_loop/RESPONSE_05.md` #2). Two-tailed but the ideal DIVERSE
-   private-LB finalist; parameter-removing, held at 0.649, isolated vs 0.8908. iter7 dnorm discarded (0.8844).
-4. Champion is safe & isolated: `seq.pos_encoding: learned` reproduces the champion bit-for-bit;
-   iter8 sets it `none`. One flag per probe. Cross-view invariance objective is queued for iter9.
+3. **Current next action:** **Run all** → upload `submission_seq_xview.csv` → paste the LB score. This
+   is iteration 9: cross-view invariance objective (`seq.consistency_lambda: 1.0`) — penalize the logit
+   variance across a row's K=2 masked views (`gemini_loop/RESPONSE_05.md` #4). Objective-level,
+   capacity-neutral, held at 0.649, isolated vs 0.8908. iter8 NoPE tied (0.8917) → locked as finalist.
+4. Champion is safe & isolated: `seq.consistency_lambda: 0` reproduces the champion bit-for-bit; iter9
+   sets it 1.0. If iter9 ≤ champion → ENDGAME: one-time prevalence sweep + finalize champion + NoPE picks.
 
 ---
 
@@ -125,8 +125,9 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 5 | relative-time reframing (`seq.relative_time`: left-align window to t_rel=0) | 0.9811 | **0.8908** | ✅ **NEW CHAMPION** (+0.0128; first win, capacity-neutral structural reframe) |
 | 6 | MC temporal-dropout TTA on champion (`seq.tta`: mask 1-2 active months, 8 views, soft-vote) | — | 0.8885 | ❌ −0.0023 (within noise, did not beat champion; reverted) |
 | 7 | duration-normalized fractional positions (`seq.pos_encoding: dnorm`; share [0,1] frame across L) | 0.9789 | 0.8844 | ❌ −0.0064 (length already matched → no shift to remove; reverted) |
-| 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | _pending_ | _pending_ | staged (RESPONSE_05 #2) |
-| — | queued: cross-view invariance objective (iter9); one-time prevalence sweep on new champion | | | not yet run |
+| 8 | NoPE / permutation-invariant SET encoder (`seq.pos_encoding: none`; drop positional embedding) | 0.9789 | 0.8917 | ➖ TIE +0.0009 (position is neutral; LOCKED as diverse finalist) |
+| 9 | cross-view invariance objective (`seq.consistency_lambda: 1.0`; penalize logit var across K views) | _pending_ | _pending_ | staged (RESPONSE_05 #4) |
+| — | endgame: one-time prevalence sweep (plateau center); finalists = champion + NoPE | | | not yet run |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
 capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A

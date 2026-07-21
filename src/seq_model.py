@@ -268,11 +268,12 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
     return PondTransformer()
 
 
-def _train(model, x, pad, y, cfg, device):
+def _train(model, x, pad, y, cfg, device, K: int = 1):
     import torch
     import torch.nn as nn
 
     s = cfg["seq"]
+    lam = float(s.get("consistency_lambda", 0.0))
     model.to(device).train()
     opt = torch.optim.AdamW(model.parameters(), lr=s["lr"], weight_decay=s["weight_decay"])
     lossf = nn.BCEWithLogitsLoss()
@@ -282,6 +283,31 @@ def _train(model, x, pad, y, cfg, device):
     n = len(y)
     bs = s["batch_size"]
     g = torch.Generator(device="cpu").manual_seed(cfg["seed"])
+
+    # Cross-view invariance (iter9): the K masking views of each row are contiguous blocks
+    # (see _mask_views), so batch by OWNER and add a penalty on the variance of the K logits
+    # of the same row: L = BCE + lam * mean_owner Var_k(logit). Teaches label-invariance to
+    # WHICH window is observed. Only when lam>0 and K>1; else the original per-view path runs
+    # unchanged (champion bit-for-bit).
+    if lam > 0.0 and K > 1 and n % K == 0:
+        n_owner = n // K
+        obs = max(1, bs // K)
+        ar = torch.arange(K)
+        for _ in range(s["epochs"]):
+            operm = torch.randperm(n_owner, generator=g)
+            for i in range(0, n_owner, obs):
+                oidx = operm[i:i + obs]
+                vidx = (oidx.unsqueeze(1) * K + ar).reshape(-1).to(device)
+                opt.zero_grad()
+                out = model(xt[vidx], pt[vidx])
+                loss = lossf(out, yt[vidx])
+                out_g = out.view(len(oidx), K)
+                cons = ((out_g - out_g.mean(dim=1, keepdim=True)) ** 2).mean()
+                loss = loss + lam * cons
+                loss.backward()
+                opt.step()
+        return model
+
     for _ in range(s["epochs"]):
         perm = torch.randperm(n, generator=g).to(device)
         for i in range(0, n, bs):
@@ -407,6 +433,9 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
         log.info("seq pos_encoding=%s (%s)", pos_mode,
                  "duration-normalized fractional positions" if pos_mode == "dnorm"
                  else "NoPE / permutation-invariant set encoder")
+    lam = float(s.get("consistency_lambda", 0.0))
+    if lam > 0.0:
+        log.info("seq cross-view invariance ON: lambda=%.3g (penalize logit variance across K views)", lam)
     tta_on = bool((s.get("tta") or {}).get("enable", False))
     if tta_on:
         _t = s["tta"]
@@ -439,7 +468,7 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                                     relative_time=rel)
 
             model = _build_model(schema.n_months, Xtr.shape[2], cfg)
-            model = _train(model, Xtr, pad_tr, ytr, cfg, device)
+            model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K)
 
             va_cube, va_owner = _mask_views(train_cube, va, schema, wd, cfg,
                                             R, cfg["seed"] + rep, oof=True)

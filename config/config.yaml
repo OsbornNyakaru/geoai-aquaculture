@@ -146,12 +146,18 @@ seq:
   # 0-5 are trained, but interpolation reads indices up to 11 (untrained). Lesson: positional
   # reframes help ONLY when they delete a channel actually SHIFTED train-vs-test (start=shifted YES;
   # length=matched NO).
-  # Iter8 (current) = NoPE: drop the positional embedding entirely -> the encoder + masked-mean-pool
-  # becomes a permutation-invariant SET encoder over observed months. Removes ALL positional
-  # memorization; the SAR aquaculture signature (persistent low backscatter) is a set statistic.
-  # Two-tailed / high-variance (order also carries pond-vs-rice fill/drain timing) but the ideal
-  # DIVERSE private-LB finalist. Parameter-REMOVING. RESPONSE_05 #2.
-  pos_encoding: none
+  # Iter8 NoPE RESULT: 0.8917 (+0.0009 vs champion = TIE, within noise). Removing ALL positional
+  # info costs nothing -> order is nuisance-or-neutral here (confirms SAR set-statistic physics).
+  # submission_seq_nope.csv is LOCKED as the DIVERSE private-LB finalist (maximally different model,
+  # ties on public -> fails on different rows). Positional lane EXHAUSTED (dnorm −0.006, NoPE +0.001,
+  # both < +0.003 -> stop-rule). Champion stays learned; budget shifted to the objective lever.
+  pos_encoding: learned
+  # Iter9 (current) = cross-view invariance objective (RESPONSE_05 #4). During training, each row's
+  # K=2 masked views get a consistency penalty: L = BCE + lambda*mean((logit_v1 - logit_v2)^2). Teaches
+  # label-invariance to WHICH window is observed — an objective/inductive-bias change (structurally like
+  # the winning reframe, NOT an inference robustness add-on like TTA). Capacity-neutral, no new params.
+  # 0.0 = champion (bit-for-bit). Only active when seq.K>1 (needs >=2 views/row).
+  consistency_lambda: 1.0
   # Iter6 (MC temporal-dropout TTA, capacity-neutral, INFERENCE-ONLY): predict clean view +
   # n_views views each masking 1-2 random active months, soft-vote. RESPONSE_04 idea C.
   # RESULT: 0.8885 vs 0.8908 champion (-0.0023, within noise but did NOT beat champion) ->

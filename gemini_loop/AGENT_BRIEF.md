@@ -74,32 +74,30 @@ The refined law (this is the compass now):
 **Champion (NEW): seq K=2 + relative_time @ realized 0.649 = 0.8908.** Standing operating-point
 tool: `prevalence_target 0.649` (holds any probe at the exact champion pos-rate for clean isolation).
 
-## CURRENT STATE: iter7 dnorm DISCARDED (0.8844); iter8 = NoPE set encoder
+## CURRENT STATE: positional lane EXHAUSTED; iter9 = cross-view invariance objective
 
-Champion = relative-time net (`pos_encoding: learned`, 0.8908). **iter7 duration-norm scored 0.8844
-(−0.0064) → discarded.** Diagnosis (a priori, not post-hoc): window LENGTH is already train/test
-distribution-matched by the masking augmentation (p(L)≈{4:.335,5:.333,6:.332}), so there was NO
-length covariate-shift to remove — dnorm only normalized away possibly-informative length signal.
-(Secondary confound: under relative_time, windows ≤6mo train only table indices 0-5, but interpolation
-read untrained indices 6-11.) **KEY REFINED LAW: a positional reframe helps ONLY when it deletes a
-channel that is actually SHIFTED train-vs-test.** START (calendar month) is shifted → relative-time
-WON. LENGTH is matched → dnorm LOST. Ask "is this channel shifted?" before proposing any reframe.
-iter8 NoPE removes positional identity entirely. Full triage: `gemini_loop/RESPONSE_05.md`.
+Champion = relative-time net (`pos_encoding: learned`, 0.8908). **iter8 NoPE scored 0.8917 (+0.0009 =
+TIE).** Removing ALL positional info costs nothing → order is nuisance-or-neutral here (confirms the
+SAR set-statistic physics). `submission_seq_nope.csv` is **LOCKED as the diverse private-LB finalist**
+(max-different model, ties public → fails on different rows). The arc — absolute-calendar 0.8780 →
+relative-time 0.8908 (+0.013) → NoPE 0.8917 (tie) — shows ALL the gain was deleting calendar-START
+memorization; residual position is neutral. Two reframes now < +0.003 → **stop-rule: positional lane
+done.** The other big shift channel (per-series AMPLITUDE) is toxic to touch (detrend −0.051, it IS
+signal). So "delete a shifted channel" is largely exhausted; budget shifts to the OBJECTIVE lever.
+REFINED LAW (keep): a reframe helps ONLY when it deletes a channel actually SHIFTED train-vs-test
+(START shifted → won; LENGTH matched → lost; POSITION-as-a-whole neutral → tie).
 
 ## EXPERIMENT QUEUE
 
-- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844.
-1. **Iter8 — NoPE / set encoder** *(current)*: `seq.pos_encoding=none` (ALREADY CODED). Drop positional
-   embedding → permutation-invariant set encoder over observed months. `submission_seq_nope.csv`.
-   Two-tailed: > 0.8908 = new champion; within ~0.01 = lock as DIVERSE finalist; craters (<0.87) =
-   order carries real signal → try set + explicit "duration=L" token middle ground, else go to iter9.
-2. **Cross-view invariance objective** across the K=2 views (`L=BCE+λ‖logit(v1)−logit(v2)‖²`): objective-level
-   capacity-neutral lever, structurally like the winning reframe (not a robustness add-on). iter9.
-3. **One-time prevalence sweep** on the champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned for the
-   OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE.
-- **Private-LB finalists:** champion + one structurally DISTINCT reframe (NoPE is the prime candidate;
-  dnorm is below champion + only mildly diverse), NOT the TTA variant (too correlated). Verify Zindi's
-  finalist mechanism (auto best-public vs designate two).
+- ~~Iter2 blend~~ ❌0.8705 · ~~Iter3 detrend~~ ❌0.8266 · ~~Iter4 K=4~~ ❌0.8665 · ~~Iter5 relative-time~~ ✅**0.8908 CHAMPION** · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (tie, FINALIST).
+1. **Iter9 — cross-view invariance objective** *(current)*: `seq.consistency_lambda=1.0`. Penalize logit
+   variance across a row's K=2 masked views: L=BCE+λ·Var_k(logit). Objective-level, capacity-neutral,
+   built on the champion base. `submission_seq_xview.csv`. Gate vs 0.8908; if ≤ champion → ENDGAME.
+2. **ENDGAME — one-time prevalence sweep** on the champion (0.62/0.635/0.65/0.665/0.68): 0.649 was tuned
+   for the OLD model; free (no retrain), isolates the 60% F1 lever. Pick plateau CENTER. Do ONCE, near deadline.
+- **Private-LB finalists (SECURED-ish):** champion relative-time (0.8908) + NoPE (0.8917). Both diverse,
+  both ~0.891. NOT the TTA variant (too correlated). Verify Zindi's finalist mechanism (auto best-public
+  vs designate two) before deadline 2026-08-16.
 
 ## REJECTED in round 05 (do not re-propose — see RESPONSE_05.md)
 

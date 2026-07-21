@@ -46,7 +46,14 @@ which IS shifted train-vs-test) → +0.0128 WON. dnorm removed window LENGTH (al
 augmentation, NOT shifted) → −0.0064 LOST. **Positional reframes help ONLY when they delete a channel
 that is actually shifted between train and test.** iter8 NoPE tests removing positional identity entirely.
 
-| 8 | _pending_ | NoPE / permutation-invariant SET encoder (drop positional embedding; pos_encoding=none) | submission_seq_nope.csv | 0.649 | _awaiting Zindi_ | |
+| 8 | 2026-07-21 | NoPE / permutation-invariant SET encoder (drop positional embedding; pos_encoding=none) | submission_seq_nope.csv | 0.649 | 0.8917 | ➖ TIE (+0.0009, within noise). Removing ALL position costs nothing → order is nuisance-or-neutral (confirms SAR set-statistic physics). **LOCKED as the diverse private-LB finalist** (max-different model, ties public → fails on different rows). |
+
+**Positional lane EXHAUSTED:** absolute-calendar 0.8780 → relative-time 0.8908 (+0.013, WON) → NoPE
+0.8917 (tie). All the gain was deleting calendar-START memorization; residual position is neutral.
+Two reframes now < +0.003 → stop-rule. The other big shift channel (per-series amplitude) is toxic to
+touch (detrend −0.051). Budget shifts to the OBJECTIVE lever (iter9) then endgame (prevalence + finalists).
+
+| 9 | _pending_ | Cross-view invariance objective (L=BCE+λ·Var_k(logit) across K=2 views; λ=1.0) | submission_seq_xview.csv | 0.649 | _awaiting Zindi_ | |
 
 **BREAKTHROUGH (2026-07-21):** relative-time reframing broke the 10-day 0.8780 plateau. The
 "added capacity hurts" lesson now has its complement: capacity-NEUTRAL *structural* change (same
