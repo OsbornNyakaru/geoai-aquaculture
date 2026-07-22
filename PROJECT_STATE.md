@@ -13,7 +13,11 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-21 · **Champion public LB: 0.8955** · **Loop state: PAUSED for research round 06 — iter10 λ=3.0 LOST (0.8921), reverted to λ=1.0; both structural lanes now measured closed**
+- **Last updated:** 2026-07-22 · **Champion public LB: 0.8955** · **Loop state: iter11 STAGED (offline validator, 0 submissions) — awaiting Colab run**
+- **🚨 READ FIRST if you are a fresh session:** two beliefs recorded in every earlier revision of this
+  file were **wrong**, and both are corrected below. (1) **Pretrained models are LEGAL** — TabPFN and
+  Presto were rejected on a misreading of the rules. (2) **The metric is RANK-ONLY** — the LB is blind
+  to calibration. See §6 and `gemini_loop/RESEARCH_07.md`.
 
 ---
 
@@ -22,23 +26,27 @@
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
 3. **Current next action: `Run all` → iter11, then paste back the RETRO-FIT + GATE lines.
-   NO ZINDI UPLOAD.** Research round 06 is complete (both reports triaged in `RESPONSE_06.md`).
-   iter11 builds an **offline LB-predicting validator**: it regenerates 7 variants whose public LB we
-   already know, estimates each from the 1030 *unlabeled* test rows (ATC / two-seed disagreement /
-   naive control), and checks whether the ranking matches reality. ~8×7 min, **zero submissions**.
-   The committed config stays the exact champion — every variant comes from `--set` overrides.
-4. **Why paused:** iter10 (λ=3.0) scored 0.8921 (−0.0034) → reverted. Both structural lanes are now
-   measured closed (positional: dnorm −0.006, NoPE +0.001; objective: λ=3 −0.003). We are out of
-   queued ideas big enough to clear the ±0.01 noise. Budget is NOT the constraint (~130 submissions
-   left over ~26 days) — **idea quality and measurement resolution are.**
-5. **Queued regardless of the research outcome** (cheap, do before the deadline): (a) seed-replication
-   of the champion, 2 subs — measures the seed spread we have always *assumed* but never measured;
-   (b) one-time prevalence sweep, 4 subs — 0.649 was tuned for the 0.8780-era model.
-6. **RULE FACTS CONFIRMED (2026-07-21, Zindi page — see `gemini_loop/RESEARCH_06_CLAUDE.md` §0):**
-   (a) we **designate 2 finalist submissions** (default = 2 best public) → the NoPE hedge is usable;
-   designate champion + NoPE manually before close. (b) **100-total-submission cap**: ≈20 used, ≈80
-   left. (c) final score = **65% LB + 35% rubric** (top-5, reproducibility/innovation) → prep a
-   reproduction README at endgame.
+   NO ZINDI UPLOAD.** iter11 builds an **offline LB-predicting validator**: it regenerates 7 variants
+   whose public LB we already know, estimates each from the 1030 *unlabeled* test rows (ATC / ATC-F1 /
+   two-seed disagreement / naive control), and checks whether the ranking matches reality.
+   **~11×7 min, zero submissions.** The committed config stays the exact champion — every variant
+   comes from `--set` overrides.
+4. **iter11 was REPAIRED on 2026-07-22 before its first run** (`RESEARCH_07.md`). Three bugs would
+   have wasted the whole spend: the DIS estimator was **unscoreable** (only the champion got a second
+   seed, but ≥3 variants are needed for a rank correlation — now fixed by seeding detrend/k4/reltime);
+   the gate could raise `KeyError`; and a loose glob admitted `_smoke` files as seed replicates.
+   The **gate itself was replaced**: exact permutation nulls at n=7 show ρ>0.7 passes by chance at
+   p=0.044 (~9% familywise over 3 estimators) **and** can reject a *perfect* validator (ρ=0.643),
+   because 4 of the 7 anchors sit inside the noise band so their measured order is itself noise. It
+   now scores concordance on pairs with |ΔLB| > 0.01 (exact null p=0.0048), with ρ reported descriptively.
+5. **After iter11, branch on the gate** — the two-scenario decision tree is in `RESEARCH_07.md` §6.
+   Zero-submission work that runs either way: the partial-S2 missingness audit, iterated adversarial
+   channel attribution, posting the two-column legality question, and building the Presto/TabPFN lane.
+6. **RULE FACTS (verified 2026-07-22):** (a) we **designate 2 finalist submissions** (default = 2 best
+   public) → the hedge is usable; designate manually before close. (b) **100-total cap**: ≈20 used,
+   ≈80 left. (c) final score = **65% LB + 35% rubric** (top-5, reproducibility/innovation) → prep a
+   reproduction README at endgame; the ITU Cropland precedent (same organiser family, 40% report
+   weight) shows this channel is real and low-variance. (d) **Pretrained models are LEGAL** — see §6.
 
 ---
 
@@ -87,10 +95,32 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   `seq.K: 2`, `seq.relative_time: true`, `seq.pos_encoding: learned`, `seq.consistency_lambda: 1.0`,
   all `seq.channels.*: false`, `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
 - **Best public LB: 0.8955** (0.8780 → +0.0128 relative-time → 0.8908 → +0.0047 cross-view invariance).
-  Field: top ≈0.9452, top-5 ≈0.928–0.945. Gap to top-5 now ≈ **+0.033**.
-- **Loop state: PAUSED for research round 06.** Both structural lanes measured closed — positional
-  (dnorm −0.006, NoPE +0.001) and objective (λ=3 −0.003, so λ=1 is an interior optimum). Diverse
-  finalist (NoPE 0.8917) locked. No experiment is staged; `UPDATE_06.md` is the live deliverable.
+- **Target RECALIBRATED 2026-07-22.** Forum scores of 0.953 / "0.98+" were posted **before the
+  25 Jun data reset**, i.e. earned on the **leaked** data — ignore them. The live competitive band is
+  the "90s club" (thread dated 14 Jul, post-reset): roughly **0.90–0.95**. We sit just below the bar,
+  **not 0.033 behind it.** The gap is smaller and more winnable than earlier revisions of this file claimed.
+- **Loop state: iter11 STAGED (offline validator, 0 submissions), awaiting a Colab run.** Both
+  structural lanes measured closed — positional (dnorm −0.006, NoPE +0.001) and objective (λ=3 −0.003,
+  so λ=1 is an interior optimum). Diverse finalist (NoPE 0.8917) provisionally locked — **but** if any
+  lane produces a model within ~0.01 of champion with different errors, it replaces NoPE as finalist #2
+  (NoPE is a near-clone and buys little private-LB variance hedge).
+- **Research round 07 done** → `gemini_loop/RESEARCH_07.md`, which carries the rule correction, the
+  rank-only proof, the two-scenario decision tree, and the fixes applied to iter11.
+
+### Confirmed data facts (verified on the live Zindi site 2026-07-22)
+
+- **TRAIN: 1,821 rows × 12 FULL months**, ~40% positive. **TEST: 1,030 rows × only 4/5/6 CONSECUTIVE
+  months**, rest `-9999`; test positive rate believed ~0.65 (which is exactly our tuned prevalence).
+- Bands: S1 **VH/VV** always present when a month is observed; **10 S2 optical bands may be missing
+  per-band due to cloud**. **lat/lon REMOVED** — these are isolated patches with no spatial context.
+- **The shift is TEMPORAL BY DESIGN:** train and test are different time periods; conditions "change
+  across seasons and years." Public LB = **30%** of test (~309 rows), private = **70%** (~721 rows).
+- **25 Jun 2026 data reset** after a leak (new train = old train + old test *with labels*; new test
+  issued; lat/lon stripped). **Our first submission was 9 Jul**, so all 7 LB anchors post-date the
+  reset and are mutually comparable — the iter11 retro-fit is valid.
+- **Open question, unanswered on the forum:** does "month 01" in train mean the same calendar month
+  as "month 01" in test? If not, several seasonal ideas are unworkable and relative-time's win is
+  even better explained.
 
 ---
 
@@ -202,16 +232,42 @@ submission. Lesson: don't probe inside the noise; hunt changes big enough to cle
 3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise. Only
    probe changes plausibly large enough to clear it; don't A/B inside the noise band.
 
-**Do not re-propose (tried & failed, or rule-illegal):** GBDT+seq blend · `per_cell_detrend` and
-the additive-channel family (`deltas`/`indices`/`rank`, now low-prior) · K>2 augmentation · BBSE/EM
-prior estimation · WIF / fixed-threshold water features · TabPFN & any pretrained/foundation model
-(rule-banned) · temperature scaling · importance-weighting / DANN (ESS collapse @ adversarial AUC
-0.99) · OOF meta-stacking · group-KFold / "it's leakage" (the gap is designed covariate shift, proven
-leak-free).
+**Do not re-propose (tried & failed, or rule-illegal):** GBDT+seq blend *(but see the caveat below —
+the blend was badly constructed, not proof that blending fails)* · `per_cell_detrend` and the
+additive-channel family (`deltas`/`indices`/`rank`, now low-prior) · K>2 augmentation · BBSE/EM
+prior estimation · WIF / fixed-threshold water features · temperature scaling ·
+importance-weighting / DANN for TRAINING (ESS collapse @ adversarial AUC 0.99) · OOF meta-stacking ·
+group-KFold / "it's leakage" (the gap is designed covariate shift, proven leak-free) · VH−VV as a
+replacement channel *(removed 2026-07-22: `(VH,VV)→(VH,VH−VV)` is an invertible linear map feeding a
+linear layer, so the model can already represent it)*.
 
-**Constraints (never violate):** only supplied data; no external/pretrained models; AutoML banned;
-`TargetF1` scored at hard 0.5 (prior/prevalence shift allowed, threshold tuning not); seeded &
-reproducible; ≤5 submissions/day.
+> **⚠️ TabPFN and pretrained/foundation models are NO LONGER on this list.** They were listed as
+> "rule-banned" — that was **wrong**. See the corrected constraints below.
+
+**Constraints (never violate) — CORRECTED 2026-07-22 from the live rules page:**
+- Only the supplied datasets. **No external DATA.**
+- **PRETRAINED MODELS ARE ALLOWED** — verbatim: *"You may use pretrained models as long as they are
+  openly available to everyone."* Every doc before 2026-07-22 wrongly said "train from scratch, no
+  pretrained models," and TabPFN was rejected on that false basis. TabPFN v2, Presto, Prithvi, Clay,
+  SatMAE are all **legal**. (Caveat to verify: Zindi also says "custom packages in your submission
+  notebook will not be accepted" — confirm what that means operationally before relying on a pip dep.)
+- AutoML banned. Open-source, seeded, reproducible only.
+- `TargetF1` scored at hard 0.5 (prior/prevalence shift allowed, threshold tuning not).
+- **100 submissions total**, ≤5/day. Final score = **65% LB + 35% code review** of the top 5.
+
+**⚠️ THE METRIC IS RANK-ONLY.** After the prevalence pin the predicted-positive count is fixed at
+P̂ = 0.649·n, so F1 = 2·TP/(P̂+P) is monotone in precision@k, and AUC is rank-only by definition.
+**The LB sees only how the model ORDERS the 1030 test rows — it is blind to calibration.** This
+reframes the "de-saturation" story told about iter9/iter10 (cross-view invariance must have won by
+changing the *ranking*, not by reducing overconfidence) and demotes any change whose mechanism is
+purely calibrative (focal loss, temperature). It also means our prevalence instrument is saturated:
+Lipton et al. show the F1-optimal cut is F1\*/2, and our `t_star = 0.445` ≈ 0.89/2 already.
+
+**Measurement protocol (quantified 2026-07-22).** Combined-metric SE ≈ **0.012** on the 309-row
+public LB (≈0.008 on the 721-row private). But a **paired** delta between two ρ≈0.9 variants of our
+own model has SE ≈ **0.006**. So: unpaired/cross-team needs ≥0.012; our own A/B is *confident* at
+≥0.012 and *suggestive* at ≥0.006; below 0.006 is unmeasurable. Expected |public − private| drift
+for a single model ≈ 0.012.
 
 ---
 
