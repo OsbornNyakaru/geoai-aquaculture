@@ -14,10 +14,16 @@
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
 - **Last updated:** 2026-07-22 · **Champion public LB: 0.8955** · **Loop state: iter11 STAGED (offline validator, 0 submissions) — awaiting Colab run**
-- **🚨 READ FIRST if you are a fresh session:** two beliefs recorded in every earlier revision of this
-  file were **wrong**, and both are corrected below. (1) **Pretrained models are LEGAL** — TabPFN and
-  Presto were rejected on a misreading of the rules. (2) **The metric is RANK-ONLY** — the LB is blind
-  to calibration. See §6 and `gemini_loop/RESEARCH_07.md`.
+- **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
+  1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
+     the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
+     verdicts have effect sizes smaller than that** — including relative-time (+0.0128) and the
+     cross-view win (+0.0047) that made this model "champion". **Do not trust any A/B in the ledger
+     below ±0.019 unless it was seed-paired.** The ±0.01 floor we operated under for fifteen
+     iterations came from row-count theory, never from a measurement.
+  2. **Pretrained models are LEGAL** — TabPFN and Presto were rejected on a misreading of the rules.
+  3. **The metric is RANK-ONLY** — the LB is blind to calibration.
+  See §6, `experiments/LB_LOG.md` (the seed section), and `gemini_loop/RESEARCH_07.md`.
 
 ---
 
@@ -25,7 +31,16 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action — TWO INDEPENDENT THINGS, do both:**
+3. **Current next action: `Run all` → iter15, then upload `submission_champion_seedavg5.csv`.**
+   iter15 measures the estimator seed-floor across five champion seeds, screens `c_meanmin` (the
+   *lower* tail — the pond literature's actual detector, which we never tested), and pools the five
+   champion seeds into one rank-averaged submission via the new `tools/seed_average.py`.
+   **Expect the seed-averaged public score to be BELOW 0.8955, and want it to be.** 0.8955 is the
+   better of two draws from a distribution with sd ~0.013 and is probably an upward fluctuation.
+   Judge the pooled submission against the **mean** of our single-seed scores (~0.886), not the max.
+   Chasing the public number under this much variance is what produces a shake-up.
+
+   **Superseded — kept for the record:**
    **(a) UPLOAD `submissions/submission_c_dropout3.csv` to Zindi** and paste the LB. The file was
    already written by the iter13 run — no rerun needed. This is our **first screen-approved
    submission** and the first LB spend since iter10.

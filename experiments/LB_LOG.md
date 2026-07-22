@@ -202,8 +202,61 @@ by the iter13 run. It changes **only** the seed, so:
 This is the seed-replication run that has sat queued since iter6 and was never spent. It is now the
 highest-value submission available, and it costs one.
 
-| 15 | 2026-07-22 | **Seed replication of the CHAMPION** (isolates seed; no other change) | submission_seq_a_xview_s7.csv | 0.649 | **pending** | — |
-| 16 | 2026-07-22 | dropout 0.3 at **seed 0** — the artifact the screen actually approved | submission_c_dropout3.csv | 0.649 | **pending** | — |
+| 15 | 2026-07-22 | **SEED REPLICATION OF THE CHAMPION** — identical config, seed 42→7 | submission_seq_a_xview_s7.csv | 0.649 | **0.8764** | 🚨 **VOIDS THE LEDGER** |
+
+# 🚨 THE SEED RESULT — read this before trusting any earlier row
+
+**The champion configuration, changing nothing but the RNG seed, moved 0.0191.**
+
+| Run | Config | Seed | LB |
+|---|---|---|---|
+| `seq_a_xview` | champion | 42 | **0.8955** |
+| `seq_a_xview_s7` | **identical** | 7 | **0.8764** |
+| `c_dropout3_s7` | dropout 0.3 | 7 | 0.8675 |
+
+**Now iter14 can be attributed properly, paired at matched seed:**
+- **seed effect** (dropout held at 0.2): **−0.0191**
+- **dropout effect** (seed held at 7): **−0.0089**
+- **The seed matters 2.15× more than the change we were testing.**
+
+## What survives
+
+| Verdict | Δ | Status |
+|---|---|---|
+| GBDT → Transformer swap | +0.0500 | ✅ SURVIVES |
+| per-cell detrend | −0.0514 | ✅ SURVIVES |
+| **relative-time (iter5)** | +0.0128 | ❌ **VOID** — inside one seed swing |
+| K=4 (iter4) | −0.0115 | ❌ VOID |
+| GBDT blend (iter2) | −0.0075 | ❌ VOID |
+| dnorm (iter7) | −0.0064 | ❌ VOID |
+| **cross-view invariance (iter9) — the CHAMPION CLAIM** | +0.0047 | ❌ **VOID** |
+| λ=3 (iter10) | −0.0034 | ❌ VOID |
+| TTA (iter6) | −0.0023 | ❌ VOID |
+| NoPE (iter8) | +0.0009 | ❌ VOID |
+
+**Two of eleven verdicts survive.** Everything else — including the relative-time "breakthrough"
+that broke a 10-day plateau, and the cross-view win that made this model champion at all — is
+smaller than the noise we never measured. We spent roughly ten iterations doing careful A/B design
+against a measurement floor **twice as large as we believed**, and the ±0.01 estimate that governed
+every decision came from row-count theory, not from a measurement.
+
+**Our "champion" is plausibly just a lucky seed.** 0.8955 is the better of two draws from a
+distribution whose sd is ~0.013. Note also that our two designated finalists (xview 0.8955, NoPE
+0.8917) differ by 0.0038 — they are not two different models, they are two draws.
+
+## The strategic consequence
+
+When run-to-run variance dominates every real effect, the highest-value move is **not another
+architectural probe — it is to stop sampling one draw.** Averaging M seeds shrinks the pooled
+prediction's variance ~M-fold, and because the metric is **rank-only** after the prevalence pin,
+averaging moves the submitted ordering toward the configuration's *expected* ordering rather than
+one RNG draw's ordering. `tools/seed_average.py` added; iter15 pools five champion seeds.
+
+This also **retires a "banked" idea we deprioritized for the wrong reason.** Multi-seed bagging was
+parked back at iter6 as a "robustness move that lands within noise." That was exactly backwards:
+the noise *is* the problem, so the variance-reduction move is the highest-value one available.
+
+| 16 | 2026-07-22 | **Seed-averaged champion** (5 seeds, rank-pooled) | submission_champion_seedavg5.csv | 0.649 | **pending** | — |
 
 ---
 

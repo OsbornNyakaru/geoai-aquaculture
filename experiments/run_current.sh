@@ -71,20 +71,26 @@ python tools/offline_validate.py \
   --seed-spread seq_a_xview \
   --screen c_meanmin c_dropout3 c_do40 c_wd3
 
+# ---- THE HEADLINE ARTIFACT: pool the five champion seeds into one submission. ----
+# Seed variance (0.0191 measured) is larger than every effect in our ledger except two. The fix is
+# to stop sampling one draw. Rank-averaging 5 seeds cuts the variance ~5x and, because the metric
+# is rank-only, moves the submitted ordering toward the configuration's EXPECTED ordering.
+python tools/seed_average.py --variant seq_a_xview --name champion_seedavg5
+
 cat <<'NEXT'
 =====================================================================
- Paste back: the RETRO-FIT table, the GATE lines, the SEED SPREAD block, and the SCREEN table.
+ Paste back: RETRO-FIT, GATE, SEED SPREAD, SCREEN, and the seed_average pairwise-rank-correlation
+ line (that number tells us how much of our model is actually reproducible across seeds).
 
- SEPARATELY AND MOST IMPORTANTLY -- upload ONE file to Zindi:
+ THEN UPLOAD ONE FILE:
 
-     submissions/submission_seq_a_xview_s7.csv
+     submissions/submission_champion_seedavg5.csv
 
- That is the CHAMPION configuration at seed 7. It changes ONLY the seed, so it isolates the
- variable iter14 confounded:
-     ~0.895  -> seed variance is small, so dropout 0.3 genuinely failed and the screen produced
-                a false positive on a margin that was too thin.
-     ~0.867  -> seed variance is ~0.028, dropout is exonerated, and much of our ledger of
-                +-0.003 to +-0.013 "effects" has to be re-read as noise.
- Either answer is worth far more than one submission. Paste the LB back.
+ EXPECT A PUBLIC SCORE BELOW 0.8955, AND WANT IT.
+ 0.8955 was the better of two draws from a distribution with sd ~0.013 and is very likely an
+ upward fluctuation. The pooled submission trades that luck for reliability on the unseen
+ 721-row private slice that actually decides the competition. Chasing the public number is
+ exactly what produces a shake-up.
+ Judge it by: does it beat the MEAN of our single-seed scores (~0.886), not the max (0.8955)?
 =====================================================================
 NEXT
