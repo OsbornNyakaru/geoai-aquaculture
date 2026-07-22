@@ -31,7 +31,26 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter15, then upload `submission_champion_seedavg5.csv`.**
+3. **Current next action: upload `submissions/submission_champion_seedavg5.csv`** (already written by
+   the iter15 run — no rerun needed), and paste the LB back. Judge it against the **mean** of our
+   single-seed scores (~0.886), **not** the max (0.8955).
+
+   **iter15 settled the measurement question. The screen's resolution is ≈0.010–0.013 LB**, derived
+   two independent ways that agree: ATC-F1's seed sd (0.0576) converts to ±0.0094 LB via the anchor
+   fit `LB = 0.1628·ATCF1 + 0.7714`, and the directly measured champion seed spread is 0.0191
+   (sd ≈0.013). Seed rank-correlation is **0.9511** — ~95% of our ordering is reproducible, ~5% is
+   RNG, and that 5% moves the LB by 0.019.
+
+   **🚨 THE STANDING RULE FROM HERE: stop running small A/B probes.** Only effects **> ~0.010 LB**
+   are measurable *in principle* with our budget. The only two effects ever measured above that
+   floor are the GBDT→Transformer swap (+0.05) and detrend (−0.05) — **both model-class changes**.
+   Every architectural tweak, loss term, pooling variant, positional reframe and regularization knob
+   sits below it. The two fundable directions are **(a) variance reduction** (seed averaging) and
+   **(b) a model-class change** = the **Presto lane** (`RESEARCH_07.md` §5e).
+   In iter15 the new seed-noise guard downgraded two **2/2-vote** candidates to HOLD because their
+   margins were inside estimator seed noise — it caught exactly the iter14 mistake.
+
+   **Superseded — kept for the record:**
    iter15 measures the estimator seed-floor across five champion seeds, screens `c_meanmin` (the
    *lower* tail — the pond literature's actual detector, which we never tested), and pools the five
    champion seeds into one rank-averaged submission via the new `tools/seed_average.py`.

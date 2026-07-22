@@ -256,7 +256,57 @@ This also **retires a "banked" idea we deprioritized for the wrong reason.** Mul
 parked back at iter6 as a "robustness move that lands within noise." That was exactly backwards:
 the noise *is* the problem, so the variance-reduction move is the highest-value one available.
 
-| 16 | 2026-07-22 | **Seed-averaged champion** (5 seeds, rank-pooled) | submission_champion_seedavg5.csv | 0.649 | **pending** | — |
+## iter15 — the seed guard fired, and the screen's resolution is now calibrated
+
+**All four candidates HELD.** Two of them (`c_dropout3`, `c_wd3`) had **2/2 votes** and were
+**downgraded to HOLD** because their ATC-F1 margins sat inside the estimator's own seed noise. The
+guard built one iteration earlier caught exactly the mistake that produced iter14.
+
+| Candidate | ATC-F1 Δ | LB-equiv | DIS Δ | Verdict |
+|---|---|---|---|---|
+| `c_meanmin` | **+0.0672** | **+0.0109** | −0.0214 | HOLD (1/2 — but the only margin that clears the noise floor) |
+| `c_dropout3` | +0.0165 ~ | +0.0027 | +0.0107 | **HOLD** — 2/2 votes, ATC-F1 inside seed noise |
+| `c_wd3` | +0.0053 ~ | +0.0009 | +0.0049 | **HOLD** — 2/2 votes, ATC-F1 inside seed noise |
+| `c_do40` | −0.0021 ~ | −0.0003 | +0.0039 | HOLD |
+
+### The calibration — two independent routes to the same noise floor
+
+Fitting LB against ATC-F1 across the seven anchors gives **LB = 0.1628·ATCF1 + 0.7714**. So:
+
+| Quantity | Estimator units | **LB-equivalent** |
+|---|---|---|
+| ATC-F1 seed sd (n=5 champion seeds) | 0.0576 | **±0.0094 LB** |
+| Directly measured champion seed spread (42 vs 7) | — | **0.0191** (sd ≈0.013) |
+
+**Those agree.** The offline estimator's noise floor and the leaderboard's measured seed noise were
+derived by completely separate routes and landed in the same place. That is the strongest validation
+this framework has received — and it fixes the screen's resolution at **≈0.010–0.013 LB**.
+
+**Pairwise rank correlation between champion seeds: mean 0.9511, min 0.9467.** So ~95% of our test
+ordering is reproducible and ~5% is RNG lottery — and that 5% is enough to move the LB by 0.019.
+
+### 🚨 The strategic conclusion this forces
+
+Only effects **larger than ~0.010 LB** are measurable at all — offline *or* on the public board.
+
+| Effect ever measured | Δ | Measurable? |
+|---|---|---|
+| GBDT → Transformer swap | +0.0500 | ✅ |
+| per-cell detrend | −0.0514 | ✅ |
+| `c_rank` (offline, LB-equiv) | −0.0277 | ✅ |
+| **everything else we have ever tested** | ≤ 0.0128 | ❌ |
+
+**Both surviving effects are model-class changes.** Every architectural tweak, loss term, pooling
+variant, positional reframe and regularization knob we have probed sits below the floor and is
+*unmeasurable in principle* with our budget — not merely unproven.
+
+**So: stop running small A/B probes.** They cannot be resolved. The two remaining moves that are
+sized to the floor are:
+1. **Variance reduction** — seed-averaging, which converts the 0.019 lottery into a stable estimate.
+2. **A model-class change** — the same species as the +0.05 GBDT→Transformer swap. That is the
+   **Presto lane** (`RESEARCH_07.md` §5e), now the only fundable architectural direction.
+
+| 16 | 2026-07-22 | **Seed-averaged champion** (5 seeds, rank-pooled; seed rank-corr 0.951) | submission_champion_seedavg5.csv | 0.649 | **pending** | — |
 
 ---
 
