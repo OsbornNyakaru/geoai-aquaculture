@@ -159,6 +159,41 @@ def atc_f1_estimate(oof_prob: np.ndarray, y: np.ndarray, p_test: np.ndarray,
     return float(2.0 * tp / denom) if denom > 0 else float("nan")
 
 
+def diversity_estimate(test_per_fold: np.ndarray) -> float:
+    """FOLD-ENSEMBLE DIVERSITY: 1 - mean pairwise Spearman between the 5 fold-models on test.
+
+    WHY (RESEARCH_07.md, code audit H1 -- the leading explanation of the OOF anti-correlation).
+    Our reported OOF scores a SINGLE fold-model (averaged over R=2 masked views), but the
+    submitted probability is the MEAN OF 5 fold-models. Averaging is not rank-preserving, and
+    after the prevalence pin the leaderboard is a pure function of the RANKING -- so fold
+    averaging is a real ensembling step that the LB sees and that OOF never measures.
+
+    That predicts the ledger's sign pattern. A change that makes each individual model better
+    but the five models MORE ALIKE raises OOF while lowering the LB, because it destroys the
+    ensemble diversity the submission depends on. K=4 masking augmentation is exactly such a
+    change (more views per row -> each fold model converges to the same smoothed function), and
+    it produced our HIGHEST OOF (0.9840) and 2nd-WORST LB. Cross-view invariance is the converse:
+    it constrains each model harder (lowest OOF, 0.9753) without homogenizing the five, and it is
+    our champion.
+
+    If this quantity ranks the anchors, we have an LB-predictive local signal that needs no
+    unlabeled-data theory at all -- and it rides free on runs we are already doing.
+    """
+    a = np.asarray(test_per_fold, dtype=float)
+    if a.ndim != 2 or a.shape[0] < 2:
+        return float("nan")
+    ranks = np.apply_along_axis(lambda r: np.argsort(np.argsort(r)).astype(float), 1, a)
+    ranks -= ranks.mean(axis=1, keepdims=True)
+    norms = np.sqrt((ranks ** 2).sum(axis=1))
+    ok = norms > 0
+    if ok.sum() < 2:
+        return float("nan")
+    ranks, norms = ranks[ok], norms[ok]
+    corr = (ranks @ ranks.T) / np.outer(norms, norms)
+    iu = np.triu_indices(corr.shape[0], k=1)
+    return float(1.0 - corr[iu].mean())
+
+
 def informative_pairs(order: List[str], est: Dict[str, Dict[str, float]],
                       min_gap: float = 0.01) -> List[tuple]:
     """Anchor pairs whose LB gap EXCEEDS the noise floor -- the only pairs worth scoring.
@@ -246,6 +281,8 @@ def main() -> None:
             "atcf1": atc_f1_estimate(oof, y, p_test, args.prevalence_target),
             "marg": margin_estimate(p_test, args.prevalence_target),
         }
+        if "test_per_fold" in getattr(d, "files", []):
+            est[v]["div"] = diversity_estimate(d["test_per_fold"])
         seeds[v] = [np.load(f)["p_test_raw"] for f in files]
         if len(seeds[v]) >= 2:
             est[v]["dis"] = disagreement_estimate(seeds[v][0], seeds[v][1])
@@ -256,18 +293,19 @@ def main() -> None:
     if not est:
         raise SystemExit("no preds bundles found - run the anchor regeneration first")
 
-    keys = ("atc", "atcf1", "dis", "marg")
+    keys = ("atc", "atcf1", "dis", "div", "marg")
     order = sorted(est, key=lambda v: est[v]["lb"])
     log.info("")
-    log.info("%-22s %8s %8s %8s %8s %8s", "variant", "LB", "ATC", "ATC-F1", "DIS", "MARG")
+    log.info("%-22s %8s %8s %8s %8s %8s %8s",
+             "variant", "LB", "ATC", "ATC-F1", "DIS", "DIV", "MARG")
     for v in order:
         e = est[v]
 
         def _f(k):
             return f"{e[k]:.4f}" if k in e and np.isfinite(e[k]) else "-"
 
-        log.info("%-22s %8.4f %8s %8s %8s %8s", v, e["lb"],
-                 _f("atc"), _f("atcf1"), _f("dis"), _f("marg"))
+        log.info("%-22s %8.4f %8s %8s %8s %8s %8s", v, e["lb"],
+                 _f("atc"), _f("atcf1"), _f("dis"), _f("div"), _f("marg"))
 
     log.info("")
     log.info("=== RETRO-FIT: Spearman rho vs known public LB (n=%d) ===", len(order))
@@ -302,22 +340,28 @@ def main() -> None:
         if not scorable:
             log.info("  %-6s : not scorable (missing bundles)", key.upper())
             continue
-        # est[a]["lb"] < est[b]["lb"] by construction of `order`, so concordant means est_a < est_b
-        good = sum(1 for a, b in scorable if est[a][key] < est[b][key])
+        # est[a]["lb"] < est[b]["lb"] by construction of `order`, so concordant means est_a < est_b.
+        # We accept ANTI-concordance too: an estimator that reliably ranks the anchors BACKWARDS
+        # is exactly as useful as one that ranks them forwards -- you negate it. Only an estimator
+        # that ranks them INCONSISTENTLY carries no signal. (Relevant to DIV, whose sign is a live
+        # empirical question: H1 predicts more fold-diversity -> better LB, but the converse would
+        # be an equally usable screen and an equally interesting finding.)
         n = len(scorable)
-        ok = good == n
-        log.info("  %-6s : %d/%d concordant  %s   (rho = %s)", key.upper(), good, n,
+        good = sum(1 for a, b in scorable if est[a][key] < est[b][key])
+        ok, sign = (good == n or good == 0), ("+" if good == n else "-")
+        log.info("  %-6s : %d/%d concordant  %s%s   (rho = %s)", key.upper(), good, n,
                  "PASS" if ok else "FAIL",
+                 f" [sign {sign}]" if ok else "",
                  f"{verdicts[key]:+.3f}" if key in verdicts else "n/a")
         if ok:
-            cleared.append(key)
+            cleared.append(key if sign == "+" else f"{key}(negated)")
 
     log.info("")
     if len(cleared) >= 1:
         log.info("CLEARED: %s", ", ".join(k.upper() for k in cleared))
         log.info("-> The noise floor is broken. Screen the gated backlog offline and submit only "
                  "when >=2 estimators rank a candidate above the champion.")
-        if cleared == ["marg"]:
+        if set(cleared) <= {"marg", "marg(negated)"}:
             log.info("-> CAVEAT: only the NAIVE control cleared. The 'sophisticated' estimators "
                      "earned nothing; treat this as a weak screen, not a validator.")
     else:

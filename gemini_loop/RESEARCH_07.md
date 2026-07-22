@@ -268,6 +268,205 @@ ITU Cropland is the **same organiser family** as ours and weighted its report at
 
 ---
 
+## 5c. Findings from the internal code audit — **this section invalidates prior conclusions**
+
+I independently verified the two most damaging claims in the code before accepting them.
+
+### ⛔ Finding (C) "the amplitude axis is toxic" has NO evidence behind it
+
+`src/seq_model.py:87-94`:
+```python
+parts = [vals, miss]          # vals = the ABSOLUTE standardized bands
+if channels_cfg and ex_mean is not None:
+    ex = _raw_extra_channels(cube, schema, channels_cfg)
+    parts.append(ex)          # detrend channels are APPENDED
+x = np.concatenate(parts, axis=2)
+```
+**`per_cell_detrend` never removed anything.** It *appended* 12 detrended channels on top of the
+untouched absolute-value channels (24 → 36). The −0.0514 therefore measured **"adding 12 correlated
+channels hurts"** — it says *nothing whatever about amplitude*.
+
+This is the single most consequential error found in the whole project, because that one run is the
+sole basis for:
+- the belief that per-series level is toxic to touch;
+- the blanket ban on the ratio/relative channel family (`deltas`, `indices`, `rank`) — **exactly the
+  family our competitor intel says wins** ("relative and ratio-based features outperform absolute
+  values across time shifts");
+- the framing of every subsequent research brief, which told each researcher amplitude was proven toxic.
+
+The competition-strategy agent independently constructed a *physical* story reconciling the −0.051
+(deleting a large class separation to remove a small offset). That story is elegant and it is **also
+unnecessary** — the run simply wasn't the experiment we thought it was. **The amplitude question is
+reopened and untested.** `seq.channels.rank` (within-series normalized rank, maximally
+amplitude-invariant, `src/seq_model.py:150-166`) has never been probed and is the clean test — as a
+**replacement** for `vals`, not an addition.
+
+### ✅ The rank-only proof, confirmed in our code
+
+`src/calibration.py:127-128` applies `logit_shift(p_test, t_star)`; line 155 then calls
+`target_prevalence_shift`, which sets `delta = −quantile(logit(p), 1−π)`. A constant logit offset
+**cancels out of a quantile**. So with `prevalence_target` set, `t_star` is **inert**, and the
+submission reduces to `top-k(p_test_raw)` plus a rank transform.
+
+Two agents reached this independently, one from the metric algebra and one from our code. Every
+calibration diagnostic in the ledger (`t*` 0.500→0.445, `δ` 2.03→1.30) is **invisible to the
+leaderboard**. The iter9 win and iter10 loss are real; the *mechanism* we recorded for both
+("de-saturation") is impossible. **"The objective lane is closed because de-saturation stops paying"
+is therefore unfounded** — λ=1 and λ=3 differ by a ranking change of unknown origin.
+
+### 🔍 The OOF anti-correlation — the leading hypothesis is now testable for free
+
+The hypothesis I had been pushing (*OOF scored on 12-month series*) is **killed by the code**: OOF
+views are drawn from the same measured test window distribution as test rows
+(`src/seq_model.py:473-474` → `src/features.py:44-93`). The window regime matches.
+
+What does **not** match is the **estimator**:
+
+| | OOF | Test |
+|---|---|---|
+| models | **1** (the current fold's net) | **mean of 5** fold-models |
+| views per row | **2** (averaged) | **1** (the real window) |
+
+`src/seq_model.py:477-482` vs `489`/`499`. Fold-averaging is **not rank-preserving**, so it is a
+genuine ensembling step that the LB sees and OOF never measures. That predicts the ledger's sign
+pattern: a change that makes each model better but the five **more alike** raises OOF and lowers LB.
+**K=4 is exactly such a change** — more views per row, each fold model converging to the same
+smoothed function — and it gave our highest OOF (0.9840) and 2nd-worst LB. Cross-view invariance is
+the converse: harder constraint per model (lowest OOF, 0.9753), no homogenisation — our champion.
+
+**I implemented the free test.** `run_seq_cv` now returns per-fold test predictions, `run_pipeline.py`
+saves them into the preds bundle, and `tools/offline_validate.py` has a new **DIV** estimator
+(1 − mean pairwise Spearman between the 5 fold-models). It rides on the runs already staged, costs
+nothing extra, and if it ranks the anchors we have an LB-predictive local signal needing no
+unlabeled-data theory at all. The gate accepts an **anti**-correlated DIV too — a reliably inverted
+estimator is just as usable (negate it) and would be an equally interesting finding.
+
+### Other confirmed defects
+
+| # | Finding | Location | Consequence |
+|---|---|---|---|
+| S3 | Band scaler fit **globally** on all 1,821 train rows, outside the fold loop | `src/seq_model.py:426` | Every fold's validation rows fed the scaler → OOF uniformly optimistic. Explains bias, not anti-correlation. Free fix. |
+| S5 | Seed determinism incomplete for the seq path (no `use_deterministic_algorithms`, no `cudnn.deterministic`) | `src/utils.py:60-65`, `src/seq_model.py:461` | **Run-to-run spread has never been measured**, yet iter8 (+0.0009), iter9 (+0.0047) and iter10 (−0.0034) are all *smaller than a plausible seed effect*. |
+| S6 | The queued endgame `prior_sweep` uses `apply_prior` (a log-odds offset), **not** `target_prevalence_shift` | `run_pipeline.py:198-208` | It would sweep a *different lever* than the one that scored 0.8955, and no entry reproduces the main submission. |
+| S8 | `TargetF1` and `TargetRAUC` are both derived from the same `p_test_raw` | `run_pipeline.py:164-168` | The two columns are scored **independently**; nothing requires one ranking. Also means the −0.0075 blend was scored on *both* columns at once — its AUC contribution was never isolated. |
+| — | Finding (B)'s asymmetry (relative-time deleted a *shifted* start; dnorm deleted a *matched* length) | `src/data.py:192-216`, `src/features.py:52-63` | **False**: start *and* length are both sampled from the measured test distribution. The real deleted channel was calendar **identity**, not a shifted start distribution. |
+| — | Repro gaps for the 35% rubric | `README.md:28,119-141` | The README documents the **GBDT** as "the model" and `--full` defaults to `--model gbdt` — a judge reproducing "the solution" reproduces the 0.826-era model, not the champion. `results.tsv` (our strongest innovation evidence) is gitignored. |
+
+### The amplitude-invariant features already sitting unused in the GBDT lane
+
+Genuinely invariant (ratio / dB-difference / rank / boolean): `ndwi`, `mndwi`, `ndvi`
+(`src/features.py:106-107,125-128`); **`vv_minus_vh`** (`:142` — a dB difference is a linear ratio,
+the cleanest candidate); `std` and `range` aggregates (`:31,34-38` — level-invariant *dispersion*,
+i.e. Ottinger's permanence signature, **already computed and never given to the Transformer**);
+`_rank_months` (`src/seq_model.py:150-166`).
+
+Frequently miscategorised as invariant but **not**: `awei_nsh`/`awei_sh` (weighted linear
+combinations, `:129-130`) and **`sdwi`** (`:144-154` — `lnVV + lnVH + const` is a *sum of levels*,
+i.e. *more* amplitude-sensitive than either band). Also still present in the GBDT lane:
+`meta_start`/`meta_end`/`meta_center` (`:212-217`) — **calendar position, the exact channel whose
+deletion won +0.0128 in the seq lane**, never deleted here.
+
+---
+
+## 5d. Findings from the pond-physics agent — **iter12 is challenged**
+
+### The verdict: CHALLENGE, with one objection voided by the code audit
+
+The physics agent raised three objections to `mean ⊕ std`. **Its lead objection is void**, and I can
+only see that by crossing its report against the code audit — neither agent could do this alone:
+
+> **(i) "std is computed over 12 months in TRAIN and 4–6 in TEST — different physical quantities,
+> shifted by construction."** This would be fatal. But `src/features.py:52-63` already samples the
+> training window's **length from the measured test p(L)** and its **start from p(start|L)**. Train
+> views are already masked to test-like 4–6-month windows. **Objection void.** (The agent flagged it
+> conditionally — "if you are not already doing it… say so and skip" — having no code access.)
+
+**Objections (ii) and (iii) stand, and they are serious:**
+
+- **Dispersion is genuinely season-dependent.** Ponds are permanent but *managed*: area expands in
+  monsoon and contracts in summer through maintenance and evaporation (Ottinger 2025), and
+  drain-for-harvest is a deliberate recurring perturbation. "Ponds have low dispersion" is true
+  *annually averaged* and unreliable *within an arbitrary 4-month slice*. Wind roughening injects
+  further weather-driven, class-correlated variance.
+- **At n=4 a std is ~41% noisy** (relative SE = 1/√(2(n−1))), sitting on top of a residual speckle
+  floor of ~1–2 dB that is comparable to the hydrological dispersion difference being sought. One
+  silver lining: because dB turns multiplicative speckle into *additive, roughly class-independent*
+  noise, the comparison is attenuated rather than biased.
+
+Expected effect for iter12 as specified: **−0.02 to +0.005, mode negative**; ~25% chance of a real win.
+
+### The proposed replacement — and an honest disagreement between two agents
+
+The physics agent argues the literature's actual pond discriminator is **"never bright in any
+month"** (an *upper-tail* statistic), not "low variance". Rice, cropland and wetland negatives are
+all defined by *having* a bright canopy month — VH climbs 6–10 dB from flood to tillering — while a
+pond never rises. A **max** is an order statistic with **no calendar reference at all**, so it is
+immune to any train/test phase shift. It recommends **mean ⊕ max** over mean ⊕ std.
+
+**This directly contradicts the feature-engineering agent**, which rejected max on the grounds that
+the drain/harvest transient is an outlier the literature deliberately *suppresses* via the temporal
+median. I am not going to paper over this. Both are partly right, and the resolution is that they
+are talking about **different bright events**:
+
+| | Bright event | Effect on max |
+|---|---|---|
+| Feature agent | Pond **drain** (dry bed → rough → brighter) | Adds noise to positives |
+| Physics agent | Rice **canopy** (+6–10 dB, volume scattering) | Separates the main hard negative |
+
+So max is simultaneously contaminated (by drains) and discriminative (against rice). Which dominates
+is an **empirical question we cannot settle from the literature** — and it is exactly the kind of
+question the iter11 validator exists to answer offline. **Do not spend a submission choosing between
+mean⊕std and mean⊕max; screen both.**
+
+### Amplitude toxicity: real physics, but now doubly reframed
+
+The physics agent independently quantified the nuisance budget over a *permanent* pond:
+
+| Source | Magnitude |
+|---|---|
+| **Incidence angle / relative orbit** (29–46° swath, ~0.2–0.3 dB/deg) | **2–5 dB** — the dominant unlabelled axis |
+| **Wind roughening** (VV, episodic) | **+3–10 dB** |
+| **VH noise floor** — VH over calm water sits *at or below* the −22 dB NESZ, so it is partly instrument noise | variable by sub-swath |
+| S2 index drift (turbidity, algae, drawdown) | 0.1–0.3 index units |
+| Absolute sensor calibration | **≤0.5 dB (3σ)** — negligible |
+
+Against a pond-vs-non-pond contrast of order 5–10 dB, that is a large nuisance. So level *is* both
+the primary signal and the primary nuisance — the physics is real.
+
+**But note the two-layer correction now in play.** §5c showed the −0.051 detrend run never removed
+amplitude at all, so it was never evidence about this. The physics here says the *conclusion* was
+nonetheless roughly right — for reasons we hadn't measured. That is a much weaker footing than we
+thought we had: **we have a plausible physical story and zero experimental evidence.** The
+`seq.channels.rank` probe (as a *replacement* for `vals`) is the test we have never run.
+
+### VH−VV: third independent rejection
+
+The physics agent agrees with the feature agent and the math audit. It adds that the same argument
+kills **SDWI** (∝ ln(10·VV·VH) = the *sum* in dB — also a linear map, also already representable),
+and warns that the only *non*-invertible version — feeding VH−VV and **dropping** the co-pol level —
+deletes signature #1, the primary pond discriminator, and should be expected to lose −0.02 to −0.05.
+
+### The structural blind spot we must simply accept
+
+With lat/lon removed and a per-cell encoder, the model **cannot represent geometry** — pond
+rectangularity, size, dike double-bounce edges, neighbourhood arrangement. That is precisely the
+mechanism the entire literature uses to separate aquaculture from natural lakes, rivers and
+reservoirs (Ottinger's method is explicitly object-based). **A residual confusion with small natural
+water bodies is baked into this competition and no reframe fixes it.** Likewise acquisition geometry
+(incidence angle), the dominant nuisance, is unobserved and therefore un-normalisable.
+
+### Independent convergence worth noting
+
+The physics agent's Idea C — **collapse the ~11 collinear S2 missing-indicators to a single
+"S2 observed" bit** — is the same proposal as the feature agent's **R2** (24→14 channels), reached
+by a completely different route. The physics route adds a reason the feature route missed: **cloud
+frequency is climatological, so the missing-indicator block is a direct proxy for calendar season
+and monsoon phase** — i.e. an 11-dimensional redundant handle on exactly the phase-locked axis whose
+deletion won us +0.0128. Two independent derivations of a capacity-*reducing* structural deletion is
+the strongest queue signal this round produced.
+
+---
+
 ## 6. THE DECISION TREE — what to do next, for both outcomes
 
 Everything hinges on **iter11**: does an offline estimator rank our seven known-LB anchors correctly

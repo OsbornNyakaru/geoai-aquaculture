@@ -403,7 +403,7 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                cfg: dict, smoke: bool = False):
     """Masking-aware CV for the sequence model.
 
-    Returns (oof_prob [N], test_prob [Ntest], fold_scores).
+    Returns (oof_prob [N], test_prob [Ntest], fold_scores, test_per_fold [n_models, Ntest]).
     """
     import torch
 
@@ -453,6 +453,13 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     oof_sum = np.zeros(n); oof_cnt = np.zeros(n)
     test_accum = np.zeros(test_cube.shape[0]); n_models = 0
     fold_scores: List[float] = []
+    # Per-fold test predictions, kept so we can measure ENSEMBLE DIVERSITY offline.
+    # Rationale (RESEARCH_07.md, code audit H1): OOF scores a SINGLE fold-model while the
+    # submission is the mean of 5 -- and fold-averaging changes the ranking, which is the only
+    # thing the leaderboard sees. So a change that makes each model better but the five MORE
+    # ALIKE raises OOF and lowers LB. That is the sign pattern the whole ledger shows (K=4:
+    # highest OOF 0.984, 2nd-worst LB). Saving these costs nothing and lets us test it directly.
+    test_per_fold: List[np.ndarray] = []
 
     for rep in range(n_repeats):
         skf = StratifiedKFold(n_splits=n_splits, shuffle=True,
@@ -482,11 +489,13 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
             oof_sum[va] += prob_rows; oof_cnt[va] += 1
 
             if tta_on:
-                test_accum += _tta_predict(model, test_cube, mean, std, schema,
-                                           channels_cfg, ex_mean, ex_std, rel, cfg,
-                                           device, seed=cfg["seed"] + rep * 100 + fold)
+                p_fold = _tta_predict(model, test_cube, mean, std, schema,
+                                      channels_cfg, ex_mean, ex_std, rel, cfg,
+                                      device, seed=cfg["seed"] + rep * 100 + fold)
             else:
-                test_accum += _predict(model, Xte, pad_te, device)
+                p_fold = _predict(model, Xte, pad_te, device)
+            test_accum += p_fold
+            test_per_fold.append(np.asarray(p_fold, dtype=np.float32))
             n_models += 1
 
             fs = combined_score(f1_at(y[va], prob_rows, 0.5), roc_auc(y[va], prob_rows))
@@ -497,4 +506,4 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     s["epochs"] = epochs_backup
     oof_prob = oof_sum / np.maximum(oof_cnt, 1)
     test_prob = test_accum / max(n_models, 1)
-    return oof_prob, test_prob, fold_scores
+    return oof_prob, test_prob, fold_scores, np.asarray(test_per_fold, dtype=np.float32)

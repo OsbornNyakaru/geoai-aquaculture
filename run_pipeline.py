@@ -105,10 +105,11 @@ def main() -> None:
 
     if args.model == "seq":
         from src.seq_model import run_seq_cv
-        oof_prob, p_test_raw, fold_scores = run_seq_cv(
+        oof_prob, p_test_raw, fold_scores, test_per_fold = run_seq_cv(
             train_cube, y, test_cube, schema, wd, cfg, smoke=smoke)
         cv = _CV()
         cv.oof_prob, cv.y, cv.fold_scores = oof_prob, y, fold_scores
+        cv.test_per_fold = test_per_fold
         # per-month input dim = values + missing (2B) + enabled transfer channels
         _ch = cfg["seq"].get("channels") or {}
         _extra = ((schema.n_bands if _ch.get("per_cell_detrend") else 0)
@@ -183,11 +184,20 @@ def main() -> None:
     # probs are saved so the blend controls its own operating point; rank
     # transform inside the blend neutralizes the seq model's overconfidence.
     preds_dir = out_dir / "preds"
+    _extra_arrays = {}
+    # Per-fold test predictions (seq lane only). These let tools/offline_validate.py measure
+    # ENSEMBLE DIVERSITY, which is a candidate explanation for the OOF anti-correlation: OOF
+    # scores one fold-model, the submission is the mean of five, and averaging changes the
+    # ranking -- the only thing the LB sees. See RESEARCH_07.md.
+    _tpf = getattr(cv, "test_per_fold", None)
+    if _tpf is not None and len(_tpf):
+        _extra_arrays["test_per_fold"] = np.asarray(_tpf, dtype=np.float32)
     save_npz_atomic(
         preds_dir / f"preds_{name}.npz",
         oof_prob=cv.oof_prob, y=cv.y, p_test_raw=p_test_raw,
         test_ids=np.asarray(bundle.test_ids),
         model=np.array(args.model), prior=np.array(cfg["calibration"].get("assumed_test_prior", 0.5)),
+        **_extra_arrays,
     )
     log.info("Wrote preds bundle %s", preds_dir / f"preds_{name}.npz")
 
