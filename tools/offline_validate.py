@@ -251,6 +251,9 @@ def main() -> None:
     ap.add_argument("--preds-dir", default="submissions/preds")
     ap.add_argument("--anchors", default="experiments/anchors.tsv")
     ap.add_argument("--prevalence-target", type=float, default=0.649)
+    ap.add_argument("--seed-spread", nargs="*", default=None, metavar="VARIANT",
+                    help="report each estimator's mean +- std ACROSS SEED REPLICATES of one config. "
+                         "A screen margin smaller than this spread is not a real signal.")
     ap.add_argument("--screen", nargs="*", default=None, metavar="VARIANT",
                     help="CANDIDATE variants to score against the champion using the estimators "
                          "that CLEARED the retro-fit. Submit only when >=2 cleared estimators rank "
@@ -379,6 +382,45 @@ def main() -> None:
              ">=0.006 and CONFIDENT at >=0.012; unpaired comparisons need >=0.012.")
 
     # ------------------------------------------------------------------ #
+    # SEED SPREAD: how much does each estimator move on the SAME config?
+    # ------------------------------------------------------------------ #
+    # WHY (added after iter14). A screen margin is only meaningful if it exceeds the estimator's own
+    # seed-to-seed noise. iter13 approved dropout=0.3 on a DIS margin of just +0.0029; if DIS moves
+    # by more than that between two seeds of an IDENTICAL config, that vote carried no information.
+    # This is the "margin condition" the round-07 math audit recommended and that was not built at
+    # the time. It costs nothing but extra seed runs, which we already generate for DIS.
+    spread: Dict[str, Dict[str, float]] = {}
+    if args.seed_spread:
+        log.info("")
+        log.info("=== SEED SPREAD: estimator variation across seed replicates of ONE config ===")
+        for v in args.seed_spread:
+            files = sorted(preds_dir.glob(f"preds_{v}.npz")) + \
+                sorted(preds_dir.glob(f"preds_{v}_s[0-9]*.npz"))
+            if len(files) < 2:
+                log.warning("  %s: need >=2 seed bundles, found %d - skipped", v, len(files))
+                continue
+            vals: Dict[str, List[float]] = {}
+            for f in files:
+                dd = np.load(f)
+                o, yy, pt = dd["oof_prob"], dd["y"], dd["p_test_raw"]
+                vals.setdefault("atcf1", []).append(
+                    atc_f1_estimate(o, yy, pt, args.prevalence_target))
+                vals.setdefault("atc", []).append(atc_estimate(o, yy, pt))
+                vals.setdefault("marg", []).append(margin_estimate(pt, args.prevalence_target))
+            log.info("  %s  (n=%d seeds)", v, len(files))
+            for k, arr in vals.items():
+                a = np.asarray(arr, dtype=float)
+                sd = float(a.std(ddof=1)) if len(a) > 1 else float("nan")
+                spread.setdefault(v, {})[k] = sd
+                log.info("      %-6s mean=%.4f  sd=%.4f  range=[%.4f, %.4f]",
+                         k.upper(), float(a.mean()), sd, float(a.min()), float(a.max()))
+        if spread:
+            log.info("")
+            log.info("  READ THIS AGAINST THE SCREEN BELOW: any candidate margin smaller than the "
+                     "sd above is INDISTINGUISHABLE FROM SEED NOISE and must not be submitted, "
+                     "regardless of vote count.")
+
+    # ------------------------------------------------------------------ #
     # SCREEN: score new candidates with the estimators that CLEARED above.
     # ------------------------------------------------------------------ #
     if not args.screen:
@@ -417,7 +459,9 @@ def main() -> None:
             cand["dis"] = disagreement_estimate(
                 np.load(files[0])["p_test_raw"], np.load(files[1])["p_test_raw"])
 
-        votes, detail = 0, []
+        # Seed-noise floor for each estimator, taken from --seed-spread on the champion.
+        floor = spread.get(args.champion, {})
+        votes, detail, thin = 0, [], []
         for key in usable + negated:
             if key not in cand or key not in est[args.champion]:
                 detail.append(f"{key.upper()}=n/a")
@@ -426,12 +470,21 @@ def main() -> None:
             if key in negated:
                 delta = -delta
             votes += int(delta > 0)
-            detail.append(f"{key.upper()}{'+' if delta > 0 else ''}{delta:.4f}")
+            sd = floor.get(key)
+            # Mark any vote whose margin is inside the estimator's own seed noise.
+            weak = sd is not None and np.isfinite(sd) and abs(delta) < sd
+            if weak and delta > 0:
+                thin.append(key.upper())
+            detail.append(f"{key.upper()}{'+' if delta > 0 else ''}{delta:.4f}{'~' if weak else ''}")
         n_avail = sum(1 for k in usable + negated if k in cand)
         verdict = ("SUBMIT" if votes >= 2 and votes == n_avail else
                    "SUBMIT (majority)" if votes >= 2 else "HOLD")
-        log.info("  %-26s %-40s votes=%d/%d  -> %s",
+        if thin and verdict.startswith("SUBMIT"):
+            verdict = f"HOLD (votes from {'/'.join(thin)} are INSIDE seed noise)"
+        log.info("  %-26s %-46s votes=%d/%d  -> %s",
                  v, " ".join(detail), votes, n_avail, verdict)
+    if spread:
+        log.info("  ('~' marks a margin smaller than that estimator's own seed-to-seed sd.)")
 
     log.info("")
     log.info("Rule: submit ONLY a candidate with >=2 cleared estimators above the champion. "

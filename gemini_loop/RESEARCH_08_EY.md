@@ -73,6 +73,89 @@ that wiped out 8 of EY's top 10.
    unanswered for the entire competition. We should verify our 0.6·F1 + 0.4·AUC weighting empirically
    against our own known submission/score pairs rather than trusting the page text.
 
+## Part 2 — the solution-mining pass (prior EY editions)
+
+**Verdict: weak technique source, strong *sociological* source.** Four of six editions are the wrong
+problem (frog counts, building-damage detection, UHI point regression, water quality). Published
+solutions are overwhelmingly "throw 100–260 tabular features at RandomForest/XGBoost/ExtraTrees with
+a random holdout" — a methodology our own design law says would actively lose here. No EY
+architecture, loss, or ensembling trick is worth importing. Five things *are*.
+
+### ⭐ Our anti-correlated OOF is a house style, not our bug
+
+The EY×Zindi sibling — **Urban Heat Island Challenge** — has a *designed geographic* shift (train
+Santiago + Rio → test **Freetown**) and a top-of-forum notebook titled literally
+**"Beat the Baseline in Under 10 Minutes (CV 0.55 vs PL 0.39)"**, plus threads "Stuck on 0.45" and
+"How Public and Private test set was split". A ~0.16 F1 gap **in the same direction as ours**, in a
+competition deliberately designed with a held-out domain.
+
+**This family of competitions is built so that in-domain CV is structurally optimistic.** Our
+anti-correlated OOF is the expected behaviour of the design, not a defect in our pipeline. Worth
+saying plainly in the code-review writeup.
+
+### ⭐ EY 2023 Level 1 — the one on-modality edition, and it corroborates both our laws
+
+Binary **rice-paddy presence** from **Sentinel-1 VV/VH time series**, scored by F1. The published
+top-3 solution (F1 **0.94**) used:
+- `VV_mean`, `VH_mean` over **six phenology-aligned windows** = 12 **amplitude** features,
+- plus 6 RVI (ratio) features,
+- into a **shallow `RandomForestClassifier(n_estimators=1800, max_depth=7)`**.
+
+Amplitude-primary and capacity-minimal — independently corroborating both of our measured laws. Note
+their validation was a plain `train_test_split` reporting **99.44% accuracy** against a real LB of
+0.94. *Nobody in this series solved the validation problem we solved.*
+
+### ⭐ We tested the WRONG TAIL
+
+The pond-mapping literature detects ponds with a **LOW-order statistic** — the temporal **median /
+p10–p25 of VH** — because a pond is a *"permanent low scatterer"* and low percentiles are robust to
+speckle and to which months happen to be observed. Ottinger's VH-median stacks are **bimodal** and
+Otsu-thresholdable.
+
+Our `mean_max` probe followed the physics agent's "ponds are never bright" framing. But the published
+detector is the **lower** tail, and we never tested it. **`mean_min` added and queued for iter15.**
+Crucially, low percentiles are computable from *any* 4–6 consecutive months without needing the
+missing ones — they degrade gracefully under exactly our masking.
+
+### Environmental blocking — the published analogue of what we invented
+
+Roberts et al. 2017 (*Ecography* 40:913–929), "Cross-validation strategies for data with **temporal**,
+spatial, hierarchical, or phylogenetic structure":
+- Random CV under dependence **seriously underestimates predictive error** (our OOF 0.975 vs LB 0.8955).
+- Block **even when residuals look clean and even when the model claims to account for the structure.**
+- **Environmental blocking** — assign folds by dissimilarity in *predictor space*, not by coordinate —
+  is recommended "when the model must predict to new climatic conditions."
+
+That last one **survives the loss of lat/lon**: use our adversarial train-vs-test discriminator
+(AUC ≈0.99) as the distance function, rank training rows by test-likeness, and validate on the most
+test-like decile. That is environmental blocking with a *learned* blocking variable. It validates
+that we built the right thing and gives us a citation for the code review.
+Implementations: `blockCV` (Valavi et al. 2019), `mlr3spatiotempcv`.
+
+### Two smaller steals
+
+- **A hard-regime secondary metric.** The EY 2022 winner tracked WMAPE restricted to the hard cases
+  because the primary metric was dominated by the easy majority. Our F1 term is hostage to
+  calibration drift under temporal shift — track "F1 at fixed 0.5 on the most test-like slice" as a
+  first-class number alongside AUC, so we know *which* component a change moved.
+- **Multi-seed RFE as an explicit reduction step.** The EY 2022 winner used recursive feature
+  elimination repeated across seeds; RicEns-Net (arXiv:2502.06062), built on the EY 2023 data, cut
+  100+ predictors to **15**. Both independently corroborate our capacity law, and multi-seed RFE is a
+  concrete procedure for deciding *which* features to cut rather than guessing.
+
+### Explicit do-not-steals
+
+The EY 2025 UHI playbook (260 engineered features → ExtraTrees, val R² 0.98) is the exact failure mode
+this competition punishes — and those same entrants' Zindi sibling collapsed from CV 0.55 to LB 0.39.
+And anything spatial (blocks, buffers, neighbourhood context, footprint fusion) does not port: we have
+no coordinates.
+
+**Evidence caveats from the agent:** `challenge.ey.com` is a JS SPA it could not render, so official
+rules and Phase-2 rubric weights are unread. MDPI/T&F/SSRN returned 403, so the feature lists are
+assembled from abstracts and secondary sources — **feature names are reliable, exact dB thresholds
+are not and none are quoted**. No official EY winner source was ever released; every repo cited is a
+self-reported participant entry.
+
 ## Also found
 
 A **live** sibling with a $10,000 prize: **EY Water Quality Forecasting Challenge** —

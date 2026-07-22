@@ -165,7 +165,45 @@ hypothesis that motivated this probe.
 **`c_k3` ≈ 0 on both estimators.** K=2 is confirmed optimal, now from three points rather than the
 two that originally justified calling it a "sharp optimum."
 
-| 14 | 2026-07-22 | Upload `submission_c_dropout3.csv` (already written by the iter13 run) | submission_c_dropout3.csv | 0.649 | **pending** | — |
+| 14 | 2026-07-22 | dropout 0.3 **at seed 7** (⚠️ NOT the screened artifact) | submission_c_dropout3_**s7**.csv | 0.649 | **0.8675** | ⚠️ **CONFOUNDED** |
+
+## ⚠️ iter14 is confounded — and it opens the most important question in the project
+
+**What was uploaded was not what the screen approved.** The offline screen scored `c_dropout3`
+(**seed 0**). The file submitted was `c_dropout3_**s7**` (**seed 7**). So this run changes **two**
+variables at once versus the champion: dropout 0.2→0.3 **and** seed 42→7.
+
+**0.8675 vs the champion's 0.8955 is −0.0280** — about **4.7σ** on the paired scale (SE ≈ 0.006).
+Far too large to shrug off, and impossible to attribute as it stands.
+
+### Why this might matter far more than dropout
+
+**We have never measured our seed-to-seed spread.** It has been *assumed* to be ~±0.01 from
+row-count theory since the very first plateau, and every verdict in this ledger rests on that
+assumption. Two readings of 0.8675, with wildly different consequences:
+
+| If… | Then |
+|---|---|
+| **dropout 0.3 is genuinely bad** | the screen produced a **false positive** on its first-ever SUBMIT, and the 2/2 rule needs a margin floor (the DIS vote was only +0.0029) |
+| **seed variance is ≈0.028** | **most of this ledger is noise.** iter9's champion win (+0.0047), iter8 NoPE (+0.0009) and iter10 (−0.0034) are all *far* inside a ±0.028 band, and the "champion" may not be distinguishable from three other configs |
+
+The second possibility is the more serious one, and it is **cheap to settle**.
+
+### The disambiguating measurement
+
+Upload **`submission_seq_a_xview_s7.csv`** — the *champion configuration at seed 7*, already written
+by the iter13 run. It changes **only** the seed, so:
+
+- **≈0.895** → seed variance is small ⇒ dropout 0.3 genuinely failed ⇒ the screen gave a false
+  positive and needs a margin floor.
+- **≈0.867** → **seed variance is ≈0.028** ⇒ dropout is exonerated, and a large part of this ledger
+  needs re-reading as noise. This would be the single most consequential measurement of the project.
+
+This is the seed-replication run that has sat queued since iter6 and was never spent. It is now the
+highest-value submission available, and it costs one.
+
+| 15 | 2026-07-22 | **Seed replication of the CHAMPION** (isolates seed; no other change) | submission_seq_a_xview_s7.csv | 0.649 | **pending** | — |
+| 16 | 2026-07-22 | dropout 0.3 at **seed 0** — the artifact the screen actually approved | submission_c_dropout3.csv | 0.649 | **pending** | — |
 
 ---
 

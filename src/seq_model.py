@@ -329,6 +329,16 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
                 # A row with zero observed months would be all -inf; keep it finite.
                 mx = torch.where(torch.isfinite(mx), mx, torch.zeros_like(mx))
                 pooled = torch.cat([mu, mx], dim=-1)
+            elif self.pooling == "mean_min":
+                # THE LOWER TAIL -- the one we never tested. Our mean_max probe took the physics
+                # agent's "ponds are never bright" framing, but the actual pond-MAPPING literature
+                # (Ottinger 2017 and the nation-scale S1 work) detects ponds with a LOW-order
+                # statistic: the temporal MEDIAN / p10-p25 of VH, because a pond is a "permanent
+                # low scatterer" and the low percentiles are robust to speckle and to which months
+                # happen to be observed. Max is the wrong tail for the published detector.
+                mn = h.masked_fill(pad.unsqueeze(-1), float("inf")).min(dim=1).values
+                mn = torch.where(torch.isfinite(mn), mn, torch.zeros_like(mn))
+                pooled = torch.cat([mu, mn], dim=-1)
             else:
                 raise ValueError(f"unknown seq.pooling: {self.pooling!r}")
             return self.head(pooled).squeeze(-1)          # logits [n]
