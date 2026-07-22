@@ -31,9 +31,26 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: upload `submissions/submission_champion_seedavg5.csv`** (already written by
-   the iter15 run — no rerun needed), and paste the LB back. Judge it against the **mean** of our
-   single-seed scores (~0.886), **not** the max (0.8955).
+3. **Current next action: `Run all` → iter17 (the PRESTO lane), then paste back the ADVERSARIAL AUC
+   lines, the RETRO-FIT + GATE, the SEED SPREAD, and the SCREEN table. No upload unless the screen
+   says SUBMIT.**
+
+   **Why only Presto now.** iter15 fixed the screen's resolution at ~0.010–0.013 LB. In the whole
+   project exactly two effects have ever exceeded that floor — the GBDT→Transformer swap (+0.05)
+   and detrend (−0.05) — and **both are model-class changes**. Everything else we probed is below
+   the floor and unmeasurable *in principle* with our budget, so running more small A/B probes
+   cannot produce information. Presto is the one remaining model-class change the rules permit.
+   **The go/no-go is free and printed early: the adversarial AUC on the embeddings.** ~0.5 means
+   the frozen encoder normalized the temporal shift away (fund it hard); >0.9 means it is
+   *encoding* the shift and the lane is likely dead — learned for zero submissions.
+
+   **iter16 result: seed-averaging scored 0.8865 against a predicted ~0.886.** The variance model
+   is confirmed to 0.0006. But there was **no ensemble gain** — we bought variance reduction, not
+   level, because the seeds are 95.1% rank-correlated so only ~5% of the error is independent.
+   **Finalist decision (revised):** designate **`champion_seedavg5` + `seq_a_xview`**, not
+   xview + NoPE. Shrunk true-quality estimates are 0.8865 vs 0.8911 — a tie inside our resolution
+   floor — but the two carry *different risk profiles* (consensus vs point estimate), whereas
+   xview and NoPE differ by 0.0038 and are two draws of the same thing.
 
    **iter15 settled the measurement question. The screen's resolution is ≈0.010–0.013 LB**, derived
    two independent ways that agree: ATC-F1's seed sd (0.0576) converts to ±0.0094 LB via the anchor

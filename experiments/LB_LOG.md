@@ -306,7 +306,45 @@ sized to the floor are:
 2. **A model-class change** — the same species as the +0.05 GBDT→Transformer swap. That is the
    **Presto lane** (`RESEARCH_07.md` §5e), now the only fundable architectural direction.
 
-| 16 | 2026-07-22 | **Seed-averaged champion** (5 seeds, rank-pooled; seed rank-corr 0.951) | submission_champion_seedavg5.csv | 0.649 | **pending** | — |
+| 16 | 2026-07-22 | **Seed-averaged champion** (5 seeds, rank-pooled; seed rank-corr 0.951) | submission_champion_seedavg5.csv | 0.649 | **0.8865** | ✅ prediction confirmed |
+
+## iter16 — the variance model is validated to 0.0006
+
+| Artifact | LB |
+|---|---|
+| xview seed 42 | 0.8955 |
+| xview seed 7 | 0.8764 |
+| **single-seed mean** | **0.88593** |
+| **seed-average (5 seeds)** | **0.88653** |
+
+**Predicted ≈0.886, measured 0.88653 — off by +0.0006.** The model of this competition is correct:
+0.8955 was an upward fluctuation, not a better model.
+
+**But there was NO ensemble gain.** Seed-averaging landed *at* the member mean (+0.0006, ≈0.05σ),
+not above it. We bought **variance reduction, not level**. The reason is visible in the diagnostic:
+seeds are **95.1% rank-correlated**, so only ~5% of the error is independent and available to
+average away. More seeds will not change this — it is diminishing returns on a small independent
+component.
+
+### What to designate as finalists — the counter-intuitive part
+
+Shrinking each artifact's observed score toward the seed distribution (prior mean 0.886, sd 0.013;
+public-slice SE 0.012):
+
+| Artifact | Observed | **Shrunk estimate of true quality** |
+|---|---|---|
+| xview seed 42 | 0.8955 | **0.8911** (public luck partly removed) |
+| seed-average | 0.8865 | **0.8865** (no seed luck to remove) |
+
+The difference, **+0.0046, is inside our ~0.010 resolution floor — a statistical tie.** But the
+*risk profiles differ*: the seed-average carries only public/private sampling noise, while the
+single seed carries that **plus** seed noise on the unseen 721-row private slice.
+
+**→ Designate `champion_seedavg5` + `seq_a_xview`.** That is a genuinely diverse pair — a
+low-variance consensus and a point estimate — and far better than the previously-planned
+xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather than two models.
+
+| 17 | 2026-07-22 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screen first* | 0.649 | **pending** | — |
 
 ---
 
