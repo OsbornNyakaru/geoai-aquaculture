@@ -95,7 +95,44 @@ De-saturation was never the mechanism; it is an artifact that anti-correlates wi
 spent only on things ≥2 cleared estimators already rank above the champion. ~80 submissions remain,
 and the constraint moves from measurement back to idea quality.
 
-| 12 | 2026-07-22 | **First offline screen**: pooling `mean_std` vs `mean_max`, 24→14 channel compaction, rank-replacement (amplitude retest), antithetic views | *no submission* | — | pending | — |
+| 12 | 2026-07-22 | **First offline screen**: `mean_std` · `mean_max` · 24→14 compaction · rank-replacement · antithetic views | *no submission* | — | **n/a — 0 subs** | ➖ ALL HELD |
+
+**iter12 — all five candidates HELD; no submission spent.** Estimators re-certified *identically*
+to iter11 (ATC-F1 15/15 ρ=+0.964; DIS 5/5 ρ=+1.000), so the screen is trustworthy.
+
+| Candidate | ATC-F1 Δ | DIS Δ | Votes | |
+|---|---|---|---|---|
+| `c_meanmax` | **+0.0838** | −0.0301 | 1/2 | HOLD |
+| `c_meanstd` | +0.0185 | −0.0175 | 1/2 | HOLD |
+| `c_antithetic` | +0.0060 | −0.0165 | 1/2 | HOLD |
+| `c_compact` | 0.0000 | 0.0000 | 0/2 | **VOID — never ran, see below** |
+| `c_rank` | **−0.1703** | −0.0796 | 0/2 | HOLD (decisively) |
+
+**The rule earned its keep.** ATC-F1 was enthusiastic about `mean_max` (+0.0838, the largest signal
+of the round) but DIS disagreed. Under the old blind regime that would have been a submission; here
+it cost nothing. The two estimators disagree in sign on *every* live candidate — worth watching.
+
+**FINDING 1 — the amplitude question is now genuinely ANSWERED.** `c_rank` (within-series rank
+*replacing* absolute values) **collapsed**: OOF 0.9753 → 0.857 / 0.865 across both seeds, ATC-F1
+−0.1703. Amplitude is the **primary signal** — the pond discriminator really is "persistently LOW
+backscatter", an absolute level. This closes the rank/ordinal family **with evidence**, and it
+retires the question reopened when we found `per_cell_detrend` had only ever *appended* channels.
+Note what is and isn't established: *removing* amplitude is catastrophic; that is not the same
+claim as the old "amplitude is toxic" law, which remains unevidenced.
+
+**FINDING 2 — `c_compact` was never tested (my bug).** The flag was set at `seq.compact_missing`
+but `to_inputs()` only receives `cfg["seq"]["channels"]`, so it never reached the model. The run came
+out **bit-identical to the champion** (`n_features: 24`, identical fold_scores) and the screen scored
+that silent no-op as a legitimate 0.0000 tie. The independently-computed `n_features` in
+`run_pipeline.py` agreed with the wrong answer, so nothing caught it. Fixed (flag moved under
+`seq.channels`), and the pipeline now logs the **actual** input width every run. Re-tested in iter13.
+
+**FINDING 3 — DIV failed, and in the direction that refutes its own hypothesis.** Fold-ensemble
+diversity scored 2/15 concordant, **ρ = −0.857**: *lower* diversity goes with *higher* LB — the
+opposite of hypothesis H1, which predicted fold-averaging diversity was the hidden driver. H1 is not
+supported. (It fails the strict all-or-nothing gate, so it is not usable negated either.)
+
+| 13 | 2026-07-22 | **Second offline screen**: `c_compact` re-test · `mean_max` without cross-view · K=3 · dropout 0.3 | *no submission* | — | pending | — |
 
 ---
 

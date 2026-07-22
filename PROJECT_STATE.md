@@ -25,8 +25,23 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter12 (the first OFFLINE SCREEN), then paste back the
+3. **Current next action: `Run all` → iter13 (second OFFLINE SCREEN), then paste back the
    RETRO-FIT + GATE + SCREEN tables. NO ZINDI UPLOAD.** ~21 runs, ~20 min, **zero submissions**.
+
+   **iter12 (first screen): all five candidates HELD, 0 submissions spent.** The rule earned its
+   keep — ATC-F1 liked `mean_max` (+0.0838) but DIS disagreed (−0.0301), which under the old blind
+   regime would have been a wasted submission. Three findings:
+   **(a) Amplitude is the PRIMARY SIGNAL** — rank-replacement collapsed OOF 0.9753 → 0.857/0.865 on
+   both seeds (ATC-F1 −0.1703). The pond discriminator is "persistently LOW backscatter", an
+   absolute level. The rank/ordinal family is now closed *with evidence*. (This does **not**
+   resurrect the old "amplitude is toxic" law, which remains unevidenced — *removing* amplitude
+   being catastrophic is a different claim.)
+   **(b) `c_compact` was never tested** — a config-path bug (`seq.compact_missing` vs
+   `seq.channels.compact_missing`) meant the flag never reached the model; the run was bit-identical
+   to the champion and the screen scored the no-op as a 0.0000 tie. Fixed; the pipeline now logs the
+   **actual** input width. Re-tested in iter13.
+   **(c) DIV failed at ρ = −0.857** (2/15) — *lower* fold-diversity goes with *higher* LB, the
+   opposite of hypothesis H1. H1 is not supported.
 
    **iter11 PASSED (2026-07-22) — the measurement constraint is broken.** Retro-fit on the 7 anchors:
    **ATC-F1 15/15 concordant, ρ=+0.964** and **DIS 5/5, ρ=+1.000 (n=4)** both cleared, while the

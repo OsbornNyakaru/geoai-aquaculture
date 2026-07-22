@@ -542,6 +542,14 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                  [k for k, v in channels_cfg.items() if v], ex_mean.shape[0])
     Xte, pad_te = to_inputs(test_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
                             relative_time=rel)
+    # Log the ACTUAL per-month input width and the flags that shaped it. iter12 set a flag at the
+    # wrong config path (seq.compact_missing instead of seq.channels.compact_missing), so it never
+    # reached to_inputs; the run came out bit-identical to the champion and the offline screen
+    # scored that silent no-op as a legitimate 0.0000 tie. The separately-computed `n_features` in
+    # run_pipeline.py agreed with the wrong answer, so nothing caught it. Print ground truth.
+    log.info("seq input width: %d channels/month | pooling=%s | channel flags: %s",
+             Xte.shape[2], s.get("pooling", "mean"),
+             {k: v for k, v in channels_cfg.items() if v} or "none")
 
     n = len(y)
     oof_sum = np.zeros(n); oof_cnt = np.zeros(n)

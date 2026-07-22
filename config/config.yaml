@@ -189,6 +189,15 @@ seq:
     # have tested it, but it APPENDED its channels (24->36), so it only ever measured "adding 12
     # correlated channels hurts". The amplitude-toxicity law is unevidenced. See RESEARCH_07.md 5c.
     rank_replace: false
+    # MUST live under seq.channels (NOT seq.*): to_inputs() only receives cfg["seq"]["channels"].
+    # iter12 set `seq.compact_missing` by mistake, so the flag never reached the model and the run
+    # came out BIT-IDENTICAL to the champion (n_features 24, identical fold_scores) -- a silent
+    # no-op that the screen scored as a legitimate 0.0000 tie. Re-tested in iter13.
+    compact_missing: false   # collapse the 12 per-band missing-indicators to [s1_observed,
+                             # s2_observed] -> 24 to 14 channels. S2 bands drop out together by
+                             # scene, so 10 of 24 channels are near-duplicates; and cloud frequency
+                             # is CLIMATOLOGICAL, making the block a wide handle on calendar season
+                             # -- the phase-locked axis whose deletion won +0.0128. Capacity-REDUCING.
 
   # ---- iter12 offline-screen candidates (all default OFF = the exact 0.8955 champion) ----
   # Screened with the estimators that CLEARED the iter11 retro-fit (ATC-F1 rho=+0.964 at 15/15;
@@ -201,12 +210,6 @@ seq:
                            # Two round-07 agents DISAGREED on which is right (drain events
                            # contaminate max; canopy events make it discriminative), so both are
                            # implemented and screened rather than chosen blind. See RESEARCH_07.md 5d.
-  compact_missing: false   # collapse the 12 per-band missing-indicators to [s1_observed,
-                           # s2_observed] -> 24 to 14 channels. S2 bands drop out together by
-                           # scene, so 10 of 24 channels are near-duplicates; and cloud frequency
-                           # is CLIMATOLOGICAL, making the block a wide handle on calendar season
-                           # -- the phase-locked axis whose deletion won +0.0128. Capacity-REDUCING.
-                           # Derived independently by two agents. See RESEARCH_07.md 5d.
   antithetic_views: false  # draw view 2 maximally distant from view 1 (K=2 only), preserving the
                            # marginal window distribution. Makes the cross-view invariance penalty
                            # (+0.0047, our champion) informative on every row instead of vacuous
