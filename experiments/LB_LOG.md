@@ -70,6 +70,33 @@ sequence-level feature engineering, untried mathematical techniques, and CV desi
 params, reframed coordinates) is the direction that transfers. Iter6+ bank robustness moves (TTA,
 multi-seed bagging) on top; both capacity-neutral, gated vs 0.8908.
 
+| 11 | 2026-07-22 | **Offline LB-predicting validator** (retro-fit to 7 known-LB anchors) | *no submission* | — | **n/a — 0 subs** | ✅ **PASSED** |
+
+**iter11 PASSED — the measurement constraint is broken.** Retro-fit against the 7 anchors:
+
+| Estimator | Concordance (pairs with \|ΔLB\| > 0.01) | Spearman ρ | Verdict |
+|---|---|---|---|
+| **ATC-F1** — metric-aligned, built this round from the rank-only proof | **15/15** | **+0.964** | **PASS** (exact null p ≈ 0.005) |
+| **DIS** — two-seed disagreement | **5/5** | **+1.000** (n=4) | **PASS** (p ≈ 0.042 → 2nd vote only) |
+| ATC — the ORIGINAL pre-committed estimator | 6/15 | **−0.429** | FAIL |
+| MARG — naive control | 8/15 | −0.321 | FAIL |
+
+**Read this carefully: the pre-repair iter11 would have failed completely.** Raw ATC is
+anti-correlated, MARG is anti-correlated, and DIS would have printed "insufficient bundles" because
+only the champion carried a second seed. The two estimators that cleared are exactly the two things
+round 07 added (`gemini_loop/RESEARCH_07.md`).
+
+**The two failures are themselves evidence for the rank-only proof.** ATC and MARG both measure
+*confidence/saturation*, which the LB provably cannot see — and both came out **negative**. Visible
+in the table: `seq_a_l3` and `seq_a_xview` have the LOWEST MARG (0.309, 0.369) yet the HIGHEST LB.
+De-saturation was never the mechanism; it is an artifact that anti-correlates with what wins.
+
+**→ SCENARIO A is live** (`RESEARCH_07.md` §6). Candidates are now screened offline and submissions
+spent only on things ≥2 cleared estimators already rank above the champion. ~80 submissions remain,
+and the constraint moves from measurement back to idea quality.
+
+| 12 | 2026-07-22 | **First offline screen**: pooling `mean_std` vs `mean_max`, 24→14 channel compaction, rank-replacement (amplitude retest), antithetic views | *no submission* | — | pending | — |
+
 ---
 
 ### Reading the Step-2 run (what to record)

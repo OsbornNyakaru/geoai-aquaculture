@@ -251,6 +251,12 @@ def main() -> None:
     ap.add_argument("--preds-dir", default="submissions/preds")
     ap.add_argument("--anchors", default="experiments/anchors.tsv")
     ap.add_argument("--prevalence-target", type=float, default=0.649)
+    ap.add_argument("--screen", nargs="*", default=None, metavar="VARIANT",
+                    help="CANDIDATE variants to score against the champion using the estimators "
+                         "that CLEARED the retro-fit. Submit only when >=2 cleared estimators rank "
+                         "a candidate above the champion.")
+    ap.add_argument("--champion", default="seq_a_xview",
+                    help="variant the candidates must beat (must be present in --anchors)")
     ap.add_argument("--min-gap", type=float, default=0.01,
                     help="anchor pairs closer than this in LB are inside the noise band and are "
                          "excluded from the gate (their measured order is itself noise)")
@@ -371,6 +377,65 @@ def main() -> None:
     log.info("")
     log.info("Measurement protocol (RESEARCH_07.md 5b): a paired A/B vs champion is SUGGESTIVE at "
              ">=0.006 and CONFIDENT at >=0.012; unpaired comparisons need >=0.012.")
+
+    # ------------------------------------------------------------------ #
+    # SCREEN: score new candidates with the estimators that CLEARED above.
+    # ------------------------------------------------------------------ #
+    if not args.screen:
+        return
+    usable = [k for k in cleared if not k.endswith("(negated)")]
+    negated = [k[:-len("(negated)")] for k in cleared if k.endswith("(negated)")]
+    if not usable and not negated:
+        log.info("")
+        log.info("SCREEN SKIPPED: no estimator cleared the retro-fit, so none is trustworthy.")
+        return
+    if args.champion not in est:
+        raise SystemExit(f"champion {args.champion!r} not among the scored anchors")
+
+    log.info("")
+    log.info("=== SCREEN: candidates vs champion %s (LB %.4f) ===",
+             args.champion, est[args.champion]["lb"])
+    log.info("Using only the estimators that cleared: %s",
+             ", ".join(sorted(usable + [f"{k}(neg)" for k in negated])))
+
+    for v in args.screen:
+        files = sorted(preds_dir.glob(f"preds_{v}.npz")) + \
+            sorted(preds_dir.glob(f"preds_{v}_s[0-9]*.npz"))
+        if not files:
+            log.warning("SCREEN: no bundle for candidate %s - skipped", v)
+            continue
+        d = np.load(files[0])
+        oof, y, p_test = d["oof_prob"], d["y"], d["p_test_raw"]
+        cand: Dict[str, float] = {
+            "atc": atc_estimate(oof, y, p_test),
+            "atcf1": atc_f1_estimate(oof, y, p_test, args.prevalence_target),
+            "marg": margin_estimate(p_test, args.prevalence_target),
+        }
+        if "test_per_fold" in getattr(d, "files", []):
+            cand["div"] = diversity_estimate(d["test_per_fold"])
+        if len(files) >= 2:
+            cand["dis"] = disagreement_estimate(
+                np.load(files[0])["p_test_raw"], np.load(files[1])["p_test_raw"])
+
+        votes, detail = 0, []
+        for key in usable + negated:
+            if key not in cand or key not in est[args.champion]:
+                detail.append(f"{key.upper()}=n/a")
+                continue
+            delta = cand[key] - est[args.champion][key]
+            if key in negated:
+                delta = -delta
+            votes += int(delta > 0)
+            detail.append(f"{key.upper()}{'+' if delta > 0 else ''}{delta:.4f}")
+        n_avail = sum(1 for k in usable + negated if k in cand)
+        verdict = ("SUBMIT" if votes >= 2 and votes == n_avail else
+                   "SUBMIT (majority)" if votes >= 2 else "HOLD")
+        log.info("  %-26s %-40s votes=%d/%d  -> %s",
+                 v, " ".join(detail), votes, n_avail, verdict)
+
+    log.info("")
+    log.info("Rule: submit ONLY a candidate with >=2 cleared estimators above the champion. "
+             "A HOLD costs nothing; a wrong submission costs 1 of ~80 and a day of latency.")
 
 
 if __name__ == "__main__":

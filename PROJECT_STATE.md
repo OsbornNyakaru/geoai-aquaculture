@@ -25,12 +25,17 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter11, then paste back the RETRO-FIT + GATE lines.
-   NO ZINDI UPLOAD.** iter11 builds an **offline LB-predicting validator**: it regenerates 7 variants
-   whose public LB we already know, estimates each from the 1030 *unlabeled* test rows (ATC / ATC-F1 /
-   two-seed disagreement / naive control), and checks whether the ranking matches reality.
-   **~11×7 min, zero submissions.** The committed config stays the exact champion — every variant
-   comes from `--set` overrides.
+3. **Current next action: `Run all` → iter12 (the first OFFLINE SCREEN), then paste back the
+   RETRO-FIT + GATE + SCREEN tables. NO ZINDI UPLOAD.** ~21 runs, ~20 min, **zero submissions**.
+
+   **iter11 PASSED (2026-07-22) — the measurement constraint is broken.** Retro-fit on the 7 anchors:
+   **ATC-F1 15/15 concordant, ρ=+0.964** and **DIS 5/5, ρ=+1.000 (n=4)** both cleared, while the
+   *original* pre-committed estimator **ATC FAILED at ρ=−0.429** and the naive control MARG failed at
+   −0.321. The pre-repair iter11 would have failed outright; the two that cleared are exactly what
+   round 07 added. And the two failures **confirm the rank-only proof** — both measure confidence,
+   which the LB cannot see, so both anti-correlate.
+   **→ SCENARIO A is live:** screen offline, submit only where **≥2 cleared estimators** beat the
+   champion. Treat DIS as a second vote only (n=4, exact null p≈0.042); ATC-F1 is the solid one.
 4. **iter11 was REPAIRED on 2026-07-22 before its first run** (`RESEARCH_07.md`). Three bugs would
    have wasted the whole spend: the DIS estimator was **unscoreable** (only the champion got a second
    seed, but ≥3 variants are needed for a rank correlation — now fixed by seeding detrend/k4/reltime);

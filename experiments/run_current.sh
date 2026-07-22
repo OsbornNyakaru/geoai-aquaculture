@@ -3,78 +3,72 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 11 — BUILD AN OFFLINE LB-PREDICTING VALIDATOR.  *** COSTS ZERO SUBMISSIONS ***
+# ITERATION 12 — THE FIRST OFFLINE SCREEN.  *** COSTS ZERO SUBMISSIONS ***
 #
-#   Round-06 research (gemini_loop/RESPONSE_06.md) had BOTH reports independently rank this
-#   #1: our binding constraint is MEASUREMENT (309-row public LB, ~+-0.01 noise, and local OOF
-#   is anti-correlated), so the highest-value move is a local signal that predicts the LB.
+#   iter11 PASSED. Two estimators cleared the retro-fit on the 7 known-LB anchors:
+#       ATC-F1  15/15 concordant, rho = +0.964   (exact null p ~ 0.005)
+#       DIS      5/5  concordant, rho = +1.000   (n=4; exact null p ~ 0.042 -> second vote only)
+#   and, confirming the rank-only proof, the two CONFIDENCE-based estimators came out NEGATIVE:
+#       ATC     6/15, rho = -0.429      MARG    8/15, rho = -0.321
+#   The leaderboard cannot see calibration, so estimators that measure saturation mislead here.
 #
-#   The method is self-certifying. We regenerate 7 historical runs whose public LB we ALREADY
-#   KNOW (0.8266 ... 0.8955), estimate each one's test performance from the 1030 UNLABELED test
-#   rows, and check whether the estimator RANKS them correctly. No submission is involved, and
-#   if every estimator fails we have learned that for free.
+#   So we can now RANK CANDIDATES OFFLINE. This run screens five of them and submits none.
+#   Each candidate runs at 2 seeds because DIS needs a seed pair to be computable.
 #
-#   Estimators (tools/offline_validate.py):
-#     ATC   Average Thresholded Confidence  (Garg et al., ICLR 2022) - verified on synthetic
-#           data to rank true test accuracy at Spearman rho = 1.0.
-#     DIS   two-seed disagreement on test   (GDE / agreement-on-the-line, Baek et al. 2022)
-#     MARG  mean post-shift |p-0.5|         - deliberate naive control the others must beat.
+#   THE PRE-COMMITTED RULE (do not renegotiate after seeing the numbers):
+#     >=2 cleared estimators above champion -> submit it (1 submission), ranked by vote margin.
+#     1 or 0 votes                          -> HOLD. Costs nothing.
+#     ALL candidates HOLD                   -> a real result: the structural lane is exhausted
+#                                             and the Presto lane (RESEARCH_07.md 5e) is next.
 #
-#   PRE-COMMITTED GATE (RESPONSE_06.md section 6):
-#     An estimator must place detrend (LB 0.8266) and K=4 (0.8665) BELOW reltime (0.8908) and
-#     xview (0.8955), with Spearman rho > 0.7.
-#       PASS -> the noise floor is broken. Screen the gated backlog offline (fold-ensemble
-#               deletion, group-DRO, VH-VV, AUC surrogate) and submit only when >=2 estimators
-#               beat the champion. The ~80 remaining submissions become a real search budget.
-#       FAIL -> Q1 is dead for 0 submissions; fund only ideas with plausible effect >= +0.013.
-#               iter12 (dispersion pooling) and iter13 (focal loss) still ship on their merits.
+#   The committed config is UNCHANGED and still the exact 0.8955 champion — every variant below
+#   is produced by --set overrides. Verified: all new flags OFF reproduces the champion tensor
+#   bit-for-bit (24 channels), rank_replace keeps 24, compact_missing gives 14.
 #
-#   Runtime ~8 x 7 min. Nothing here is uploaded to Zindi.
-#   NOTE: the champion config in config.yaml is UNCHANGED - every variant below is produced by
-#   --set overrides, so the repo's committed state stays the exact 0.8955 champion.
+#   Runtime: the iter11 log measured ~35-70 s per run, so ~21 runs is roughly 20 minutes.
 # =====================================================================
 set -euo pipefail
 
 COMMON="--full --model seq"
 
-# ---- Anchors: historical variants with known public LB (see experiments/anchors.tsv) ----
-# pre-relative-time era (relative_time=false, consistency_lambda=0)
-python run_pipeline.py $COMMON --name seq_a_detrend \
-  --set seq.relative_time=false --set seq.consistency_lambda=0 \
-  --set seq.channels.per_cell_detrend=true                        # LB 0.8266
-python run_pipeline.py $COMMON --name seq_a_k4 \
-  --set seq.relative_time=false --set seq.consistency_lambda=0 --set seq.K=4   # LB 0.8665
-python run_pipeline.py $COMMON --name seq_a_base \
-  --set seq.relative_time=false --set seq.consistency_lambda=0    # LB 0.8780
+# ---- Anchors: historical variants with known public LB (experiments/anchors.tsv) ----
+# Regenerated every time so the retro-fit re-certifies the estimators against THIS code.
+# If ATC-F1 or DIS stops clearing the gate below, the code changed something that matters and
+# the screen results are VOID — report that rather than the screen table.
+PRE="--set seq.relative_time=false --set seq.consistency_lambda=0"
+python run_pipeline.py $COMMON --name seq_a_detrend $PRE --set seq.channels.per_cell_detrend=true
+python run_pipeline.py $COMMON --name seq_a_k4      $PRE --set seq.K=4
+python run_pipeline.py $COMMON --name seq_a_base    $PRE
+python run_pipeline.py $COMMON --name seq_a_reltime --set seq.consistency_lambda=0
+python run_pipeline.py $COMMON --name seq_a_nope    --set seq.consistency_lambda=0 --set seq.pos_encoding=none
+python run_pipeline.py $COMMON --name seq_a_l3      --set seq.consistency_lambda=3
+python run_pipeline.py $COMMON --name seq_a_xview                                   # CHAMPION, LB 0.8955
 
-# relative-time era
-python run_pipeline.py $COMMON --name seq_a_reltime \
-  --set seq.consistency_lambda=0                                  # LB 0.8908
-python run_pipeline.py $COMMON --name seq_a_nope \
-  --set seq.consistency_lambda=0 --set seq.pos_encoding=none      # LB 0.8917
-python run_pipeline.py $COMMON --name seq_a_l3 \
-  --set seq.consistency_lambda=3                                  # LB 0.8921
-python run_pipeline.py $COMMON --name seq_a_xview                 # LB 0.8955 (CHAMPION)
+# Second seeds for the four gate variants -> makes DIS scoreable (>=3 variants needed for a rho).
+python run_pipeline.py $COMMON --name seq_a_xview_s7   --set seed=7
+python run_pipeline.py $COMMON --name seq_a_detrend_s7 --set seed=7 $PRE --set seq.channels.per_cell_detrend=true
+python run_pipeline.py $COMMON --name seq_a_k4_s7      --set seed=7 $PRE --set seq.K=4
+python run_pipeline.py $COMMON --name seq_a_reltime_s7 --set seed=7 --set seq.consistency_lambda=0
 
-# ---- Second seeds: REQUIRED for the DIS estimator to be scoreable at all. ----
-# BUG FIXED 2026-07-22 (RESEARCH_07.md, math audit Finding 3): the previous version generated a
-# second seed for seq_a_xview ONLY. offline_validate.py needs >=3 variants carrying a `dis` value
-# to compute a Spearman rho, so DIS would have printed "insufficient bundles" and the entire
-# 8-run compute spend would have produced nothing for that estimator. We now seed the three other
-# variants the GATE depends on, so DIS is scored on the same 4 anchors as ATC.
-# (seq_a_xview_s7 doubles as the queued seed-replication run: submitting it later would measure
-#  our true seed-to-seed LB spread for 1 submission.)
-python run_pipeline.py $COMMON --name seq_a_xview_s7 --set seed=7
-python run_pipeline.py $COMMON --name seq_a_detrend_s7 \
-  --set seed=7 --set seq.relative_time=false --set seq.consistency_lambda=0 \
-  --set seq.channels.per_cell_detrend=true
-python run_pipeline.py $COMMON --name seq_a_k4_s7 \
-  --set seed=7 --set seq.relative_time=false --set seq.consistency_lambda=0 --set seq.K=4
-python run_pipeline.py $COMMON --name seq_a_reltime_s7 \
-  --set seed=7 --set seq.consistency_lambda=0
+# ---- CANDIDATES (all vs the champion; 2 seeds each so DIS is computable) ----
+# c_meanstd / c_meanmax : the round-07 pooling disagreement, settled by measurement not argument.
+# c_compact             : 24 -> 14 channels. Capacity-REDUCING; two agents derived it independently.
+# c_rank                : the FIRST genuine test of the amplitude question (per_cell_detrend never
+#                         removed amplitude, it appended — so the toxicity law is unevidenced).
+# c_antithetic          : makes the cross-view penalty informative on every row (overlap 2.37->1.28).
+for S in "" "_s7"; do
+  SEED=""; [ -n "$S" ] && SEED="--set seed=7"
+  python run_pipeline.py $COMMON --name "c_meanstd$S"     $SEED --set seq.pooling=mean_std
+  python run_pipeline.py $COMMON --name "c_meanmax$S"     $SEED --set seq.pooling=mean_max
+  python run_pipeline.py $COMMON --name "c_compact$S"     $SEED --set seq.compact_missing=true
+  python run_pipeline.py $COMMON --name "c_rank$S"        $SEED --set seq.channels.rank_replace=true
+  python run_pipeline.py $COMMON --name "c_antithetic$S"  $SEED --set seq.antithetic_views=true
+done
 
-# ---- The retro-fit: do any of these estimators rank the known LB correctly? ----
+# ---- Retro-fit (re-certify the estimators) + SCREEN the candidates ----
 python tools/offline_validate.py \
-  --preds-dir submissions/preds --anchors experiments/anchors.tsv
+  --preds-dir submissions/preds --anchors experiments/anchors.tsv \
+  --champion seq_a_xview \
+  --screen c_meanstd c_meanmax c_compact c_rank c_antithetic
 
-echo "=== done. NO UPLOAD NEEDED. Paste the RETRO-FIT table + GATE lines back to the agent. ==="
+echo "=== done. NO UPLOAD. Paste back the RETRO-FIT table, the GATE lines, and the SCREEN table. ==="

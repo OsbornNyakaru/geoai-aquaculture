@@ -112,12 +112,16 @@ large enough to clear ±0.01. **Budget is no longer the constraint** (~130 submi
 
 - …~~Iter5 relative-time~~ ✅0.8908 · ~~Iter6 TTA~~ ❌0.8885 · ~~Iter7 dnorm~~ ❌0.8844 · ~~Iter8 NoPE~~ ➖0.8917 (FINALIST) · ~~Iter9 xview λ=1.0~~ ✅**0.8955 CHAMPION** · ~~Iter10 λ=3.0~~ ❌0.8921 (reverted).
 ~~Research round 06~~ DONE — both reports triaged in `RESPONSE_06.md`. Queue that came out of it:
-1. **Iter11 — OFFLINE LB-PREDICTING VALIDATOR** *(current, staged, **0 submissions**)*. Both reports
-   ranked this #1 independently. Regenerate 7 known-LB variants via the new `--set` overrides, estimate
-   each from the 1030 **unlabeled** test rows (ATC · two-seed disagreement · a naive margin control),
-   and check the ranking against `experiments/anchors.tsv`. **Gate:** detrend+K4 must fall below
-   reltime+xview with ρ>0.7. PASS → screen the backlog offline, ~80 subs become a real search budget.
-   FAIL → costs nothing; revert to funding only ≥+0.013 ideas.
+1. ~~**Iter11 — OFFLINE LB-PREDICTING VALIDATOR**~~ ✅ **PASSED 2026-07-22, 0 submissions.**
+   **ATC-F1 15/15 concordant, ρ=+0.964** · **DIS 5/5, ρ=+1.000 (n=4)** → both CLEARED.
+   The *original* pre-committed estimator **ATC FAILED (6/15, ρ=−0.429)** and the naive control MARG
+   failed (8/15, −0.321) — so the pre-repair version of this experiment would have failed outright,
+   and the two that cleared are precisely what research round 07 added.
+   **Those two failures confirm the rank-only proof:** ATC and MARG both measure confidence, which
+   the LB provably cannot see, and both came out negative (`seq_a_l3`/`seq_a_xview` have the LOWEST
+   MARG yet the HIGHEST LB). De-saturation was never the mechanism.
+   **→ SCENARIO A: screen offline; submit only where ≥2 cleared estimators beat the champion.**
+   Caveat: DIS rests on n=4 (exact null p≈0.042) — second vote only. ATC-F1 (p≈0.005) is the solid one.
 2. **Iter12 — dispersion pooling** `mean ⊕ std` over observed months (Fable's R3; Ottinger's
    permanence/low-std physics). Fallback if within noise: split-pool (mean d/2 ⊕ std d/2) = exactly
    capacity-neutral. **NOT** mean⊕max — the drain event is an outlier the literature suppresses.

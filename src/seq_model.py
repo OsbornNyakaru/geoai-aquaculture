@@ -14,6 +14,7 @@ the GBDT path.
 """
 from __future__ import annotations
 
+import math
 from typing import List, Tuple
 
 import numpy as np
@@ -84,6 +85,32 @@ def to_inputs(cube: np.ndarray, mean: np.ndarray, std: np.ndarray,
     miss = np.isnan(cube).astype(np.float32)            # [n, M, B]
     vals = (cube - mean) / std
     vals = np.where(np.isnan(vals), 0.0, vals).astype(np.float32)
+
+    ch = channels_cfg or {}
+    if ch.get("rank_replace"):
+        # AMPLITUDE-INVARIANT REPLACEMENT (not an addition). Substitute the within-series
+        # normalized RANK of each band for its standardized absolute value, keeping the channel
+        # count identical -- so this is a capacity-NEUTRAL structural swap, the only family that
+        # has ever won here.
+        # This is the first genuine test of the amplitude question. `per_cell_detrend` was
+        # believed to have tested it, but it APPENDED its channels on top of `vals` (24->36) and
+        # so only measured "adding 12 correlated channels hurts". See RESEARCH_07.md 5c.
+        rk = _rank_months(cube)
+        vals = np.where(np.isnan(rk), 0.0, rk).astype(np.float32)
+
+    if ch.get("compact_missing"):
+        # Collapse the 12 per-band missing indicators to 2: [s1_observed, s2_observed].
+        # S2 bands drop out together by scene when cloudy, so the 12 indicators are near-perfectly
+        # collinear -- 10 of 24 input channels are duplicates. Beyond redundancy, cloud frequency
+        # is CLIMATOLOGICAL, making the block a wide handle on calendar season, i.e. exactly the
+        # phase-locked axis whose deletion won +0.0128. Capacity-REDUCING (24 -> 14 channels).
+        # Derived independently by two round-07 research agents. See RESEARCH_07.md 5d.
+        s1_idx = [i for i, b in enumerate(schema.bands) if b in ("VH", "VV")]
+        s2_idx = [i for i in range(cube.shape[2]) if i not in s1_idx]
+        s1_obs = (~np.isnan(cube[:, :, s1_idx])).any(axis=2, keepdims=True)
+        s2_obs = (~np.isnan(cube[:, :, s2_idx])).any(axis=2, keepdims=True)
+        miss = np.concatenate([1.0 - s1_obs, 1.0 - s2_obs], axis=2).astype(np.float32)
+
     parts = [vals, miss]
     if channels_cfg and ex_mean is not None:
         ex = _raw_extra_channels(cube, schema, channels_cfg)
@@ -225,10 +252,35 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
                 dropout=s["dropout"], batch_first=True, activation="gelu",
             )
             self.enc = nn.TransformerEncoder(layer, num_layers=s["layers"])
+            # Pooling over observed months. "mean" is the champion.
+            #   mean_std  second moment  -- ponds are permanent -> LOW temporal dispersion
+            #   mean_max  upper tail     -- ponds are "never bright"; rice/cropland ALWAYS have a
+            #                               bright canopy month (VH +6-10 dB), so max separates the
+            #                               main hard negative, and an order statistic carries NO
+            #                               calendar reference (immune to the temporal shift).
+            # Round 07 produced a genuine disagreement between two research agents on which is
+            # right (drain events contaminate max; canopy events make it discriminative), so both
+            # are implemented and SCREENED OFFLINE rather than chosen blind. See RESEARCH_07.md 5d.
+            self.pooling = s.get("pooling", "mean")
+            pooled_dim = d if self.pooling == "mean" else 2 * d
             self.head = nn.Sequential(
-                nn.Linear(d, d // 2), nn.GELU(), nn.Dropout(s["dropout"]),
+                nn.Linear(pooled_dim, d // 2), nn.GELU(), nn.Dropout(s["dropout"]),
                 nn.Linear(d // 2, 1),
             )
+            if self.pooling != "mean":
+                # Make the expansion IDENTITY-PRESERVING at init: the second-moment half is zeroed
+                # so it contributes nothing, and the mean half is re-initialized at the CHAMPION's
+                # scale. Without the re-init, nn.Linear's default bound = 1/sqrt(fan_in) would use
+                # fan_in = 2d instead of d, shrinking the mean weights by 1/sqrt(2) -- so the model
+                # would NOT start equivalent to the champion and any LB delta would be confounded
+                # with an init-scale change. (Verified: without this, outputs differ at init.)
+                # Net effect: the new statistic must be EARNED, which is what makes this a
+                # capacity-neutral probe rather than the kind of capacity ADD our design law
+                # penalizes (+2048 params, ~2.9%).
+                with torch.no_grad():
+                    bound = 1.0 / math.sqrt(d)
+                    self.head[0].weight[:, :d].uniform_(-bound, bound)
+                    self.head[0].weight[:, d:].zero_()
 
         def _dnorm_pos(self, pad):
             """Duration-normalized positional encoding (iter7, RESPONSE_05 idea #1).
@@ -262,7 +314,23 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
                 h = self.proj(x) + self.pos
             h = self.enc(h, src_key_padding_mask=pad)     # ignore masked months
             keep = (~pad).unsqueeze(-1).float()           # [n, M, 1]
-            pooled = (h * keep).sum(1) / keep.sum(1).clamp(min=1.0)
+            n_obs = keep.sum(1).clamp(min=1.0)            # [n, 1] observed months
+            mu = (h * keep).sum(1) / n_obs
+            if self.pooling == "mean":
+                pooled = mu
+            elif self.pooling == "mean_std":
+                # BIASED 1/N (not 1/(N-1)): the Bessel factor is 1.155 at N=4 vs 1.043 at N=12,
+                # an ~11% multiplicative window-LENGTH artifact -- larger than biased's. And
+                # sqrt has infinite gradient at 0, reachable at N=4 with dropout, so clamp.
+                var = ((h - mu.unsqueeze(1)) ** 2 * keep).sum(1) / n_obs
+                pooled = torch.cat([mu, (var + 1e-5).sqrt()], dim=-1)
+            elif self.pooling == "mean_max":
+                mx = h.masked_fill(pad.unsqueeze(-1), float("-inf")).max(dim=1).values
+                # A row with zero observed months would be all -inf; keep it finite.
+                mx = torch.where(torch.isfinite(mx), mx, torch.zeros_like(mx))
+                pooled = torch.cat([mu, mx], dim=-1)
+            else:
+                raise ValueError(f"unknown seq.pooling: {self.pooling!r}")
             return self.head(pooled).squeeze(-1)          # logits [n]
 
     return PondTransformer()
@@ -385,12 +453,38 @@ def _mask_views(cube: np.ndarray, rows: np.ndarray, schema: Schema,
     """Return (masked_cube [len*K, M, B], owner_row_index [len*K])."""
     from .utils import rng_for
 
+    # ANTITHETIC PAIRING (K=2 only). The cross-view invariance penalty -- our champion, +0.0047 --
+    # is only as strong as the DIFFERENCE between the two views. With L in {4,5,6} of 12 months and
+    # iid starts, many pairs overlap heavily, so Var_k(logit) is near-vacuous for those rows and the
+    # gradient carries little signal. Drawing view 2 maximally distant from view 1 makes the penalty
+    # informative on every row. This is textbook antithetic variates: the MARGINAL window
+    # distribution is unchanged (we resample from the same measured p(L), p(start|L)), so no new
+    # train/test shift is introduced and no parameter is added -- exactly zero capacity change.
+    # It also reinterprets iter10: lambda=3 amplified a NOISY signal; improving the signal itself
+    # is the strictly better move. See RESEARCH_07.md 5a (R3).
+    antithetic = bool(cfg["seq"].get("antithetic_views", False)) and K == 2
+
     out, owners = [], []
     for i in rows:
+        prev_start, prev_L = None, None
         for k in range(K):
             tag = (10000 + k) if oof else k
             rng = rng_for(seed, int(i), tag)
             start, L = sample_window(wd, cfg, rng, schema.n_months)
+            if antithetic and k == 1 and prev_start is not None:
+                # Resample from the SAME distribution until the second window is far from the
+                # first; keep the best-separated draw if the target is never met.
+                need = max(1.0, prev_L / 2.0)
+                best, best_gap = (start, L), abs(start - prev_start)
+                for _ in range(16):
+                    if best_gap >= need:
+                        break
+                    cand_s, cand_L = sample_window(wd, cfg, rng, schema.n_months)
+                    gap = abs(cand_s - prev_start)
+                    if gap > best_gap:
+                        best, best_gap = (cand_s, cand_L), gap
+                start, L = best
+            prev_start, prev_L = start, L
             out.append(apply_mask(cube[i], start, L, schema, wd, cfg, rng))
             owners.append(int(i))
     return np.stack(out), np.array(owners)
