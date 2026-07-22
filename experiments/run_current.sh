@@ -3,52 +3,41 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 13 — SECOND OFFLINE SCREEN.  *** COSTS ZERO SUBMISSIONS ***
+# ITERATION 14 — REGULARIZATION SWEEP.  *** COSTS ZERO SUBMISSIONS ***
+#   Run this WHILE the c_dropout3 submission is in flight on Zindi. The two are independent:
+#   the upload measures dropout 0.3 on the real leaderboard, this screen maps the shape of the
+#   whole regularization axis offline. No reason to serialize them.
 #
-#   iter12 outcome: ALL FIVE CANDIDATES HELD (no candidate got >=2 votes). The pre-committed
-#   rule worked exactly as intended -- ATC-F1 liked mean_max a lot (+0.0838) but DIS disagreed
-#   (-0.0301), so we spent zero submissions on it. Two real findings came out of it:
+#   WHY: iter13 produced our FIRST-EVER screen SUBMIT. c_dropout3 (dropout 0.2 -> 0.3) cleared
+#   both certified estimators (ATC-F1 +0.0165, DIS +0.0029). It is EXACTLY parameter-neutral --
+#   pure regularization strength -- and it is the most on-thesis knob in the repo under our own
+#   design law ("less fit transfers better"), yet it had never been touched once in twelve
+#   iterations. We spent those twelve on architecture while the plainest knob sat at its default.
+#   That is the lesson worth acting on: sweep the axis properly rather than stopping at one point.
 #
-#     1. c_rank COLLAPSED: OOF 0.9753 -> 0.857/0.865 across both seeds, ATC-F1 -0.1703.
-#        Replacing absolute band values with within-series RANK destroys the model. So
-#        AMPLITUDE IS THE PRIMARY SIGNAL -- the pond discriminator really is "persistently
-#        LOW backscatter", an absolute level. The amplitude question, reopened when we found
-#        per_cell_detrend had only ever APPENDED channels, is now genuinely ANSWERED, and the
-#        rank/ordinal feature family is closed with evidence rather than by assumption.
-#     2. c_compact WAS NEVER TESTED -- a config-path bug (seq.compact_missing instead of
-#        seq.channels.compact_missing) meant the flag never reached to_inputs(). The run came
-#        out bit-identical to the champion and the screen scored the no-op as a 0.0000 tie.
-#        FIXED; it is re-tested below, and the pipeline now logs the ACTUAL input width.
+#   Caveat carried forward: the DIS margin was TINY (+0.0029). This is a 2/2 by the rule, not a
+#   resounding one, and estimator deltas are NOT on the LB scale.
 #
-#   THE ESTIMATORS RE-CERTIFIED IDENTICALLY on both runs (ATC-F1 15/15 rho=+0.964; DIS 5/5
-#   rho=+1.000), so the screen itself is trustworthy. Note DIV FAILED (2/15, rho=-0.857):
-#   fold-diversity is strongly ANTI-correlated with LB, the OPPOSITE of hypothesis H1.
+#   CANDIDATES (all exactly parameter-neutral; 2 seeds each so DIS is computable):
+#     c_do35 / c_do40 / c_do50   dropout 0.35 / 0.40 / 0.50 -- is 0.3 a slope or a peak?
+#     c_wd3                      weight_decay 1e-4 -> 1e-3, the OTHER untouched regularizer
+#     c_ep40                     epochs 60 -> 40, i.e. regularize by early stopping instead
+#   If the dropout curve keeps rising to 0.5, the real finding is "we were badly under-regularized
+#   all along" and the architecture work was fighting the wrong problem. If it peaks at 0.3-0.35,
+#   we take the peak and move on to the Presto lane.
 #
-#   THIS ROUND screens four candidates:
-#     c_compact     the genuine re-test of the 24 -> 14 channel deletion (expect n=14 in the log)
-#     c_meanmax_l0  mean_max WITHOUT cross-view invariance. ATC-F1 loved mean_max but DIS said it
-#                   was seed-unstable; the zero-init second-moment head plus a variance penalty may
-#                   be fighting each other. This separates the two.
-#     c_k3          K=3 views. K=2 beat K=4, but K=3 was never tried and the optimum was declared
-#                   "sharp" from two points. Capacity-neutral in parameters.
-#     c_dropout3    dropout 0.2 -> 0.3. Exactly parameter-neutral, and under a design law that says
-#                   "less fit transfers better" this is the most on-thesis knob in the repo -- and
-#                   it has never been touched once in twelve iterations.
-#
-#   PRE-COMMITTED RULE (unchanged; do not renegotiate after seeing numbers):
-#     >=2 cleared estimators above champion -> submit it. 1 or 0 -> HOLD, costs nothing.
-#     If everything HOLDS again, the structural lane is exhausted and the Presto lane
-#     (RESEARCH_07.md 5e) becomes the next spend.
+#   PRE-COMMITTED RULE (unchanged): >=2 cleared estimators above champion -> submit.
+#   1 or 0 -> HOLD. Do not renegotiate after seeing numbers.
 #
 #   Committed config remains the exact 0.8955 champion; every variant comes from --set.
-#   Runtime ~21 runs, roughly 20 minutes.
+#   ~21 runs, roughly 20 minutes.
 # =====================================================================
 set -euo pipefail
 
 COMMON="--full --model seq"
 
 # ---- Anchors: re-certify the estimators against THIS code every run. ----
-# If ATC-F1 or DIS stops clearing, something regressed and the SCREEN BELOW IS VOID.
+# If ATC-F1 or DIS stops clearing, something regressed and THE SCREEN BELOW IS VOID.
 PRE="--set seq.relative_time=false --set seq.consistency_lambda=0"
 python run_pipeline.py $COMMON --name seq_a_detrend $PRE --set seq.channels.per_cell_detrend=true
 python run_pipeline.py $COMMON --name seq_a_k4      $PRE --set seq.K=4
@@ -64,21 +53,23 @@ python run_pipeline.py $COMMON --name seq_a_detrend_s7 --set seed=7 $PRE --set s
 python run_pipeline.py $COMMON --name seq_a_k4_s7      --set seed=7 $PRE --set seq.K=4
 python run_pipeline.py $COMMON --name seq_a_reltime_s7 --set seed=7 --set seq.consistency_lambda=0
 
-# ---- CANDIDATES (2 seeds each so DIS is computable) ----
-# WATCH THE LOG: c_compact MUST print "seq input width: 14 channels/month". If it prints 24 the
-# flag did not take effect again and its screen row is meaningless -- report that, do not read it.
+# ---- CANDIDATES (2 seeds each) ----
+# c_dropout3 is regenerated so the sweep has its 2/2 winner on the same axis for comparison.
 for S in "" "_s7"; do
   SEED=""; [ -n "$S" ] && SEED="--set seed=7"
-  python run_pipeline.py $COMMON --name "c_compact$S"    $SEED --set seq.channels.compact_missing=true
-  python run_pipeline.py $COMMON --name "c_meanmax_l0$S" $SEED --set seq.pooling=mean_max --set seq.consistency_lambda=0
-  python run_pipeline.py $COMMON --name "c_k3$S"         $SEED --set seq.K=3
-  python run_pipeline.py $COMMON --name "c_dropout3$S"   $SEED --set seq.dropout=0.3
+  python run_pipeline.py $COMMON --name "c_dropout3$S" $SEED --set seq.dropout=0.3
+  python run_pipeline.py $COMMON --name "c_do35$S"     $SEED --set seq.dropout=0.35
+  python run_pipeline.py $COMMON --name "c_do40$S"     $SEED --set seq.dropout=0.4
+  python run_pipeline.py $COMMON --name "c_do50$S"     $SEED --set seq.dropout=0.5
+  python run_pipeline.py $COMMON --name "c_wd3$S"      $SEED --set seq.weight_decay=1.0e-3
+  python run_pipeline.py $COMMON --name "c_ep40$S"     $SEED --set seq.epochs=40
 done
 
 # ---- Retro-fit (re-certify) + SCREEN ----
 python tools/offline_validate.py \
   --preds-dir submissions/preds --anchors experiments/anchors.tsv \
   --champion seq_a_xview \
-  --screen c_compact c_meanmax_l0 c_k3 c_dropout3
+  --screen c_dropout3 c_do35 c_do40 c_do50 c_wd3 c_ep40
 
-echo "=== done. NO UPLOAD. Paste back the RETRO-FIT table, the GATE lines, and the SCREEN table. ==="
+echo "=== done. NO UPLOAD FROM THIS RUN. Paste back the RETRO-FIT + GATE + SCREEN tables. ==="
+echo "=== SEPARATELY: upload submissions/submission_c_dropout3.csv to Zindi and paste the LB. ==="

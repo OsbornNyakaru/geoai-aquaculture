@@ -132,7 +132,40 @@ diversity scored 2/15 concordant, **ρ = −0.857**: *lower* diversity goes with
 opposite of hypothesis H1, which predicted fold-averaging diversity was the hidden driver. H1 is not
 supported. (It fails the strict all-or-nothing gate, so it is not usable negated either.)
 
-| 13 | 2026-07-22 | **Second offline screen**: `c_compact` re-test · `mean_max` without cross-view · K=3 · dropout 0.3 | *no submission* | — | pending | — |
+| 13 | 2026-07-22 | **Second offline screen**: `c_compact` re-test · `mean_max` without cross-view · K=3 · dropout 0.3 | *no submission* | — | **n/a — 0 subs** | ✅ **1 SUBMIT** |
+
+**iter13 — the screen fired for the first time.** Estimators re-certified identically for the third
+consecutive run (ATC-F1 15/15 ρ=+0.964; DIS 5/5 ρ=+1.000).
+
+| Candidate | ATC-F1 Δ | DIS Δ | Votes | |
+|---|---|---|---|---|
+| **`c_dropout3`** (dropout 0.2 → **0.3**) | **+0.0165** | **+0.0029** | **2/2** | ✅ **SUBMIT** |
+| `c_k3` (K=3) | −0.0032 | −0.0010 | 0/2 | HOLD |
+| `c_compact` (24→14 ch) | −0.0053 | −0.0252 | 0/2 | HOLD |
+| `c_meanmax_l0` (mean_max, λ=0) | −0.0847 | −0.0126 | 0/2 | HOLD |
+
+**`c_dropout3` is the first candidate ever to clear.** It is **exactly parameter-neutral** — pure
+regularization strength — and it is the most on-thesis knob in the repo under our own design law
+("less fit transfers better"), yet it had **never been touched once in twelve iterations**. We spent
+those twelve iterations on architecture while the plainest regularization knob sat at its default.
+⚠️ **Honest caveat:** the ATC-F1 margin (+0.0165) is solid but the DIS margin (+0.0029) is *tiny*.
+This is a 2/2 by the pre-committed rule, not a resounding one. Estimator deltas are **not** on the
+LB scale — do not read +0.0165 as an expected LB gain.
+
+**`c_compact` genuinely ran this time and FAILED** (−0.0053 / −0.0252; non-zero deltas confirm the
+flag took effect, unlike iter12's silent 0.0000 no-op). The 24→14 channel deletion was derived
+**independently by two research agents** and it does not work. Independent convergence of two
+reasoning agents is **not** evidence — a useful correction to how we weight that signal.
+
+**`c_meanmax_l0` flipped hard negative (−0.0847) vs iter12's `c_meanmax` at +0.0838 with λ=1.**
+Same pooling, opposite sign, the only difference being cross-view invariance. So the upper-tail
+statistic *depends on* the variance penalty rather than competing with it — the opposite of the
+hypothesis that motivated this probe.
+
+**`c_k3` ≈ 0 on both estimators.** K=2 is confirmed optimal, now from three points rather than the
+two that originally justified calling it a "sharp optimum."
+
+| 14 | 2026-07-22 | Upload `submission_c_dropout3.csv` (already written by the iter13 run) | submission_c_dropout3.csv | 0.649 | **pending** | — |
 
 ---
 

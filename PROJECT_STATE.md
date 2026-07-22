@@ -25,8 +25,25 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter13 (second OFFLINE SCREEN), then paste back the
-   RETRO-FIT + GATE + SCREEN tables. NO ZINDI UPLOAD.** ~21 runs, ~20 min, **zero submissions**.
+3. **Current next action — TWO INDEPENDENT THINGS, do both:**
+   **(a) UPLOAD `submissions/submission_c_dropout3.csv` to Zindi** and paste the LB. The file was
+   already written by the iter13 run — no rerun needed. This is our **first screen-approved
+   submission** and the first LB spend since iter10.
+   **(b) `Run all` → iter14** (regularization sweep, **0 submissions**) and paste back the three
+   tables. Independent of (a); do not serialize them.
+
+   **iter13: the screen FIRED for the first time.** `c_dropout3` (dropout 0.2 → **0.3**) cleared
+   both certified estimators — **ATC-F1 +0.0165, DIS +0.0029, 2/2 → SUBMIT**. It is *exactly
+   parameter-neutral*, the most on-thesis knob in the repo under our own "less fit transfers better"
+   law — and it had **never been touched in twelve iterations**. We spent those twelve on
+   architecture while the plainest regularization knob sat at its default.
+   ⚠️ The DIS margin is **tiny** (+0.0029): a 2/2 by the rule, not a resounding one. Estimator
+   deltas are **not** on the LB scale.
+   Also from iter13: **`c_compact` genuinely ran and FAILED** (−0.0053/−0.0252) — the 24→14 deletion
+   two research agents derived *independently* does not work, so independent agent convergence is
+   **not** evidence. **`c_meanmax_l0` flipped to −0.0847** vs +0.0838 with λ=1, so the upper-tail
+   statistic *depends on* cross-view invariance rather than competing with it. **`c_k3` ≈ 0** — K=2
+   confirmed optimal from three points instead of two.
 
    **iter12 (first screen): all five candidates HELD, 0 submissions spent.** The rule earned its
    keep — ATC-F1 liked `mean_max` (+0.0838) but DIS disagreed (−0.0301), which under the old blind
