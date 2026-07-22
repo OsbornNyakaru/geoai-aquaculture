@@ -467,10 +467,134 @@ the strongest queue signal this round produced.
 
 ---
 
+## 5e. The pretrained lane — **measured, not speculated**
+
+The agent vendored the real Presto source, loaded the real pretrained weights, and ran the encoder
+end-to-end on our exact tensor shape. These are measurements, not estimates.
+
+### Presto fits our data almost exactly
+
+| Metric | Value |
+|---|---|
+| Frozen encoder params | **404,160** |
+| Checkpoint size | **3.3 MB** — ships in the git repo, **no runtime download** |
+| Embedding dim | 128 |
+| Inference, 2,851 rows × 12 timesteps | **2.43 s on CPU** |
+| GPU required | **No** |
+| Extra dependency | `einops` only |
+| **Fitted** params (logistic head) | **129** |
+
+**All 12 of our bands map 1:1 onto Presto's first 12 normalized slots with zero leftovers, and our
+units already match** — it expects S1 in **dB** (`src/data.py:_detect_sar_units` already reports `db`)
+and S2 as **raw DN × 1e4** (`src/features.py:133` already asserts this). NDVI is derived free.
+One trap: **our `BAND_ORDER` is VH-first, Presto is VV-first — the indices must be swapped.**
+
+At **129 fitted parameters**, this is *less* fitted capacity than anything we have ever shipped —
+which makes it consistent with our design law rather than a violation of it.
+
+### Two measured hazards
+
+**1. The calendar-time hazard is real and first-order.** Presto's `month` argument indexes an
+absolute calendar-month embedding carried by every non-SRTM token. Measured on 512 rows with a
+random linear probe:
+
+| Change | Rank correlation vs base |
+|---|---|
+| `latlons` (0,0) → fixed (10, 105) | **0.958** |
+| `month` = const → true start month | **0.456** |
+
+So the fake lat/lon is a survivable nuisance (we have no coordinates and it is **not maskable** —
+unconditionally concatenated at `presto.py:426`), but **`month` is a lever on the ordering**.
+Setting `month=0` for all rows is *precisely our relative-time reframing applied to Presto* — the
+change that won us +0.0128. **The month-constant variant must be primary; month-true is a separate
+experiment, not a default.**
+
+**2. Group-level masking is a genuine information loss.** Presto masks at *token-group* granularity:
+`group_mask = max(mask[:, :, channel_idxs])`. **Losing `red` alone kills the entire S2_RGB token for
+that month.** Our champion carries per-band missing indicators and can represent "I have blue and
+green but not red"; Presto structurally cannot. On a dataset defined by per-band cloud dropout, this
+is a concrete handicap and the most likely way the lane underperforms.
+
+### Packaging: vendor it, do not pip-install it
+
+`pip install -e .` drags `earthengine-api`, `openmapflow`, `cropharvest`, and pins `torch==2.0` —
+a dependency nightmare that also collides with Zindi's "use the most recent versions" rule. Presto
+is **MIT**, so the compliant route is to **vendor ~960 lines plus the 3.3 MB checkpoint into the
+repo** (agent verified this exact patch runs). Also: **do not use `single_file_presto.py`** — that
+older revision asserts every row in a batch has the same number of masked tokens, which our variable
+4/5/6-month windows violate.
+
+Operationally, "custom packages will not be accepted" means reviewers must be able to re-run the
+notebook without a private wheel from us. It does **not** ban public dependencies.
+
+### TabPFN: legal with one pin; the drift-resilient variant is dead
+
+- **Envelope:** 1,821 × 144 × 2 classes is comfortably inside the ≤10,000 × ≤500 × ≤10 design regime.
+- **NaN handling is native** — feed masked months as `np.nan` directly, no indicator columns.
+- **⚠️ Pin to TabPFN-v2 weights.** TabPFN-2.5 / 2.6 / 3 weights are under **non-commercial**
+  licenses, which conflicts with "openly available to everyone" in a cash-prize competition. Only
+  v2 (Apache-2.0-with-attribution) is unambiguously clean.
+- **⚠️ `AutoTabPFNClassifier` / `tabpfn-extensions` post-hoc ensembling is BANNED** — portfolio
+  search over configurations is exactly what the AutoML prohibition targets. Plain `TabPFNClassifier` only.
+- **Drift-Resilient TabPFN: REJECTED.** Its code hard-asserts a per-row `dist_shift_domain` index,
+  and the method works by fitting a *trajectory* across an ordered sequence of **labeled** domains.
+  We have exactly one. It would degrade to base TabPFN plus a constant feature. (Also GPL-3.0.)
+- Its calibration advantage — TabPFN's headline strength — is **worth nothing to us** under a
+  rank-only metric. Judge it on AUC deltas only.
+
+### The train/test symmetry trap (applies to both)
+
+Train rows have 12 months; test rows have 4–6. Feeding full-12-month train and 4-month test into a
+shared frozen encoder would be **a domain gap we manufactured ourselves**. Both lanes must push
+train rows through the existing `seq.K` window sampler first. This is the second most likely way the
+lane fails.
+
+### Rejected, one line each
+
+**Prithvi · Clay · SatMAE · DOFA** — all patch/image encoders; we have isolated cells with no spatial
+context, so they are structurally inapplicable. **Galileo** — same authors as Presto, but
+spatial-patch tokenization; Presto *is* the pixel-native member of that family. **Chronos · TimesFM ·
+Moirai** — univariate forecasting objectives; embeddings optimised for horizon extrapolation, not
+discrimination, and they discard the cross-band structure where the pond signal lives.
+**MOMENT** — weak reject; the only one with a documented classification head and native masking, but
+pretrained on generic UCR/Monash series with no remote-sensing physics.
+
+### The honest counter-case
+
+**(a) Legality.** Zindi's data-standards page names *"pre-trained models with standard libraries"* as
+a permitted category, and we would fit 129 parameters on Zindi data alone. But Presto was pretrained
+on 21.5M real global Sentinel time series, and a purist could argue that launders external Sentinel
+data into the model. There is no label leakage — pretraining is self-supervised reconstruction with
+no aquaculture labels, and it predates this competition. **Do not resolve this ourselves: post it on
+the forum and get an organiser answer in writing before designating a Presto submission as a finalist.**
+
+**(b) The strongest technical objection.** A frozen 128-d bottleneck chosen by someone else's
+objective may simply throw away the fine-grained signal our temporal Transformer spent 10 iterations
+learning. A global prior is also a *smoother* — it will happily assign similar embeddings to ponds
+and to any other flat low-backscatter water body, which is exactly the discrimination we need.
+
+**(c) Probability.** Base rate for a new lane winning here is ~20%, and both prior winners were
+*deletions*. Agent's estimate: **~25% that Presto beats 0.8955 outright; ~30% that it lands within
+0.01; ~45% that it closes.** TabPFN-v2 standalone: ~12% / ~30%.
+
+**Why fund it anyway:** expected value is dominated by the ~55–60% chance of a genuinely
+**decorrelated near-champion**, which becomes **finalist #2 in place of NoPE** — whose near-clone
+status makes it a weak private-LB hedge. Cost is 3 submissions (~4% of budget) and about an hour of
+compute. And per §2, a documented principled negative result on a geospatial foundation model is
+itself rubric content for the 35%.
+
+---
+
 ## 6. THE DECISION TREE — what to do next, for both outcomes
 
 Everything hinges on **iter11**: does an offline estimator rank our seven known-LB anchors correctly
 (detrend + K4 below reltime + xview, Spearman ρ > 0.7)?
+
+> **Note added after the full agent round.** Two items below were superseded by later findings:
+> the "amplitude is toxic" premise behind several entries is **unfounded** (§5c), and iter12 is
+> **challenged** (§5d) — screen `mean⊕std` *and* `mean⊕max` offline rather than picking one blind.
+> The single highest-value addition is the **Presto lane** (§5e), which enters Step 0 as a build
+> (free) and both branches as a submission.
 
 ### STEP 0 — runs in BOTH worlds, immediately, for zero submissions
 
@@ -579,7 +703,23 @@ ledger we already have.
 | 8 | Post the two-column legality question to the Zindi forum | 0 | both |
 | 9 | Remove **VH−VV** from the gated backlog | 0 | both |
 | 10 | Drop the endgame prevalence sweep to low priority (t\*≈F1\*/2 ⇒ saturated) | 0 | both |
-| 11 | Then branch on the iter11 gate into Scenario A or B above | — | — |
+| 11 | **Post the pretrained-model legality question to the forum** (name Presto + TabPFN-v2 and their licences; get it in writing before designating finalists) | 0 | both |
+| 12 | **Build the Presto lane offline** — vendor the MIT source + 3.3 MB checkpoint, `month=const`, `latlons=const`, train views through the existing `seq.K` window sampler, then run adversarial validation on the embeddings (AUC ≈0.5 → the encoder normalised the shift away; >0.9 → it is *encoding* the shift and the head will latch on) | 0 subs | both |
+| 13 | Then branch on the iter11 gate into Scenario A or B above | — | — |
+
+### Corrections this round made to our own ledger
+
+| Belief | Status |
+|---|---|
+| "Amplitude/per-series level is toxic" (from detrend −0.051) | **UNFOUNDED** — that run appended channels, never removed amplitude (§5c). Plausible physics story, zero evidence. |
+| "Pretrained models are banned" | **FALSE** — explicitly permitted (§1). Cost us the largest untried lane for months. |
+| "iter9 won / iter10 lost via de-saturation" | **IMPOSSIBLE** — `t_star` is algebraically inert; the LB is rank-only (§5c). |
+| "Objective lane closed" | **UNFOUNDED** — rested on the de-saturation story. |
+| "relative-time won because window START is shifted; dnorm lost because LENGTH is matched" | **FALSE** — both are sampled from the measured test distribution. The deleted channel was calendar *identity*. |
+| "OOF is scored on 12-month series" (my hypothesis) | **KILLED** by the code — window regimes match; the *estimator* differs (1 model vs 5). |
+| "VH−VV is a promising channel" | **REJECTED** three times independently (§5b, §5d). |
+| "Top-5 is ≈0.928, we are 0.033 behind" | **RECALIBRATED** — the high scores were pre-reset/leaked; real bar ≈0.90–0.95. |
+| "Blending is dead" | **NARROWED** — our champion is already a 5-fold ensemble; the law is "no *weak or correlated* components." |
 
 ### Open questions carried forward
 
