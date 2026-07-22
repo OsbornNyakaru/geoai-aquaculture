@@ -102,6 +102,82 @@ def margin_estimate(p_test: np.ndarray, prevalence_target: float | None = 0.649)
     return float(np.abs(p - 0.5).mean())
 
 
+def _logit(p: np.ndarray) -> np.ndarray:
+    p = np.clip(np.asarray(p, dtype=float), _EPS, 1 - _EPS)
+    return np.log(p) - np.log1p(-p)
+
+
+def atc_f1_estimate(oof_prob: np.ndarray, y: np.ndarray, p_test: np.ndarray,
+                    prevalence_target: float = 0.649) -> float:
+    """METRIC-ALIGNED ATC: estimate the deployed F1, not raw-0.5 accuracy.
+
+    WHY (RESEARCH_07.md, math audit Finding 1). After the prevalence pin the submission has a
+    FIXED predicted-positive count P_hat = prevalence * n_test, so
+
+        F1 = 2*TP / (2*TP + FP + FN) = 2*TP / (P_hat + P)
+
+    with P (the true positive count) fixed by ground truth. F1 is therefore monotone in TP among
+    the top-P_hat rows -- i.e. precision@k, a functional of the test RANKING alone. ROC-AUC is
+    rank-only by definition. So the leaderboard sees ONLY the ranking, and is blind to calibration.
+
+    Plain `atc_estimate` scores confidence at the raw 0.5 cut, so it separates variants largely by
+    saturation -- exactly the axis the LB cannot see, and exactly the axis our variants differ on
+    (cross-view invariance moved t_star 0.500 -> 0.445 with AUC intact). That makes it confounded
+    as a proxy. This estimator instead measures margin from the DEPLOYED decision boundary on both
+    sides, and recombines per-class ATC into an F1 estimate.
+    """
+    oof_prob = np.asarray(oof_prob, dtype=float)
+    y = np.asarray(y).astype(int)
+
+    # Put OOF and test on the same footing: pin both to the deployed positive rate, then the
+    # decision boundary is 0.5 on each and the margin is comparable across the two populations.
+    p_oof_s, _ = target_prevalence_shift(oof_prob, float(prevalence_target))
+    p_test_s, _ = target_prevalence_shift(np.asarray(p_test, dtype=float), float(prevalence_target))
+
+    z_oof, z_test = _logit(p_oof_s), _logit(p_test_s)
+    yhat_o, yhat_t = (z_oof >= 0).astype(int), (z_test >= 0).astype(int)
+    s_oof, s_test = np.abs(z_oof), np.abs(z_test)
+
+    def _class_acc(cls: int) -> float:
+        """ATC restricted to the rows PREDICTED to be `cls`: estimated accuracy within that class."""
+        mo, mt = yhat_o == cls, yhat_t == cls
+        if mo.sum() == 0 or mt.sum() == 0:
+            return float("nan")
+        err = float((y[mo] != cls).mean())
+        t = float(np.quantile(s_oof[mo], err)) if err > 0 else float(s_oof[mo].min())
+        return float((s_test[mt] >= t).mean())
+
+    prec, neg_acc = _class_acc(1), _class_acc(0)
+    if not np.isfinite(prec) or not np.isfinite(neg_acc):
+        return float("nan")
+    n_pos_pred = float(yhat_t.sum())
+    n_neg_pred = float((1 - yhat_t).sum())
+    tp = prec * n_pos_pred
+    fp = n_pos_pred - tp
+    fn = (1.0 - neg_acc) * n_neg_pred
+    denom = 2.0 * tp + fp + fn
+    return float(2.0 * tp / denom) if denom > 0 else float("nan")
+
+
+def informative_pairs(order: List[str], est: Dict[str, Dict[str, float]],
+                      min_gap: float = 0.01) -> List[tuple]:
+    """Anchor pairs whose LB gap EXCEEDS the noise floor -- the only pairs worth scoring.
+
+    Four of our seven anchors (0.8908 / 0.8917 / 0.8921 / 0.8955) lie within 0.005 of each other,
+    i.e. INSIDE the +-0.01 public-LB noise band, so their measured LB ORDER is itself mostly noise.
+    Demanding that an estimator reproduce that order is demanding it reproduce noise: a PERFECT
+    validator can score Spearman rho = 0.643 (< 0.7) purely by disagreeing with a noise-scrambled
+    cluster, and so would fail the original gate through no fault of its own.
+    Concordance on the informative pairs alone has exact null p = 0.0048 (vs 0.044 for rho > 0.7).
+    """
+    pairs = []
+    for i, a in enumerate(order):
+        for b in order[i + 1:]:
+            if abs(est[b]["lb"] - est[a]["lb"]) > min_gap:
+                pairs.append((a, b))
+    return pairs
+
+
 # --------------------------------------------------------------------------- #
 # Retro-fit scoring
 # --------------------------------------------------------------------------- #
@@ -140,6 +216,9 @@ def main() -> None:
     ap.add_argument("--preds-dir", default="submissions/preds")
     ap.add_argument("--anchors", default="experiments/anchors.tsv")
     ap.add_argument("--prevalence-target", type=float, default=0.649)
+    ap.add_argument("--min-gap", type=float, default=0.01,
+                    help="anchor pairs closer than this in LB are inside the noise band and are "
+                         "excluded from the gate (their measured order is itself noise)")
     args = ap.parse_args()
 
     anchors = load_anchors(Path(args.anchors))
@@ -153,64 +232,101 @@ def main() -> None:
     for a in anchors:
         v = a["variant"]
         # a variant may have several seed runs: preds_<v>.npz, preds_<v>_s7.npz, ...
-        files = sorted(preds_dir.glob(f"preds_{v}.npz")) + sorted(preds_dir.glob(f"preds_{v}_s*.npz"))
+        # `_s[0-9]*` not `_s*`: the loose glob also matched preds_<v>_smoke.npz, which would have
+        # silently entered the two-seed disagreement estimator as if it were a seed replicate.
+        files = sorted(preds_dir.glob(f"preds_{v}.npz")) + sorted(preds_dir.glob(f"preds_{v}_s[0-9]*.npz"))
         if not files:
             log.warning("MISSING bundle for variant %s (looked in %s) - skipped", v, preds_dir)
             continue
-        d = np.load(files[0], allow_pickle=True)
+        d = np.load(files[0])
         oof, y, p_test = d["oof_prob"], d["y"], d["p_test_raw"]
         est[v] = {
             "lb": a["lb"],
             "atc": atc_estimate(oof, y, p_test),
+            "atcf1": atc_f1_estimate(oof, y, p_test, args.prevalence_target),
             "marg": margin_estimate(p_test, args.prevalence_target),
         }
-        seeds[v] = [np.load(f, allow_pickle=True)["p_test_raw"] for f in files]
+        seeds[v] = [np.load(f)["p_test_raw"] for f in files]
         if len(seeds[v]) >= 2:
             est[v]["dis"] = disagreement_estimate(seeds[v][0], seeds[v][1])
+        else:
+            log.warning("variant %s has only %d seed bundle(s) - DIS not computable for it",
+                        v, len(seeds[v]))
 
     if not est:
         raise SystemExit("no preds bundles found - run the anchor regeneration first")
 
+    keys = ("atc", "atcf1", "dis", "marg")
     order = sorted(est, key=lambda v: est[v]["lb"])
     log.info("")
-    log.info("%-22s %8s %8s %8s %8s", "variant", "LB", "ATC", "DIS", "MARG")
+    log.info("%-22s %8s %8s %8s %8s %8s", "variant", "LB", "ATC", "ATC-F1", "DIS", "MARG")
     for v in order:
         e = est[v]
-        log.info("%-22s %8.4f %8.4f %8s %8.4f", v, e["lb"], e["atc"],
-                 f"{e['dis']:.4f}" if "dis" in e else "-", e["marg"])
 
-    lb = [est[v]["lb"] for v in order]
+        def _f(k):
+            return f"{e[k]:.4f}" if k in e and np.isfinite(e[k]) else "-"
+
+        log.info("%-22s %8.4f %8s %8s %8s %8s", v, e["lb"],
+                 _f("atc"), _f("atcf1"), _f("dis"), _f("marg"))
+
     log.info("")
     log.info("=== RETRO-FIT: Spearman rho vs known public LB (n=%d) ===", len(order))
-    verdicts = {}
-    for key in ("atc", "dis", "marg"):
-        have = [v for v in order if key in est[v]]
+    verdicts: Dict[str, float] = {}
+    for key in keys:
+        have = [v for v in order if key in est[v] and np.isfinite(est[v][key])]
         if len(have) < 3:
-            log.info("  %-5s : insufficient bundles (%d)", key.upper(), len(have))
+            log.info("  %-6s : insufficient bundles (%d) - not scored", key.upper(), len(have))
             continue
         rho = spearman([est[v]["lb"] for v in have], [est[v][key] for v in have])
         verdicts[key] = rho
-        log.info("  %-5s : rho = %+.3f   (n=%d)", key.upper(), rho, len(have))
+        log.info("  %-6s : rho = %+.3f   (n=%d)", key.upper(), rho, len(have))
 
-    # ---- the pre-committed gate (RESPONSE_06.md section 6) ----
+    # ---- GATE (REVISED 2026-07-22 -- RESEARCH_07.md, math audit section 3) ----
+    # The original gate was "detrend/K4 below reltime/xview AND rho > 0.7". Exact permutation
+    # nulls at n=7 show rho > 0.7 alone passes by CHANCE with p = 0.044, and across 3 estimators
+    # the familywise false-unlock rate is ~9%. Worse, it can REJECT a perfect validator: 4 of the
+    # 7 anchors sit inside the LB noise band, and a true-skill oracle that disagrees with that
+    # noise-scrambled cluster scores rho = 0.643 < 0.7. We therefore score only the anchor pairs
+    # whose LB gap EXCEEDS the noise floor (exact null p = 0.0048), and report rho descriptively.
     log.info("")
-    need = {"seq_a_detrend", "seq_a_k4", "seq_a_reltime", "seq_a_xview"}
-    if need.issubset(set(est)):
-        for key, rho in verdicts.items():
-            bad = max(est["seq_a_detrend"][key], est["seq_a_k4"][key])
-            good = min(est["seq_a_reltime"][key], est["seq_a_xview"][key])
-            ok = bad < good
-            log.info("GATE %-5s: detrend/K4 below reltime/xview? %s  (rho=%+.3f)",
-                     key.upper(), "PASS" if ok else "FAIL", rho)
-            if ok and rho > 0.7:
-                log.info("  -> %s CLEARS THE BAR: usable offline screen. Open the gated backlog.",
-                         key.upper())
+    pairs = informative_pairs(order, est, min_gap=args.min_gap)
+    log.info("=== GATE: concordance on the %d anchor pairs with |dLB| > %.3f ===",
+             len(pairs), args.min_gap)
+    if not pairs:
+        log.info("  no informative pairs - cannot evaluate the gate")
+    cleared = []
+    for key in keys:
+        scorable = [(a, b) for a, b in pairs
+                    if key in est[a] and key in est[b]
+                    and np.isfinite(est[a][key]) and np.isfinite(est[b][key])]
+        if not scorable:
+            log.info("  %-6s : not scorable (missing bundles)", key.upper())
+            continue
+        # est[a]["lb"] < est[b]["lb"] by construction of `order`, so concordant means est_a < est_b
+        good = sum(1 for a, b in scorable if est[a][key] < est[b][key])
+        n = len(scorable)
+        ok = good == n
+        log.info("  %-6s : %d/%d concordant  %s   (rho = %s)", key.upper(), good, n,
+                 "PASS" if ok else "FAIL",
+                 f"{verdicts[key]:+.3f}" if key in verdicts else "n/a")
+        if ok:
+            cleared.append(key)
+
+    log.info("")
+    if len(cleared) >= 1:
+        log.info("CLEARED: %s", ", ".join(k.upper() for k in cleared))
+        log.info("-> The noise floor is broken. Screen the gated backlog offline and submit only "
+                 "when >=2 estimators rank a candidate above the champion.")
+        if cleared == ["marg"]:
+            log.info("-> CAVEAT: only the NAIVE control cleared. The 'sophisticated' estimators "
+                     "earned nothing; treat this as a weak screen, not a validator.")
     else:
-        log.info("GATE: need all 4 anchor variants %s to evaluate", sorted(need))
+        log.info("NO ESTIMATOR CLEARED -> Q1 failed, at a cost of 0 submissions. Fall back to "
+                 "Scenario B (RESEARCH_07.md section 6): build a TEMPORAL holdout instead, and "
+                 "fund only structural deletions with plausible effect >= +0.013.")
     log.info("")
-    log.info("Decision rule: rho > 0.7 AND gate PASS -> screen candidates offline, submit only "
-             "when >=2 estimators beat the champion. Otherwise Q1 failed (cost: 0 submissions) "
-             "and we fund only ideas with plausible effect >= +0.013.")
+    log.info("Measurement protocol (RESEARCH_07.md 5b): a paired A/B vs champion is SUGGESTIVE at "
+             ">=0.006 and CONFIDENT at >=0.012; unpaired comparisons need >=0.012.")
 
 
 if __name__ == "__main__":

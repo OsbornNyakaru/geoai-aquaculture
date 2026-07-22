@@ -56,10 +56,22 @@ python run_pipeline.py $COMMON --name seq_a_l3 \
   --set seq.consistency_lambda=3                                  # LB 0.8921
 python run_pipeline.py $COMMON --name seq_a_xview                 # LB 0.8955 (CHAMPION)
 
-# second seed of the champion -> enables the two-seed disagreement estimator.
-# (This is also the queued seed-replication run: submitting submission_seq_a_xview_s7.csv
-#  later would measure our true seed-to-seed LB spread for 1 submission.)
+# ---- Second seeds: REQUIRED for the DIS estimator to be scoreable at all. ----
+# BUG FIXED 2026-07-22 (RESEARCH_07.md, math audit Finding 3): the previous version generated a
+# second seed for seq_a_xview ONLY. offline_validate.py needs >=3 variants carrying a `dis` value
+# to compute a Spearman rho, so DIS would have printed "insufficient bundles" and the entire
+# 8-run compute spend would have produced nothing for that estimator. We now seed the three other
+# variants the GATE depends on, so DIS is scored on the same 4 anchors as ATC.
+# (seq_a_xview_s7 doubles as the queued seed-replication run: submitting it later would measure
+#  our true seed-to-seed LB spread for 1 submission.)
 python run_pipeline.py $COMMON --name seq_a_xview_s7 --set seed=7
+python run_pipeline.py $COMMON --name seq_a_detrend_s7 \
+  --set seed=7 --set seq.relative_time=false --set seq.consistency_lambda=0 \
+  --set seq.channels.per_cell_detrend=true
+python run_pipeline.py $COMMON --name seq_a_k4_s7 \
+  --set seed=7 --set seq.relative_time=false --set seq.consistency_lambda=0 --set seq.K=4
+python run_pipeline.py $COMMON --name seq_a_reltime_s7 \
+  --set seed=7 --set seq.consistency_lambda=0
 
 # ---- The retro-fit: do any of these estimators rank the known LB correctly? ----
 python tools/offline_validate.py \

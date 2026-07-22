@@ -30,13 +30,35 @@ LB**. So:
 
 ## Hard competition constraints (never violate)
 
-- Only the supplied competition data. **No external data, no pretrained/foundation
-  models** (bans TabPFN, ImageNet/SSL backbones). Train from scratch.
+- Only the supplied competition data. **No external data.**
+- **PRETRAINED MODELS ARE ALLOWED** if openly available to everyone. *(CORRECTED 2026-07-22 from
+  the live rules page — every doc before this date wrongly said "train from scratch, no pretrained
+  models." TabPFN, Presto, Prithvi, Clay, SatMAE etc. are LEGAL. See `RESEARCH_07.md` §1.)*
 - **AutoML banned.** Open-source, seeded, reproducible only.
 - `TargetF1` scored at a **hard 0.5 cut** — no threshold tuning. Base-rate / prior /
   prevalence correction (a monotone shift so the F1-optimum lands at 0.5) *is* allowed.
-- **Max 5 submissions/day** — the scarce resource. Compute is NOT the bottleneck;
-  submissions are. Spend each probe deliberately.
+- **100 submissions total**, max 5/day. Compute is NOT the bottleneck. Final score = **65% LB +
+  35% code review** of the top 5 (reproducibility, clarity, novelty).
+
+## Confirmed data facts (verified on the live site 2026-07-22 — see `RESEARCH_07.md` §2)
+
+- **TRAIN: 1,821 rows × 12 FULL months**, ~40% positive. **TEST: 1,030 rows × only 4/5/6
+  CONSECUTIVE months**, rest `-9999`; test positive rate believed higher (~0.65).
+- Bands: S1 VH/VV always present when the month is observed; 10 S2 optical bands may be missing
+  **per-band due to cloud**. **lat/lon REMOVED.**
+- **The shift is TEMPORAL BY DESIGN** — train and test are different time periods; conditions
+  "change across seasons and years."
+- Public LB = **30%** of test (~309 rows), private = **70%** (~721 rows).
+- **25 Jun 2026 data reset** after a leak (new train = old train + old test *with labels*; new test
+  issued). Our first submission was 9 Jul, so **all 7 anchors post-date it and are comparable.**
+- Forum scores of 0.95/0.98 are **pre-reset (leaked)** — ignore. Real bar is the "90s club" ≈0.90–0.95.
+
+## Measurement protocol (quantified 2026-07-22)
+
+Combined-metric SE ≈ **0.012** on public (309 rows), ≈0.008 on private. But a **paired** delta
+between two ρ≈0.9 variants of our own model has SE ≈ **0.006**. So: unpaired/cross-team needs
+≥0.012; our own A/B is *confident* at ≥0.012, *suggestive* at ≥0.006, unmeasurable below 0.006.
+Expected |public − private| drift for one model ≈ **0.012**.
 
 ## State of play
 
