@@ -131,9 +131,34 @@ large enough to clear ±0.01. **Budget is no longer the constraint** (~130 submi
 4. **Gated on iter11 passing:** fold-ensemble deletion (train-on-all; kills OOF so it is unshippable
    without a validator) → group-DRO over window-length groups → VH−VV replacement channel → pairwise
    AUC surrogate (demoted: in-domain AUC already ≈0.99).
-5. **Endgame:** one-time prevalence sweep (4 subs; needs a `calibration.prevalence_sweep` list mirroring
-   `prior_sweep` but calling `target_prevalence_shift()`; the 0.649 entry must come out byte-identical
-   to the main submission — pick the plateau CENTRE) · designate the 2 finalists · reproduction README.
+5. **Endgame — REPRIORITIZED 2026-07-22 after the EY comparison (`RESEARCH_08_EY.md`):**
+   - **Reproducibility is now a live risk, not a deadline chore.** In the EY Biodiversity Challenge
+     (same platform, same rulebook template) **only 2 of the top 10 survived post-challenge code
+     review**; the rest were eliminated for missing the code deadline or reproducibility concerns,
+     and one prize went unpaid. Our standing is **65% LB + 35% code review of the top 5** — a larger
+     weight against a smaller field. ✅ Partly addressed: `experiments/reproduce_champion.sh` (with a
+     config guard that refuses to run if the committed config drifts off-champion) + README corrected
+     (it had documented the **GBDT** as "the model" while `--full` defaults to `--model gbdt`, so a
+     reviewer would have reproduced the 0.826-era baseline). **Still open:** pin `torch==x.y.z`,
+     ship an environment lock, track `experiments/results.tsv` (currently gitignored — it is our
+     strongest innovation evidence), regenerate a clean champion log.
+   - **Designate both finalists deliberately** — Zindi defaults to "best 2 public", a shake-up
+     generator on a 30% slice. Use the certified offline validators to pick the *non-obvious* second.
+   - **Audit for implicitly-banned derived features.** EY's enforcement covered not just lat/lon but
+     *distances, nearest-neighbour, clustering, grid binning, any positional encoding*. Verify
+     nothing in our pipeline reconstructs position or row identity.
+   - **Verify the metric empirically.** EY's own metric description contradicted itself (F1 vs
+     accuracy) and was never answered. Check our 0.6·F1 + 0.4·AUC weighting against our known
+     submission/score pairs rather than trusting the page text.
+   - One-time prevalence sweep — **low priority**: `t_star = 0.445 ≈ F1*/2` already matches the
+     Lipton et al. optimum, so expect a plateau, not a gain. Note `prior_sweep` currently uses
+     `apply_prior` (a log-odds offset), **not** `target_prevalence_shift`, so it would sweep the
+     wrong lever as written.
+6. **Screen candidate — pseudo-labeling / self-training on the 1,030 test rows.** An EY organizer
+   explicitly permitted predictions "generated from compliant models and the provided competition
+   data" under a near-identical rulebook. **Honest note:** we rejected CAST self-training in round
+   05, but on *technical* grounds (OOD/ESS-collapse at adversarial AUC 0.99), never legal ones. What
+   changed is not the legality argument but that we can now **screen it for zero submissions**.
 - **Private-LB finalists — mechanism CONFIRMED (2026-07-21, Zindi rules page):** you **choose 2
   submissions** before close; if you don't, Zindi defaults to your 2 best *public* scores. So the
   hedge is USABLE: **manually designate xview λ=1.0 (0.8955) + NoPE (0.8917)** — do NOT rely on the
