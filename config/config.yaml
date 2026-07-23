@@ -202,7 +202,7 @@ seq:
   # ---- iter12 offline-screen candidates (all default OFF = the exact 0.8955 champion) ----
   # Screened with the estimators that CLEARED the iter11 retro-fit (ATC-F1 rho=+0.964 at 15/15;
   # DIS rho=+1.000 at 5/5). Submit only where >=2 cleared estimators beat the champion.
-  pooling: mean            # mean | mean_std | mean_max
+  pooling: mean            # mean | mean_std | mean_max | mean_min | moments (mean+std+min+max)
                            #   mean_std: ponds are permanent -> LOW temporal dispersion (Ottinger)
                            #   mean_max: ponds are "never bright"; rice/cropland always have a
                            #             canopy month (VH +6-10 dB). An order statistic carries no

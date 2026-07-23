@@ -262,7 +262,9 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
             # right (drain events contaminate max; canopy events make it discriminative), so both
             # are implemented and SCREENED OFFLINE rather than chosen blind. See RESEARCH_07.md 5d.
             self.pooling = s.get("pooling", "mean")
-            pooled_dim = d if self.pooling == "mean" else 2 * d
+            # width of the pooled vector in units of d: mean=1, pairwise=2, full moments=4.
+            _pool_mult = {"mean": 1, "moments": 4}.get(self.pooling, 2)
+            pooled_dim = _pool_mult * d
             self.head = nn.Sequential(
                 nn.Linear(pooled_dim, d // 2), nn.GELU(), nn.Dropout(s["dropout"]),
                 nn.Linear(d // 2, 1),
@@ -339,6 +341,20 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
                 mn = h.masked_fill(pad.unsqueeze(-1), float("inf")).min(dim=1).values
                 mn = torch.where(torch.isfinite(mn), mn, torch.zeros_like(mn))
                 pooled = torch.cat([mu, mn], dim=-1)
+            elif self.pooling == "moments":
+                # FULL DISPERSION STACK: mean + std + min + max, the form BOTH round-09 researchers
+                # converged on (Claude's moment pool; Gemini's PMA targets the same lossy pool by a
+                # different route). "Permanence" (low std) and the low tail (min) are the pond
+                # discriminators that a bare mean literally discards; the high tail (max) separates
+                # the seasonal rice/cropland swing. Mask-aware throughout; sqrt/inf guarded exactly
+                # as in the pairwise modes above.
+                var = ((h - mu.unsqueeze(1)) ** 2 * keep).sum(1) / n_obs
+                sd = (var + 1e-5).sqrt()
+                mn = h.masked_fill(pad.unsqueeze(-1), float("inf")).min(dim=1).values
+                mn = torch.where(torch.isfinite(mn), mn, torch.zeros_like(mn))
+                mx = h.masked_fill(pad.unsqueeze(-1), float("-inf")).max(dim=1).values
+                mx = torch.where(torch.isfinite(mx), mx, torch.zeros_like(mx))
+                pooled = torch.cat([mu, sd, mn, mx], dim=-1)
             else:
                 raise ValueError(f"unknown seq.pooling: {self.pooling!r}")
             return self.head(pooled).squeeze(-1)          # logits [n]

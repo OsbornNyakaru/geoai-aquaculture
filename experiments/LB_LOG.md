@@ -345,7 +345,34 @@ low-variance consensus and a point estimate — and far better than the previous
 xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather than two models.
 
 | 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
-| 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *screen first* | 0.649 | **pending** | — |
+| 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **to upload ×1** | ➖ variance-only |
+| 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *screen first* | 0.649 | **pending** | — |
+
+---
+
+## iter18 result — architecture pooling is MARGINAL, not a level lever
+
+Cross-architecture rank-correlation **mean ρ = 0.9395** (min 0.9097) — only a hair below the seed
+baseline 0.9511. The four tied transformer variants are the *same model class*, so they barely
+decorrelate; the variance-reduction factor (1+ρ(M−1))/M ≈ 0.96 forces the blend to the member mean,
+exactly like seed-avg. The screen line (`archblend4 ATC-F1 −0.0101 LB`) is partly a rank-vs-prob
+representation artifact and should not be read as "worse." **Read the matrix: marginal.** Decision:
+upload `champion_archblend4` **once** to bank the lowest-variance finalist (pools seed AND architecture
+noise → best private-slice artifact per the order-statistics argument), then move on.
+
+**The lesson (confirmed by both round-09 researchers):** pooling transformer-variants cannot buy
+*level*; a member needs ρ<0.9 (target 0.6–0.75) to add ensemble level, and only a *different model
+class* (MiniRocket/CropNet, iter20) can supply that. The representation lever comes first (iter19).
+
+## iter19 — dispersion / lower-tail pooling (staged)
+
+Three-way convergence: Claude Research (moment pooling — ponds are permanent = low dispersion, mean
+discards it), Gemini (replace the pool), and our own iter12 `mean_min` probe (the ONLY candidate to
+ever clear the floor: +0.0672 ATC-F1). Isolated change = `seq.pooling` ∈ {mean_min, mean_std,
+moments}, each at 2 seeds so DIS + the seed-noise guard apply. New `moments` mode (mean⊕std⊕min⊕max,
+pooled_dim 4·d) added and unit-verified (correct widths, identity-preserving zeroed extra halves).
+Submit only if ≥2 cleared estimators beat champion AND the margin exceeds the estimator's seed sd —
+the guard that correctly held `mean_min` last time.
 
 ---
 

@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 (single seed; reliable level ≈0.8865)** · **Loop state: iter18 STAGED (the GRAND ENSEMBLE, ≤1 submission) — awaiting Colab run. iter17 killed the Presto lane for 0 submissions.**
+- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 (single seed; reliable level ≈0.8865)** · **Loop state: iter19 STAGED (DISPERSION POOLING screen). iter18 grand-ensemble was MARGINAL (cross-arch ρ=0.9395); upload champion_archblend4 once to bank the low-variance finalist. Round-09 deep research triaged in `gemini_loop/RESPONSE_09.md`.**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,11 +31,19 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter18 (the GRAND ENSEMBLE), then paste back the
-   CROSS-ARCHITECTURE RANK CORRELATION matrix, the RETRO-FIT + GATE, the SEED SPREAD, and the
-   SCREEN line for `champion_archblend4`. The DECISION is the correlation matrix, not the screen:
-   mean ρ < ~0.90 → upload `submission_champion_archblend4.csv` (the ≤1 submission from this run);
-   ρ ≈ 0.95 → do NOT upload, pivot to pseudo-labeling / ROCKET.**
+3. **Current next action: `Run all` → iter19 (DISPERSION POOLING screen), then paste back the
+   RETRO-FIT + GATE, the SEED SPREAD, and the SCREEN lines for `c_meanmin` / `c_meanstd` /
+   `c_moments`. Submit a pooling variant only if ≥2 cleared estimators beat champion AND the margin
+   exceeds that estimator's seed sd. Separately: upload `submission_champion_archblend4.csv` once
+   (bank the lowest-variance finalist).**
+
+   **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
+   ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model
+   class, so they barely decorrelate and the blend lands at the member mean (variance-only, like
+   seed-avg). Lesson: pooling variants can't buy *level*; only a different model class can. So the
+   plan is representation first (iter19 pooling), then a decorrelated MiniRocket/CropNet member
+   (iter20). Round-09 deep research (Claude + Gemini) is triaged in `gemini_loop/RESPONSE_09.md`;
+   the three-way convergence on dispersion pooling is why iter19 leads.
 
    **iter17 result — the Presto lane is DEAD, for 0 submissions.** All four configs returned
    adversarial AUC **0.965–0.976** on the frozen embeddings (>0.9 ⇒ the encoder *encodes* the
