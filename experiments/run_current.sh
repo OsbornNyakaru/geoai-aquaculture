@@ -3,49 +3,40 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 16 — THE PRESTO LANE.  *** 0 SUBMISSIONS FROM THIS RUN ***
+# ITERATION 18 — THE GRAND ENSEMBLE (cross-architecture rank-blend).  *** AT MOST 1 SUBMISSION ***
 #
-#   WHY THIS AND NOTHING ELSE. iter15 closed the measurement question with two independent
-#   estimates that agree: the screen resolves ~0.010-0.013 LB. In the entire project only TWO
-#   effects have ever exceeded that floor --
-#         GBDT -> Transformer swap  +0.0500
-#         per-cell detrend          -0.0514
-#   Both are MODEL-CLASS changes. Every architectural tweak, loss term, pooling variant,
-#   positional reframe and regularization knob we probed is BELOW the floor and unmeasurable in
-#   principle with our budget. Running more of them cannot produce information.
+#   WHY THIS. iter17 killed the Presto lane for 0 submissions: the adversarial AUC on its frozen
+#   embeddings came back 0.965-0.976 (>0.9 = the encoder ENCODES the designed temporal shift rather
+#   than normalizing it), and ATC-F1 put it 0.044-0.059 LB BELOW champion. That closes the
+#   foundation-model / model-class frontier. But it also proved, on a general-purpose representation
+#   that never saw our labels, that the train->test shift is REAL and LARGE -- so the ~0.975 OOF vs
+#   ~0.89 LB gap is mostly irreducible covariate shift, and our champion already carries the right
+#   response (masking views + relative time + cross-view invariance are shift-invariance machinery).
 #
-#   iter16 also confirmed the variance story: the 5-seed average scored 0.8865 against a
-#   single-seed mean of 0.8859 -- i.e. we bought VARIANCE REDUCTION, not a level gain, exactly as
-#   predicted, because the seeds are 95.1% rank-correlated so only ~5% of the error is independent.
+#   The seed-average bought VARIANCE reduction but no LEVEL (0.8865 == the single-seed mean 0.8859),
+#   because seeds are 95.1% rank-correlated. The one remaining cheap shot at LEVEL is to pool across
+#   DIFFERENT ARCHITECTURES, which may be decorrelated where seeds are not. The top cluster is
+#   statistically tied on the LB but built from genuinely different inductive biases:
+#         reltime 0.8908 | nope 0.8917 | l3 0.8921 | xview 0.8955
 #
-#   So there is one fundable architectural direction left, and the rules permit it:
-#       "You may use pretrained models as long as they are openly available to everyone."
-#   Presto is a ~0.4M-param transformer pretrained with masked-modality SSL on 21.5M Sentinel-1/2
-#   PIXEL TIME SERIES -- our exact data shape, and its pretraining objective is literally our
-#   central difficulty. FROZEN, the fitted model is a ~129-parameter logistic head: LESS fitted
-#   capacity than anything we have shipped, so it does not contradict the capacity law.
+#   THE GO/NO-GO IS FREE AND PRINTED FIRST -- the CROSS-ARCHITECTURE RANK-CORRELATION MATRIX:
+#         mean rho ~ 0.95 (like seeds) -> the blend behaves like the seed-average; NO level gain.
+#                                          Do not upload. Pivot to pseudo-labeling / ROCKET.
+#         mean rho < ~0.90             -> members carry independent signal; pooling gains level with
+#                                          bounded downside (the blend lands between its members).
+#                                          Upload submission_champion_archblend4.csv.
 #
-#   TWO THINGS TO WATCH IN THE LOG:
-#     1. ADVERSARIAL AUC on the embeddings. This is the go/no-go and it costs nothing:
-#          ~0.5  -> the frozen encoder NORMALIZED THE TEMPORAL SHIFT AWAY. Very promising.
-#          >0.9  -> Presto is ENCODING the shift and the head will latch onto it. Expect failure.
-#     2. month=const vs month=true. month=const deletes absolute calendar identity and keeps only
-#        relative step -- our relative-time reframing applied to Presto. It is PRIMARY. The
-#        research pass measured the month argument as a first-order lever (rank corr 0.46), so
-#        these are two genuinely different models, not a tweak.
+#   DO NOT read the SCREEN for the decision here: ATC-F1's own seed sd is 0.0576 (== +-0.0094 LB),
+#   coarser than any ensemble gain by construction, so the screen will HOLD regardless. The
+#   correlation matrix is the instrument with resolution for this question.
 #
-#   Runtime: Presto inference is ~2.4 s for all 2,851 rows ON CPU. The expensive part is the
-#   anchor regeneration for the retro-fit, as usual.
+#   Runtime: dominated by the anchor regeneration (~5 min). The blend itself is ~1 s.
 # =====================================================================
 set -euo pipefail
 
 COMMON="--full --model seq"
 
-# ---- 0. Vendor Presto (MIT source + 3.3 MB checkpoint), patched to import standalone. ----
-pip install -q einops
-python tools/fetch_presto.py
-
-# ---- 1. Anchors: re-certify the estimators against THIS code. ----
+# ---- 1. Anchors: re-certify the estimators against THIS code AND give the blend fresh members. ----
 PRE="--set seq.relative_time=false --set seq.consistency_lambda=0"
 python run_pipeline.py $COMMON --name seq_a_detrend $PRE --set seq.channels.per_cell_detrend=true
 python run_pipeline.py $COMMON --name seq_a_k4      $PRE --set seq.K=4
@@ -61,39 +52,36 @@ for SD in 7 13 21 29; do
   python run_pipeline.py $COMMON --name "seq_a_xview_s${SD}" --set seed=$SD
 done
 
-# ---- 2. The Presto lane. Both month modes, 2 seeds each (head seed only; encoder is frozen). ----
-# NOTE: train rows are pushed through the SAME masking-window sampler as always, so the encoder
-# sees train and test at the same observation density. Skipping that would manufacture a domain
-# gap of our own making -- the second most likely way this lane fails.
-for MM in const true; do
-  for SD in 42 7; do
-    SUF=""; [ "$SD" != "42" ] && SUF="_s${SD}"
-    python run_presto.py --month-mode "$MM" --seed "$SD" --name "c_presto_${MM}${SUF}"
-  done
-done
+# ---- 2. THE GRAND ENSEMBLE. Two-level rank-average (pool seeds within each architecture, then ----
+#         pool the four architectures with EQUAL weight). Prints the correlation matrix first.
+#         diag-extra shows k4 and base in the matrix WITHOUT pooling them (they are below the
+#         cluster on the LB; we only want to see whether they are decorrelated).
+python tools/arch_blend.py \
+  --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview \
+  --diag-extra seq_a_k4 seq_a_base \
+  --name champion_archblend4
 
-# ---- 3. Retro-fit + seed floor + screen ----
+# ---- 3. Retro-fit gate + seed floor + screen the blend (INFORMATIONAL; decision is the matrix). ----
 python tools/offline_validate.py \
   --preds-dir submissions/preds --anchors experiments/anchors.tsv \
   --champion seq_a_xview \
   --seed-spread seq_a_xview \
-  --screen c_presto_const c_presto_true
+  --screen champion_archblend4
 
-# ---- 4. Keep the variance-reduction artifact current. ----
+# ---- 4. Keep the seed-average finalist current as the fallback artifact. ----
 python tools/seed_average.py --variant seq_a_xview --name champion_seedavg5
 
 cat <<'NEXT'
 =====================================================================
- Paste back: the ADVERSARIAL AUC lines from the Presto runs (the go/no-go), the RETRO-FIT + GATE,
- the SEED SPREAD block, and the SCREEN table.
+ Paste back: the CROSS-ARCHITECTURE RANK CORRELATION matrix (the go/no-go), the RETRO-FIT + GATE,
+ the SEED SPREAD block, and the SCREEN line for champion_archblend4.
 
- NO UPLOAD from this run unless the screen says SUBMIT.
-
- How to read it:
-   adversarial AUC ~0.5 and a positive screen  -> Presto normalized the shift away. Fund it hard.
-   adversarial AUC >0.9                        -> Presto is encoding the shift; lane likely dead,
-                                                  and we will have learned that for 0 submissions.
-   screen HOLD but LB-equiv margin > +0.010    -> worth one submission anyway; that is the only
-                                                  band where our instrument can actually resolve.
+ THE DECISION IS THE CORRELATION MATRIX, NOT THE SCREEN:
+   mean rho < ~0.90  -> UPLOAD submission_champion_archblend4.csv (level gain available; bounded
+                        downside; same variance-reduction category as the seed-average that already
+                        validated at 0.8865). This is the at-most-one submission from this run.
+   mean rho ~ 0.95   -> DO NOT upload; the blend behaves like the seed-average. Pivot next iter to
+                        pseudo-labeling (transductive shift adaptation) or a ROCKET model class.
+   0.90 <= rho < 0.94 -> marginal; upload only if you want to spend 1 of ~80 on a small expected gain.
 =====================================================================
 NEXT

@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-22 · **Champion public LB: 0.8955** · **Loop state: iter11 STAGED (offline validator, 0 submissions) — awaiting Colab run**
+- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 (single seed; reliable level ≈0.8865)** · **Loop state: iter18 STAGED (the GRAND ENSEMBLE, ≤1 submission) — awaiting Colab run. iter17 killed the Presto lane for 0 submissions.**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,18 +31,30 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter17 (the PRESTO lane), then paste back the ADVERSARIAL AUC
-   lines, the RETRO-FIT + GATE, the SEED SPREAD, and the SCREEN table. No upload unless the screen
-   says SUBMIT.**
+3. **Current next action: `Run all` → iter18 (the GRAND ENSEMBLE), then paste back the
+   CROSS-ARCHITECTURE RANK CORRELATION matrix, the RETRO-FIT + GATE, the SEED SPREAD, and the
+   SCREEN line for `champion_archblend4`. The DECISION is the correlation matrix, not the screen:
+   mean ρ < ~0.90 → upload `submission_champion_archblend4.csv` (the ≤1 submission from this run);
+   ρ ≈ 0.95 → do NOT upload, pivot to pseudo-labeling / ROCKET.**
 
-   **Why only Presto now.** iter15 fixed the screen's resolution at ~0.010–0.013 LB. In the whole
-   project exactly two effects have ever exceeded that floor — the GBDT→Transformer swap (+0.05)
-   and detrend (−0.05) — and **both are model-class changes**. Everything else we probed is below
-   the floor and unmeasurable *in principle* with our budget, so running more small A/B probes
-   cannot produce information. Presto is the one remaining model-class change the rules permit.
-   **The go/no-go is free and printed early: the adversarial AUC on the embeddings.** ~0.5 means
-   the frozen encoder normalized the temporal shift away (fund it hard); >0.9 means it is
-   *encoding* the shift and the lane is likely dead — learned for zero submissions.
+   **iter17 result — the Presto lane is DEAD, for 0 submissions.** All four configs returned
+   adversarial AUC **0.965–0.976** on the frozen embeddings (>0.9 ⇒ the encoder *encodes* the
+   designed temporal shift rather than normalizing it). ATC-F1 put Presto **0.044–0.059 LB below
+   champion**; both configs HOLD. Its OOF (0.967–0.969) is already below champion's 0.975. That
+   closes the foundation-model / model-class frontier. **But it was worth every second:** a
+   near-perfect train/test separator existing in a general-purpose, label-free representation of the
+   raw pixels **independently proves the shift is real and large** — the ~0.975 OOF vs ~0.89 LB gap
+   is mostly irreducible covariate shift, and our champion already carries the right response
+   (masking views + relative time + cross-view invariance = shift-invariance machinery). Presto lost
+   *because* it faithfully re-encodes the raw signal, shift included.
+
+   **Why the grand ensemble now.** The seed-average bought variance reduction but no level (0.8865 ==
+   the single-seed mean 0.8859), because seeds are 95.1% rank-correlated. The one remaining cheap
+   shot at *level* is to pool across **different architectures**, which may be decorrelated where
+   seeds are not. The go/no-go is free — the cross-architecture rank-correlation matrix
+   (`tools/arch_blend.py`): ρ ≈ 0.95 ⇒ no gain (behaves like seed-avg); ρ < ~0.90 ⇒ pooling gains
+   level with bounded downside. The screen cannot resolve this (ATC-F1 seed sd 0.0576 ⇒ ±0.0094 LB,
+   coarser than any ensemble gain), so the matrix is the instrument.
 
    **iter16 result: seed-averaging scored 0.8865 against a predicted ~0.886.** The variance model
    is confirmed to 0.0006. But there was **no ensemble gain** — we bought variance reduction, not

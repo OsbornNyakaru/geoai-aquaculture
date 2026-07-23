@@ -344,7 +344,42 @@ single seed carries that **plus** seed noise on the unseen 721-row private slice
 low-variance consensus and a point estimate — and far better than the previously-planned
 xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather than two models.
 
-| 17 | 2026-07-22 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screen first* | 0.649 | **pending** | — |
+| 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
+| 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *screen first* | 0.649 | **pending** | — |
+
+---
+
+## iter17 — the Presto lane is DEAD, learned for 0 submissions
+
+All four Presto configs returned **adversarial AUC 0.965–0.976** on the frozen embeddings. Our
+pre-committed go/no-go: >0.9 ⇒ the encoder is *encoding* the designed temporal shift, not
+normalizing it. The screen agreed independently:
+
+| config | adv-AUC | ATC-F1 vs champ | OOF combined | verdict |
+|---|---|---|---|---|
+| c_presto_const | 0.9757 | **−0.0444 LB** | 0.9672 | HOLD (1/2) |
+| c_presto_true  | 0.9668 | **−0.0589 LB** | 0.9693 | HOLD (1/2) |
+
+ATC-F1 (ρ+0.964, metric-aligned) puts Presto well below champion; DIS votes up but is the weak
+second vote. Presto's OOF is *already* below champion's 0.975. No version of "fund it" survives.
+
+**The valuable byproduct.** A near-perfect train/test separator (AUC 0.97) exists even in a
+general-purpose, label-free representation of the raw pixels. That is independent proof the
+train→test **shift is real and large** — it lives in the data, not our pipeline. So the ~0.975 OOF
+vs ~0.89 LB gap is mostly *irreducible covariate shift*, which bounds the ceiling for every model
+and explains why the champion (which carries shift-invariance machinery) beats a faithful
+raw-signal encoder. **Scenario B is now active: the model-class frontier via foundation models is
+closed.**
+
+## iter18 — the GRAND ENSEMBLE (staged)
+
+Seed-averaging bought variance reduction but no level (seeds 95.1% correlated). Pooling across
+**architectures** is the last cheap shot at *level*, IF they are decorrelated. `tools/arch_blend.py`
+two-level rank-averages the tied top cluster (reltime/nope/l3/xview) and prints the
+cross-architecture rank-correlation matrix as the **free go/no-go**: ρ < ~0.90 → upload the blend
+(bounded downside, same variance-reduction category as the seed-avg); ρ ≈ 0.95 → no gain, pivot to
+pseudo-labeling / ROCKET. The offline screen cannot resolve an ensemble gain (ATC-F1 seed sd 0.0576
+== ±0.0094 LB), so the correlation matrix — not the screen — is the deciding instrument.
 
 ---
 
