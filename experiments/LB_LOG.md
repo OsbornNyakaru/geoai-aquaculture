@@ -345,7 +345,7 @@ low-variance consensus and a point estimate — and far better than the previous
 xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather than two models.
 
 | 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
-| 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **to upload ×1** | ➖ variance-only |
+| 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **0.894643** | ✅ leading finalist |
 | 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *screen first* | 0.649 | **pending** | — |
 
 ---
@@ -364,7 +364,23 @@ noise → best private-slice artifact per the order-statistics argument), then m
 *level*; a member needs ρ<0.9 (target 0.6–0.75) to add ensemble level, and only a *different model
 class* (MiniRocket/CropNet, iter20) can supply that. The representation lever comes first (iter19).
 
-## iter19 — dispersion / lower-tail pooling (staged)
+**archblend4 uploaded → LB 0.894643.** Landed at champion level (0.8955−0.0009, a tie), **+0.0021
+above its member average** and **+0.0081 above the pure seed-average** (0.8865) — all inside σ_public
+(~0.013–0.018) so not significant, but every sign favorable. It pools BOTH seed and architecture
+noise → lowest-variance artifact → **now the leading finalist** (replaces seedavg5 at the top). This is
+exactly what iter18's marginal ρ=0.9395 predicted: small decorrelation gain, within noise, min variance.
+
+## Round-10 cross-examination (Claude given Gemini's report) → `gemini_loop/RESPONSE_10.md`
+
+Confirmed our RESPONSE_09 verdicts (Gemini weaker; 3/5 refuted; CORAL/TENT/Saerens/Zou rejected) and
+added a **new #1: instance-expansion reframing** (each observed sub-window = an independent training
+example; data-model change, directly matched to the masking trap; unverified competitor lead ~0.914
+AUC). Also flagged that dispersion pooling as [mean‖std‖min‖max] is a **capacity ADD** our own law
+predicts loses — the capacity-neutral form is [mean_{d/2}‖std_{d/2}] at width d. iter19 is the
+empirical test of whether the 2× `mean_min` signal survives replication. Roadmap re-ranked:
+instance-expansion → decorrelated member → in-domain SSL → capacity-neutral pooling → LN-TTA.
+
+## iter19 — dispersion / lower-tail pooling (staged, RUNNING)
 
 Three-way convergence: Claude Research (moment pooling — ponds are permanent = low dispersion, mean
 discards it), Gemini (replace the pool), and our own iter12 `mean_min` probe (the ONLY candidate to
