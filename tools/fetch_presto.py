@@ -123,9 +123,13 @@ def main() -> None:
         subprocess.run(["git", "clone", "--depth", "1", "--branch", args.rev, REPO, td],
                        check=True, capture_output=True)
         src = Path(td)
+        # NOTE: model.py MUST keep its upstream filename. presto.py does
+        # `from .model import ...`, so the vendored copy has to be importable as
+        # `presto.model` — renaming it (e.g. to presto_model.py) orphans that import.
+        # presto.py itself can be renamed freely: nothing imports `.presto`.
         pairs = [
             (src / "presto" / "presto.py", VENDOR / "presto_core.py", True),
-            (src / "presto" / "model.py", VENDOR / "presto_model.py", True),
+            (src / "presto" / "model.py", VENDOR / "model.py", True),
         ]
         for a, b, shim in pairs:
             if not a.exists():
