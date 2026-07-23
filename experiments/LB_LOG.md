@@ -346,7 +346,8 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 
 | 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
 | 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **0.894643** | ✅ leading finalist |
-| 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *screened; mean_min stands out* | 0.649 | **c_meanmin to upload** | — |
+| 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *mean_min screened* | 0.649 | **0.898566** (c_meanmin) | ➖ within noise |
+| 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *screen first* | 0.649 | **pending** | — |
 
 ---
 
@@ -400,7 +401,26 @@ predicts ≈0.906. ≥~0.902 → real (first above-floor architectural gain; the
 it); ≤~0.895 → killed for 1 submission, proceed to instance-expansion. `mean_std`/`moments` HOLD
 (below floor, DIS negative). iter18's arch-corr matrix re-printed unchanged (ρ=0.9395).
 
-## iter19 — dispersion / lower-tail pooling (staged, RUNNING)
+**c_meanmin uploaded → LB 0.898566.** The seed-PAIRED test (vs xview seed42 = 0.8955) gives
+**+0.0031 — inside noise.** Reads:
+- **ATC-F1 was directionally right, magnitude ~3× too high** (predicted +0.011, realized +0.003) →
+  discount ATC-F1 *magnitude* going forward; trust its *sign*.
+- **DIS was flatly wrong** (predicted −0.035). On this physics-backed split, ATC-F1 won the call.
+- mean_min is **not** a standalone level gain, but it is **≥ champion** and 0.8986 is our **highest
+  single public draw after the 0.8955 champion** — so it is banked as a finalist AND becomes an
+  ensemble-member candidate on a NEW diversity axis (pooling, not architecture).
+
+## iter20 — mean_min as a decorrelated ensemble member (staged)
+
+iter18 showed the mean-pool architecture variants are ~0.94 correlated (too alike for level). iter20
+asks whether a MIN-pool model is decorrelated enough (target rank-corr <0.9 vs the mean-pool cluster)
+to finally add ensemble LEVEL. `arch_blend` prints c_meanmin's correlation row as the free go/no-go;
+`champion_archblend5` adds it as a 5th member. mean_min run at 5 seeds so it can be seed-collapsed
+(`champion_meanmin_seedavg5`, banked finalist) — this also directly measures whether mean_min's seed
+variance really is higher, which is what DIS was reacting to. If the correlation is ~0.94 too, pooling
+diversity is exhausted and iter21 = instance-expansion (the cross-exam's #1 data-model lever).
+
+## iter19 — dispersion / lower-tail pooling (RESULT above; superseded by iter20)
 
 Three-way convergence: Claude Research (moment pooling — ponds are permanent = low dispersion, mean
 discards it), Gemini (replace the pool), and our own iter12 `mean_min` probe (the ONLY candidate to
