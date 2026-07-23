@@ -346,7 +346,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 
 | 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
 | 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **0.894643** | ✅ leading finalist |
-| 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *screen first* | 0.649 | **pending** | — |
+| 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *screened; mean_min stands out* | 0.649 | **c_meanmin to upload** | — |
 
 ---
 
@@ -379,6 +379,26 @@ AUC). Also flagged that dispersion pooling as [mean‖std‖min‖max] is a **ca
 predicts loses — the capacity-neutral form is [mean_{d/2}‖std_{d/2}] at width d. iter19 is the
 empirical test of whether the 2× `mean_min` signal survives replication. Roadmap re-ranked:
 instance-expansion → decorrelated member → in-domain SSL → capacity-neutral pooling → LN-TTA.
+
+## iter19 RESULT — dispersion pooling: `mean_min` is the standout, an ATC-F1/DIS split
+
+| candidate | ATC-F1 Δ (LB-eq) | DIS Δ (LB-eq) | OOF combined | votes |
+|---|---|---|---|---|
+| c_meanmin | **+0.0672 (+0.0109)** — **above the 0.0576 seed floor** | −0.0214 (−0.0355) | 0.97536 | 1/2 HOLD |
+| c_moments | +0.0470 (+0.0076) `~` | −0.0262 (−0.0436) | 0.97642 | 1/2 HOLD |
+| c_meanstd | +0.0185 (+0.0030) `~` | −0.0097 (−0.0161) | 0.97526 | 1/2 HOLD |
+
+All HOLD by the 2-vote rule. But `mean_min`'s ATC-F1 margin (+0.0672) is **the only candidate margin
+in the whole project to exceed the seed-noise floor**, and it **replicated** iter12's +0.0672 with a
+2nd seed. Its OOF (0.97536) is identical to champion (0.97528) — same in-distribution fit, but ATC-F1
+(our stronger estimator, ρ+0.964 n=7) detects better test-transfer. DIS (weaker, ρ+1.000 n=4) objects,
+but its objection is seed *stability* (a variance concern, fixable by averaging), not level.
+
+**Decision: reasoned override of the HOLD — upload `c_meanmin` (seed 42) as a SEED-PAIRED test vs the
+known `seq_a_xview` seed 42 = 0.8955** (identical config except pooling → seed noise cancels). ATC-F1
+predicts ≈0.906. ≥~0.902 → real (first above-floor architectural gain; then seed-average + ensemble
+it); ≤~0.895 → killed for 1 submission, proceed to instance-expansion. `mean_std`/`moments` HOLD
+(below floor, DIS negative). iter18's arch-corr matrix re-printed unchanged (ρ=0.9395).
 
 ## iter19 — dispersion / lower-tail pooling (staged, RUNNING)
 

@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 (single seed; reliable ≈0.8865)** · **Leading finalist: `champion_archblend4` = 0.894643 (champion-level, lowest variance).** · **Loop state: iter19 RUNNING (dispersion-pooling screen). NEXT big lever = iter20 instance-expansion. Round-09/10 research triaged in `gemini_loop/RESPONSE_09.md` + `RESPONSE_10.md`.**
+- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 (single seed; reliable ≈0.8865)** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter19 DONE — `mean_min` pooling is the standout (ATC-F1 +0.0672, ABOVE the seed floor, replicated; DIS disagrees). Next action: upload `c_meanmin` as a seed-paired test vs xview seed42=0.8955, then paste LB. iter20 depends on that result (mean_min consolidation if it confirms, else instance-expansion).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
