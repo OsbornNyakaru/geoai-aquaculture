@@ -362,7 +362,7 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
     return PondTransformer()
 
 
-def _train(model, x, pad, y, cfg, device, K: int = 1):
+def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
     import torch
     import torch.nn as nn
 
@@ -371,9 +371,13 @@ def _train(model, x, pad, y, cfg, device, K: int = 1):
     model.to(device).train()
     opt = torch.optim.AdamW(model.parameters(), lr=s["lr"], weight_decay=s["weight_decay"])
     lossf = nn.BCEWithLogitsLoss()
-    xt = torch.from_numpy(x).to(device)
-    pt = torch.from_numpy(pad).to(device)
-    yt = torch.from_numpy(y.astype(np.float32)).to(device)
+
+    def _to_dev(xn, padn, yn):
+        return (torch.from_numpy(xn).to(device),
+                torch.from_numpy(padn).to(device),
+                torch.from_numpy(yn.astype(np.float32)).to(device))
+
+    xt, pt, yt = _to_dev(x, pad, y)
     n = len(y)
     bs = s["batch_size"]
     g = torch.Generator(device="cpu").manual_seed(cfg["seed"])
@@ -402,7 +406,18 @@ def _train(model, x, pad, y, cfg, device, K: int = 1):
                 opt.step()
         return model
 
-    for _ in range(s["epochs"]):
+    # INSTANCE-EXPANSION (iter21). The independent-view path (lam=0) already trains each of the K
+    # masked views as its own BCE example. `resampler`, when supplied, goes one step further: it
+    # regenerates a FRESH set of K masked windows per row at the start of every epoch, so the model
+    # sees ~K*epochs distinct (row, sub-window) instances instead of K fixed ones -- the purest form
+    # of "multiply each row into many masked sub-windows matched to the test masking". resampler is
+    # only wired up on the lam=0 path (coupling needs a fixed owner structure); resampler=None
+    # reproduces the champion bit-for-bit.
+    for ep in range(s["epochs"]):
+        if resampler is not None:
+            xe, pade, ye = resampler(ep)
+            xt, pt, yt = _to_dev(xe, pade, ye)
+            n = len(ye)
         perm = torch.randperm(n, generator=g).to(device)
         for i in range(0, n, bs):
             idx = perm[i:i + bs]
@@ -603,7 +618,25 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                                     relative_time=rel)
 
             model = _build_model(schema.n_months, Xtr.shape[2], cfg)
-            model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K)
+
+            # Instance-expansion: fresh masked windows every epoch (lam=0 path only). Each epoch's
+            # views are drawn from the SAME measured p(L), p(start|L), so no new train/test shift is
+            # introduced -- only the NUMBER of distinct masked instances the model trains on grows.
+            resampler = None
+            if bool(s.get("resample_per_epoch", False)) and lam == 0.0:
+                _tr, _rep = tr, rep
+
+                def resampler(ep, _tr=_tr, _rep=_rep):
+                    c, own = _mask_views(train_cube, _tr, schema, wd, cfg, K,
+                                         cfg["seed"] + _rep + 7919 * (ep + 1), oof=False)
+                    Xe, pe = to_inputs(c, mean, std, schema, channels_cfg, ex_mean, ex_std,
+                                       relative_time=rel)
+                    return Xe, pe, y[own]
+                if fold == 0 and rep == 0:
+                    log.info("seq instance-expansion: per-epoch view resampling ON "
+                             "(K=%d fresh views/row each of %d epochs)", K, s["epochs"])
+
+            model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K, resampler=resampler)
 
             va_cube, va_owner = _mask_views(train_cube, va, schema, wd, cfg,
                                             R, cfg["seed"] + rep, oof=True)

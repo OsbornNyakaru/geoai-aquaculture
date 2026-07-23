@@ -347,7 +347,8 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 17 | 2026-07-23 | **PRESTO lane** — frozen pretrained encoder + 129-param logistic head | *screened, HELD* | 0.649 | **not submitted** | ❌ lane dead |
 | 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **0.894643** | ✅ leading finalist |
 | 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *mean_min screened* | 0.649 | **0.898566** (c_meanmin) | ➖ within noise |
-| 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *screen first* | 0.649 | **pending** | — |
+| 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *ρ=0.9928, not decorrelated* | 0.649 | **not submitted** | ❌ lane closed |
+| 21 | 2026-07-23 | **INSTANCE-EXPANSION** — each masked sub-window = an independent training example | *screen first* | 0.649 | **pending** | — |
 
 ---
 
@@ -410,7 +411,33 @@ it); ≤~0.895 → killed for 1 submission, proceed to instance-expansion. `mean
   single public draw after the 0.8955 champion** — so it is banked as a finalist AND becomes an
   ensemble-member candidate on a NEW diversity axis (pooling, not architecture).
 
-## iter20 — mean_min as a decorrelated ensemble member (staged)
+## iter20 RESULT — mean_min is a rank-TWIN of the champion; the pooling-ensemble lane is CLOSED
+
+The go/no-go was unambiguous: **ρ(c_meanmin, seq_a_xview) = 0.9928** — the highest pair in the whole
+matrix. mean_min does not reorder the champion; it nudges a few scores within noise (hence the +0.003
+paired LB, a lucky draw). Consequences:
+- **archblend5 mean ρ = 0.9486 → SKIP**; its ATC-F1 is −0.0633 (worse than archblend4's −0.0101),
+  because adding a near-duplicate just double-weights xview and drags the blend. **Not submitted.**
+- **c_meanmin seed sd = 0.0729 > xview 0.0576** — DIS's instinct was right: mean_min is *higher*
+  variance. So it is both non-decorrelated AND noisier → useless as a member.
+- `champion_meanmin_seedavg5` written but not worth a finalist slot (≈ xview seed-avg by rank).
+  **`champion_archblend4` (0.8946) remains the leading finalist.**
+
+**The deeper lesson:** every mean-based transformer variant we can build lives at ρ≈0.93–0.99 — the
+ensemble/representation lane inside this model class is EXHAUSTED for buying *level*. Only a genuine
+data-model or model-class change can now move the needle. Pivot to instance-expansion.
+
+## iter21 — instance-expansion (staged)
+
+The cross-exam's #1 lever: treat each `(row, masked sub-window)` as an INDEPENDENT training example
+(own BCE, no owner-grouping, no cross-view coupling), aggregate per-row at inference. It is the only
+proposal that is BOTH a data-model change (the category that cleared our floor: GBDT→Transformer
++0.052) AND directly matched to the designed masking trap (test rows literally ARE partial windows).
+Unverified competitor lead ~0.914 AUC with "each month a training data point." In tension with our
+winning COUPLING mechanism (cross-view λ), so a genuine alternative regime. Screen with ATC-F1 (whose
+*sign* we now trust, magnitude discounted after mean_min over-predicted) before any submission.
+
+## iter20 — mean_min as a decorrelated ensemble member (RESULT above)
 
 iter18 showed the mean-pool architecture variants are ~0.94 correlated (too alike for level). iter20
 asks whether a MIN-pool model is decorrelated enough (target rank-corr <0.9 vs the mean-pool cluster)
