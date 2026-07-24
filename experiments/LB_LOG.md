@@ -350,7 +350,8 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *ρ=0.9928, not decorrelated* | 0.649 | **not submitted** | ❌ lane closed |
 | 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
 | 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | submission_champion_rocketblend5.csv | 0.649 | **0.885661** | 🎯 first ρ<0.90 member; blend tied cluster (weak member) |
-| 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen first* | 0.649 | **pending** | — |
+| 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen VOID→exhausted* | 0.649 | **not submitted** | ❌ strength⊥diversity tradeoff |
+| 24 | 2026-07-24 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | *screen first* | 0.649 | **pending** | — |
 
 ---
 
@@ -539,6 +540,58 @@ public, lowest variance). `champion_rocketblend5` (0.8857) is banked as a candid
 finalist: it is tied on public but carries a genuinely independent (ρ0.87) component, so for the
 private slice it hedges the transformer-cluster's shared errors better than `seedavg5` (a pure-
 transformer ρ0.95 pool) does. Final pair decided at the end.
+
+## iter23 RESULT — decorrelation ⊥ strength: the ROCKET lane is exhausted
+
+Estimators re-certified clean (ATC-F1 15/15 ρ+0.964; DIS 5/5 ρ+1.000). Paired screen, univariate vs
+multivariate ROCKET:
+
+| candidate | ATC-F1 vs champ (LB-eq) | DIS vs champ | ρ(·, xview) | OOF combined |
+|---|---|---|---|---|
+| `c_rocket` (univariate) | −0.2462 (−0.0401) | −0.0214 | **0.8665** | 0.9689 |
+| `c_rocket_mv` (multivariate) | −0.2115 (−0.0344) | −0.0350 | **0.9114** | 0.9760 |
+
+**Both signals say "lane exhausted", exactly the pre-committed stop condition:**
+1. **The ATC-F1 gain is within noise.** +0.0347 ATC-F1 (mv − uni) < the estimator's seed sd 0.0576.
+   DIS moved the *other* way (−0.0214 → −0.0350). No competence gain that clears the floor.
+2. **It bought that non-gain by RE-CORRELATING.** ρ(rocket, xview) jumped **0.8665 → 0.9114**, back
+   toward the rank-twin cluster (mean cluster ρ with mv = 0.9106, ≈ archblend4's 0.9395; uni was the
+   only member ever below 0.90).
+
+**The finding (and it is a real one): ROCKET's diversity was a symptom of its weakness.** The
+univariate model disagreed with the Transformer *because* it was blind to cross-band structure. Teach
+it the cross-band pond signature (low VH ∧ low NDVI ∧ low NDWI) and it starts agreeing with the
+Transformer — which already exploits exactly that via cross-band attention. Within this family you
+cannot get decorrelated AND competent: the mechanism that adds strength is the mechanism that removes
+the diversity. mv vs uni ρ = 0.9504 (they are near-twins of each other), so multivariate mostly moved
+rocket *toward* the transformer, not to a new place.
+
+**Decision: NOT submitted.** rocketblend5_mv (mean ρ 0.9106) and xview_rocket_mv (ρ 0.9114) are
+marginal, indistinguishable from archblend4. The ROCKET lane is closed. Finalist pair remains
+`champion_archblend4` (0.8946) + `champion_rocketblend5` (0.8857, the UNIVARIATE-rocket blend — our
+most decorrelated artifact, ρ0.87 member, the better private-slice hedge).
+
+## iter24 — GBDT as the decorrelated member: the last untested model class (staged)
+
+ROCKET failed because its diversity came from *ignoring* signal. A GBDT (LGBM+XGB+CatBoost on the
+hand-engineered temporal-AGGREGATE features) is the opposite kind of learner: it is a mature, strong
+tabular model that USES cross-band/cross-feature structure natively, but discards the temporal
+ORDERING the Transformer attends to — so its diversity comes from a genuinely different
+representation, not from a blindness. Historically (iter2, pre-seed-noise pipeline) the GBDT was
+ρ≈0.849 to the seq model (decorrelated) and scored **LB 0.8780** standalone — only −0.0175 below the
+current champion (≈ one seed-swing, so that gap is largely VOID). That is a strictly better
+decorrelated-member profile than ROCKET (which was −0.040 weak). Its one prior blend attempt (iter2,
+0.8705) predates the seed-variance understanding, the prevalence pin, and the clean two-level
+rank-blend — so it is void and worth re-measuring properly.
+
+**0-submission screen.** Run `--model gbdt` at 2 seeds; screen it; print ρ(gbdt, xview) via arch_blend.
+- **ρ(gbdt, xview) < ~0.90 AND gbdt ATC-F1 close to champion** → a decorrelated AND competent member
+  (what ROCKET couldn't be) → blend it and spend ONE submission; a blend that beats the cluster is the
+  first LEVEL gain since the GBDT→Transformer swap.
+- **ρ ≥ ~0.90 OR gbdt ATC-F1 far below champion** → the last model class is closed too → the
+  architecture search is definitively DONE → lock the finalist pair and pivot to the Phase-Two
+  reproducibility/novelty writeup (35% of the top-5 rubric). **This is the final architecture screen
+  either way.**
 
 ## iter23 — MULTIVARIATE ROCKET: make the decorrelated member competitive (staged)
 

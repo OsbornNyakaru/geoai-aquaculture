@@ -3,30 +3,30 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 23 — MULTIVARIATE ROCKET: make the decorrelated member competitive.  *** SCREEN, 0 SUBS ***
+# ITERATION 24 — GBDT AS THE DECORRELATED MEMBER (the last untested model class).  *** SCREEN, 0 SUBS ***
 #
-#   WHERE WE ARE. iter22 proved ROCKET is the first genuinely decorrelated member ever built
-#   (rho(rocket,xview)=0.8665; the whole transformer cluster is 0.82-0.87 away vs the 0.93-0.99
-#   rank-twins of every in-family variant). BUT rocket is a weaker learner (ATC-F1 -0.040 LB), so the
-#   1/5 blend champion_rocketblend5 only tied the cluster (LB 0.8857 ~ the seed-avg consensus). The
-#   decorrelation is real; the member is just not strong enough to cash it in.
+#   WHY (and why NOT ROCKET). iter22-23 settled ROCKET: it decorrelates (ρ0.87) ONLY because it is
+#   blind to cross-band structure; teaching it that structure (multivariate) makes it stronger but
+#   re-correlates it to ρ0.91 -- within this family decorrelation and competence trade off. A GBDT is
+#   the opposite kind of learner: LGBM+XGB+CatBoost on the hand-engineered temporal-AGGREGATE features.
+#   It USES cross-band/cross-feature structure natively (so it is NOT weak-by-blindness like ROCKET),
+#   but it discards the temporal ORDERING the Transformer attends to -- so its diversity comes from a
+#   genuinely different REPRESENTATION, the one profile that could be decorrelated AND competent.
 #
-#   THE FIX (mechanism, not just capacity). iter22's ROCKET is UNIVARIATE: each random kernel
-#   convolves ONE band, so it can never encode a cross-band signature like "low VH AND low NDVI AND
-#   low NDWI" -- the actual pond fingerprint, which the Transformer captures via cross-band attention.
-#   MULTIVARIATE kernels span a random SUBSET of the 24 channels and sum the per-band convs before
-#   PPV/max pooling (the ROCKET-multivariate recipe). This adds genuine cross-band signal the
-#   univariate form structurally lacks -> should raise ATC-F1 (true transfer), not merely OOF. Local
-#   smoke already shows OOF-AUC 0.943 -> 0.970 from this one change.
+#   PRIOR EVIDENCE. iter2 (old pipeline) measured GBDT ρ≈0.849 to seq (decorrelated) at LB 0.8780 --
+#   only −0.0175 below today's champion (≈ one seed swing, so that gap is largely VOID). Strictly a
+#   better decorrelated-member profile than ROCKET's −0.040. Its one prior blend (iter2, 0.8705)
+#   predates the seed-variance understanding, the prevalence pin, and the clean two-level rank-blend,
+#   so it is void and worth re-measuring properly. GBDT smoke re-verified locally: valid submission +
+#   arch_blend-ready preds bundle.
 #
-#   ISOLATED CHANGE: rocket.multivariate (+ max_channels). false reproduces the iter22 member
-#   bit-for-bit (verified locally: identical smoke final_oof/auc).
-#
-#   DECISION: SCREEN, 0 subs. Paired univariate (c_rocket) vs multivariate (c_rocket_mv) isolates the
-#   mechanism. Submit ONLY if c_rocket_mv ATC-F1 clearly > c_rocket AND rho(mv,xview) still < ~0.90
-#   (competent AND still decorrelated). Then the blend could finally beat the cluster -- the first
-#   LEVEL gain since the GBDT->Transformer swap. Otherwise ROCKET's lane is exhausted: lock
-#   champion_archblend4 + champion_rocketblend5 as the diverse finalist pair and pivot to the writeup.
+#   DECISION: SCREEN, 0 subs. This is the FINAL architecture screen either way.
+#     ρ(gbdt,xview) < ~0.90  AND  gbdt ATC-F1 close to champion  -> decorrelated AND competent (what
+#       ROCKET could not be) -> upload champion_gbdtblend5; a blend beating the cluster = first LEVEL
+#       gain since the GBDT->Transformer swap.
+#     ρ >= ~0.90  OR  gbdt ATC-F1 far below champion -> the last model class is closed -> lock the
+#       finalist pair (archblend4 + rocketblend5) and pivot to the Phase-Two reproducibility/novelty
+#       writeup (35% of the top-5 rubric).
 # =====================================================================
 set -euo pipefail
 
@@ -48,18 +48,16 @@ for SD in 7 13 21 29; do
   python run_pipeline.py $COMMON --name "seq_a_xview_s${SD}" --set seed=$SD
 done
 
-# ---- 2. ROCKET: univariate baseline vs MULTIVARIATE, 2 seeds each (paired; DIS + seed-collapse). ----
-python run_pipeline.py --full --model rocket --name c_rocket
-python run_pipeline.py --full --model rocket --name c_rocket_s7    --set seed=7
-python run_pipeline.py --full --model rocket --name c_rocket_mv    --set rocket.multivariate=true
-python run_pipeline.py --full --model rocket --name c_rocket_mv_s7 --set rocket.multivariate=true --set seed=7
+# ---- 2. THE LAST MODEL CLASS. GBDT ensemble at 2 seeds (for DIS + a seed-collapsed finalist). ----
+python run_pipeline.py --full --model gbdt --name g_gbdt
+python run_pipeline.py --full --model gbdt --name g_gbdt_s7 --set seed=7
 
-# ---- 3. Retro-fit gate + seed floor + screen BOTH rocket variants (the paired ATC-F1 read). ----
+# ---- 3. Retro-fit gate + seed floor + screen the GBDT member. ----
 python tools/offline_validate.py \
   --preds-dir submissions/preds --anchors experiments/anchors.tsv \
   --champion seq_a_xview \
   --seed-spread seq_a_xview \
-  --screen c_rocket c_rocket_mv
+  --screen g_gbdt
 
 # ---- 4. Go/no-go correlations + candidate blends. ----
 # 4a. Leading finalist (4 transformers) — keep current.
@@ -67,38 +65,31 @@ python tools/arch_blend.py \
   --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview \
   --diag-extra seq_a_k4 seq_a_base \
   --name champion_archblend4
-# 4b. iter22 univariate blend — baseline to compare the multivariate blend against.
+# 4b. THE CANDIDATE: GBDT as the 5th member. Its matrix row (rho to xview / cluster) is the decision.
 python tools/arch_blend.py \
-  --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview c_rocket \
-  --name champion_rocketblend5
-# 4c. THE CANDIDATE: multivariate rocket as the 5th member. Its matrix row is the decision --
-#     rho(rocket_mv, xview) must stay < ~0.90 for the added strength to still buy diversity.
+  --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview g_gbdt \
+  --name champion_gbdtblend5
+# 4c. Maximally-diverse 2-way option: champion + GBDT (the two strongest, most-different learners).
 python tools/arch_blend.py \
-  --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview c_rocket_mv \
-  --diag-extra c_rocket \
-  --name champion_rocketblend5_mv
-# 4d. Maximally-diverse 2-way option with the multivariate member.
-python tools/arch_blend.py \
-  --members seq_a_xview c_rocket_mv \
-  --name champion_xview_rocket_mv
-# 4e. Seed-collapse the multivariate rocket (standalone diverse hedge) + keep xview seed-avg current.
-python tools/seed_average.py --variant c_rocket_mv --name champion_rocket_mv_seedavg2 || true
+  --members seq_a_xview g_gbdt \
+  --name champion_xview_gbdt
+# 4d. Seed-collapse GBDT (standalone diverse hedge) + keep xview seed-avg current.
+python tools/seed_average.py --variant g_gbdt --name champion_gbdt_seedavg2 || true
 python tools/seed_average.py --variant seq_a_xview --name champion_seedavg5
 
 cat <<'NEXT'
 =====================================================================
- Paste back: (i) the `run: c_rocket` and `run: c_rocket_mv` summary blocks (final_oof, oof_auc),
- (ii) the RETRO-FIT + GATE and the SCREEN lines for BOTH c_rocket and c_rocket_mv, and (iii) the
- arch_blend matrices for 4b (uni) and 4c (mv) -- the 'rocket_mv' row in 4c is the decision.
+ Paste back: (i) the `run: g_gbdt` summary (final_oof, oof_auc), (ii) the RETRO-FIT + GATE and the
+ SCREEN line for g_gbdt, and (iii) the 4b arch_blend matrix -- the 'gbdt' row is the whole decision.
 
- THE PAIRED READ: c_rocket_mv vs c_rocket isolates the multivariate (cross-band) mechanism.
-   - c_rocket_mv ATC-F1 clearly > c_rocket  AND  rho(rocket_mv, xview) still < ~0.90
-        -> the decorrelated member is now COMPETENT. Upload champion_rocketblend5_mv (or
-           champion_xview_rocket_mv). A blend that beats the cluster = first LEVEL gain since the
-           GBDT->Transformer swap, and the best diverse finalist for the private slice.
-   - ATC-F1 flat / within seed sd, OR rho jumps toward the cluster (strength bought by re-correlating)
-        -> ROCKET's lane is exhausted. Lock champion_archblend4 (0.8946) + champion_rocketblend5
-           (0.8857) as the diverse finalist pair and pivot to the Phase-Two reproducibility/novelty
-           writeup (35% of the top-5 rubric).
+ THE DECISION (final architecture screen; I make the single upload call from your paste, 0 subs spent):
+   - rho(gbdt, xview) < ~0.90  AND  gbdt ATC-F1 close to champion (within ~0.02 LB)
+        -> DECORRELATED + COMPETENT, the profile ROCKET could not reach. Upload champion_gbdtblend5
+           (or champion_xview_gbdt). A blend that beats the cluster = first LEVEL gain since the
+           GBDT->Transformer swap, and the strongest diverse finalist for the private slice.
+   - rho >= ~0.90  OR  gbdt ATC-F1 far below champion
+        -> the last model class is closed. The architecture search is DONE. Lock champion_archblend4
+           (0.8946) + champion_rocketblend5 (0.8857) as the diverse finalist pair and pivot to the
+           Phase-Two reproducibility + novelty writeup (35% of the top-5 rubric).
 =====================================================================
 NEXT

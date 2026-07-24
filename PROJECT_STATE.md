@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter23 STAGED — MULTIVARIATE ROCKET (kernels span random band SUBSETS → cross-band pond signature the univariate form can't encode). iter22 result: ROCKET is the FIRST decorrelated member ever (ρ 0.82–0.87 vs the transformer cluster) but a weaker learner (−0.040 LB); its 1/5 blend `champion_rocketblend5` = 0.885661, TIED the cluster (no gain — diversity benefit cancelled by the member's level cost). iter23 tries to make the decorrelated member COMPETENT: 0-sub screen, paired univariate vs multivariate; submit only if c_rocket_mv ATC-F1 > c_rocket AND ρ(mv,xview) still <0.90. Local smoke: multivariate lifts OOF-AUC 0.943→0.970. Multivariate default OFF reproduces iter22 bit-for-bit (verified).**
+- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter24 STAGED — GBDT as the decorrelated member (the LAST untested model class; final architecture screen). iter23 closed ROCKET: multivariate lifted ATC-F1 only within noise (+0.035 < seed sd 0.058) AND re-correlated the member ρ0.87→0.91 — proving decorrelation⊥strength IN THAT FAMILY (its diversity was a symptom of being blind to cross-band structure). GBDT is the opposite: strong on cross-feature structure, diverse via a different REPRESENTATION (aggregates, no temporal order). Prior: GBDT ρ≈0.849 to seq, LB 0.8780 (−0.018, ≈1 seed swing → void). 0-sub screen; ρ<0.90 AND ATC-F1 near champion → blend+submit; else architecture search DONE → Phase-Two writeup. Finalist pair: archblend4 (0.8946) + rocketblend5 (0.8857, uni-rocket, most decorrelated artifact).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,16 +31,16 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter23 (MULTIVARIATE ROCKET screen — 0 submissions).** Paste
-   back: the `run: c_rocket` and `run: c_rocket_mv` summaries; the RETRO-FIT + GATE and the SCREEN
-   lines for BOTH; and the 4b (uni) + 4c (mv) arch_blend matrices. The paired read is c_rocket_mv vs
-   c_rocket (isolates the cross-band mechanism): **c_rocket_mv ATC-F1 clearly > c_rocket AND
-   ρ(rocket_mv, xview) still < ~0.90** → the decorrelated member is now competent → I upload
-   `champion_rocketblend5_mv`; a blend beating the cluster = first LEVEL gain since the
-   GBDT→Transformer swap. **ATC-F1 flat / ρ jumps toward the cluster** → ROCKET's lane exhausted →
-   lock `champion_archblend4` (0.8946) + `champion_rocketblend5` (0.8857) as the diverse finalist pair
-   and pivot to the Phase-Two reproducibility/novelty writeup (35% of the top-5 rubric). iter22 result
-   recorded: rocketblend5 = 0.885661 (tied cluster; decorrelation real but member too weak).
+3. **Current next action: `Run all` → iter24 (GBDT decorrelated-member screen — 0 submissions; the
+   FINAL architecture screen).** Paste back: the `run: g_gbdt` summary; the RETRO-FIT + GATE and the
+   SCREEN line for g_gbdt; and the 4b arch_blend matrix (the 'gbdt' row is the decision). **ρ(gbdt,
+   xview) < ~0.90 AND gbdt ATC-F1 within ~0.02 LB of champion** → decorrelated AND competent (the
+   profile ROCKET couldn't reach) → I upload `champion_gbdtblend5`; a blend beating the cluster = first
+   LEVEL gain since the GBDT→Transformer swap. **ρ ≥ ~0.90 OR gbdt ATC-F1 far below champion** → the
+   last model class is closed, the architecture search is DONE → lock `champion_archblend4` (0.8946) +
+   `champion_rocketblend5` (0.8857) and pivot to the Phase-Two reproducibility/novelty writeup (35% of
+   the top-5 rubric). iter23 recorded: multivariate ROCKET re-correlated ρ0.87→0.91 for a within-noise
+   ATC-F1 gain → ROCKET lane exhausted (decorrelation⊥strength).
 
    **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
    ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model
