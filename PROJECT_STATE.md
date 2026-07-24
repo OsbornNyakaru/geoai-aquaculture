@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter22 STAGED — ROCKET, a genuinely DIFFERENT model class (random conv kernels + linear; `src/rocket_model.py`, smoke-tested locally). iter21 CLOSED instance-expansion (per-epoch resampling raised OOF like k4=0.8665; the offline screen even went VOID — ATC-F1 fell to 14/15 as one anchor pair flipped between runs). Every in-family lane is now closed; ROCKET is the last lever of the model-class species that cleared the floor. The Colab run spends 0 subs: it prints the free cross-model rank-corr go/no-go (ρ<0.90 → blend it; ρ≥0.94 → search finished → writeup).**
+- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter22 RAN — ROCKET (different model class) is the FIRST decorrelated member ever: ρ(rocket,xview)=0.8665, ρ to the whole transformer cluster 0.82–0.87 (vs the 0.93–0.99 rank-twins of every in-family variant). BUT it is a weaker standalone learner (ATC-F1 −0.040 LB, 0/2 HOLD). Decorrelated-but-weak → small-weight blend. AWAITING UPLOAD of `champion_rocketblend5` (rocket at 1/5; blend mean ρ 0.9395→0.9118). ≥~0.885 → bank the most-diverse finalist; <~0.88 → rocket dragged, keep archblend4. Estimators re-certified clean this run (ATC-F1 15/15, DIS 5/5); iter21's void was a one-run wobble.**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,13 +31,15 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter22 (ROCKET, a different model class — go/no-go, 0 subs).
-   Paste back: the two `c_rocket` fold lines + its `run:` summary; the RETRO-FIT + GATE and the
-   SCREEN line for `c_rocket`; and BOTH `arch_blend` correlation matrices. The 'rocket' row of the
-   5-member matrix (4b) is the whole decision: ρ(rocket, xview) < ~0.90 AND rocket ATC-F1 within
-   ~0.05 of champion → upload `champion_rocketblend5` (first real ensemble-level artifact + best
-   diverse finalist); ρ ≥ ~0.94 → the architecture search is finished, lock `champion_archblend4`
-   and pivot to the Phase-Two reproducibility/novelty writeup. The run itself spends 0 submissions.**
+3. **Current next action: UPLOAD `submission_champion_rocketblend5.csv` to Zindi and paste the LB.**
+   iter22 ran: ROCKET is the first decorrelated member (ρ 0.82–0.87) but a weaker learner (−0.040 LB,
+   0/2 HOLD), so it goes into a SMALL-weight blend (1/5), not equal weight. rocketblend5 is both the
+   measurement and the finalist candidate. Read: **≥ ~0.885** → level preserved, bank it as the most-
+   decorrelated finalist (upgrade the diverse slot); then either pivot to the Phase-Two writeup OR
+   iter23 = *strengthen* ROCKET (10k kernels / MiniRocket recipe) so the decorrelated member is
+   competitive and the blend gain turns real. **< ~0.88** → the weak member dragged the blend; keep
+   `champion_archblend4` (0.8946) and pivot to the writeup. A public score below 0.8955 is expected
+   and fine — we optimise the unseen 721-row private slice.
 
    **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
    ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model

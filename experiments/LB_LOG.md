@@ -349,7 +349,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *mean_min screened* | 0.649 | **0.898566** (c_meanmin) | ➖ within noise |
 | 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *ρ=0.9928, not decorrelated* | 0.649 | **not submitted** | ❌ lane closed |
 | 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
-| 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | *staged* | 0.649 | **pending** | — |
+| 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | champion_rocketblend5 | 0.649 | **pending upload** | 🎯 first ρ<0.90 member |
 
 ---
 
@@ -471,6 +471,50 @@ online, and that only model-class-sized effects (~0.05) are measurable with this
 foundation-model/SSL ✅closed (adv-AUC 0.97), instance-expansion ✅closed. The ONLY unspent lever of
 the right species (a *different model class*, like the GBDT→Transformer swap that cleared the floor)
 is a decorrelated non-transformer member (MiniRocket/Hydra/ROCKET) — cross-exam's #2.
+
+## iter22 RESULT — ROCKET is the FIRST decorrelated member (ρ 0.82–0.87), but a weaker learner
+
+**Milestone: after 20 iterations of rank-twins, a member finally cleared ρ<0.90.** Estimators
+re-certified cleanly this run (ATC-F1 15/15 ρ+0.964 PASS; DIS 5/5 ρ+1.000 PASS — the iter21 void was
+a one-run anchor wobble). The cross-model rank-correlation:
+
+| pair | ρ | | pair | ρ |
+|---|---|---|---|---|
+| rocket ↔ xview | **0.8665** | | rocket ↔ nope | **0.8241** |
+| rocket ↔ l3 | 0.8619 | | rocket ↔ k4 | 0.8292 |
+| rocket ↔ reltime | 0.8471 | | *transformer ↔ transformer* | 0.91–0.97 |
+
+Every in-family variant (positional / objective / pooling / instance-expansion) sat at ρ 0.93–0.99.
+ROCKET at **0.82–0.87** is the first member below 0.90 — the 2-way go/no-go printed *"POOL IT: level
+gain is available."* This is direct empirical confirmation of the design law: only a different
+**model class** decorrelates; everything inside the Transformer class is a rank-twin.
+
+**BUT ROCKET is a weaker standalone learner.** The screen (trustworthy this run) votes it below
+champion on both cleared estimators: **ATC-F1 −0.2462 (≈ −0.040 LB), DIS −0.0214 → 0/2 HOLD**. That
+−0.040 is ~4× the seed floor (±0.0094 LB), a real gap, not noise. rocket standalone ≈ 0.855. Its OOF
+(0.9689 / 0.9717 across seeds) is also below the transformer cluster, consistent with a genuinely
+lower-capacity model — expected for random (un-trained) kernels + a linear head.
+
+**So this is textbook decorrelated-but-weaker.** Equal weight over-weights the weak member; the
+right artifact is a SMALL-weight blend. Three candidates were written:
+- `champion_rocketblend5` = 5-way {reltime, nope, l3, xview, rocket}, rocket at **1/5** weight
+  (mean ρ dropped 0.9395 → **0.9118** vs archblend4, i.e. the blend is measurably more diverse).
+- `champion_xview_rocket` = 2-way, rocket at **1/2** (too aggressive for a −0.04 member; probe only).
+- `champion_rocket_seedavg2` = rocket alone, 2 seeds (rank-corr 0.9248) — a standalone diverse hedge.
+
+**Decision: upload `champion_rocketblend5`** — the principled small-weight artifact. It is BOTH the
+measurement (does adding a decorrelated-but-weak member preserve champion-cluster level, or does it
+drag?) and the finalist candidate. Read on the paste-back:
+- **≥ ~0.885** (in-cluster) → level preserved; bank it as the most-decorrelated finalist we can build,
+  upgrading the diverse slot over `seedavg5`/`archblend4`. The architecture search then ends here
+  (rocket was the last lever) → pivot to the Phase-Two writeup, OR iter23 = *strengthen* rocket
+  (more kernels / MiniRocket recipe) to make the decorrelated member competitive and the blend gain
+  real.
+- **< ~0.88** (collapse) → the weak member dragged the blend; `champion_archblend4` (0.8946) stays the
+  finalist and the search is done → writeup.
+
+Note per project law: a public score *below* 0.8955 is expected and fine — we optimise the unseen
+721-row private slice, and a ρ=0.87 member is the best private-variance-reduction lever available.
 
 ## iter22 — ROCKET, a genuinely different model class (staged)
 
