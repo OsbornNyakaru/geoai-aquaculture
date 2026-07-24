@@ -45,29 +45,50 @@ log = get_logger()
 # ROCKET transform (pure numpy)
 # --------------------------------------------------------------------------- #
 def _make_kernels(n_kernels: int, n_channels: int, M: int,
-                  lengths, seed: int):
-    """Sample `n_kernels` univariate random kernels.
+                  lengths, seed: int, multivariate: bool = False,
+                  max_channels: int = 9):
+    """Sample `n_kernels` random kernels. Each is (channels[array], W[n_sub,klen], d, bias, pad).
 
-    Each kernel is (channel, weights, dilation, bias, use_padding). Univariate-per-random-channel
-    (rather than random channel SUBSETS) keeps the transform simple and robust; with ~24 channels
-    and thousands of kernels every channel still gets hundreds of kernels. Weights are mean-centered
-    (ROCKET), dilation is drawn on a log2 scale bounded so the receptive field fits in M, bias is
-    U(-1,1), padding is a random coin flip -- all exactly as in the reference ROCKET.
+    UNIVARIATE (multivariate=False): each kernel convolves ONE random band. Simple and robust; with
+    ~24 channels and thousands of kernels every band still gets hundreds of kernels. This is the
+    iter22 member, reproduced bit-for-bit here (the RNG draw order is unchanged; the 1-D weight is
+    only reshaped to [1, klen], which consumes no randomness).
+
+    MULTIVARIATE (multivariate=True, iter23): each kernel spans a random SUBSET of bands, subset size
+    ~ 2^U(0, log2(max_channels)) capped at n_channels, and the per-band dilated convolutions are
+    SUMMED before pooling -- the ROCKET-multivariate recipe. This lets a single kernel encode a
+    cross-band signature (e.g. low VH AND low NDVI), which the univariate form structurally cannot,
+    and which is the actual pond fingerprint the Transformer captures via cross-band attention.
+
+    Weights are mean-centered over the whole block (ROCKET), dilation is drawn on a log2 scale so the
+    receptive field fits in M, bias is U(-1,1), padding is a random coin flip.
     """
     rng = np.random.default_rng(seed)
     lengths = [int(k) for k in lengths if 1 < int(k) <= M]
+    max_c = max(1, min(int(max_channels), n_channels))
     kernels = []
     for _ in range(n_kernels):
-        c = int(rng.integers(0, n_channels))
-        klen = int(rng.choice(lengths))
-        max_exp = np.log2((M - 1) / (klen - 1))          # so (klen-1)*d + 1 <= M
-        d = int(2 ** rng.uniform(0.0, max(max_exp, 0.0)))
-        d = max(d, 1)
-        w = rng.standard_normal(klen).astype(np.float32)
-        w -= w.mean()                                    # mean-centered
+        if multivariate:
+            klen = int(rng.choice(lengths))
+            n_sub = int(2 ** rng.uniform(0.0, np.log2(max_c))) if max_c > 1 else 1
+            n_sub = min(max(n_sub, 1), n_channels)
+            chans = np.sort(rng.choice(n_channels, size=n_sub, replace=False))
+            max_exp = np.log2((M - 1) / (klen - 1))      # so (klen-1)*d + 1 <= M
+            d = max(int(2 ** rng.uniform(0.0, max(max_exp, 0.0))), 1)
+            w = rng.standard_normal((n_sub, klen)).astype(np.float32)
+        else:
+            # EXACT iter22 draw order (c, klen, d, w) so univariate reproduces iter22 bit-for-bit;
+            # the [None,:] reshape unifies the stored shape and consumes no randomness.
+            c = int(rng.integers(0, n_channels))
+            klen = int(rng.choice(lengths))
+            max_exp = np.log2((M - 1) / (klen - 1))
+            d = max(int(2 ** rng.uniform(0.0, max(max_exp, 0.0))), 1)
+            chans = np.array([c])
+            w = rng.standard_normal(klen).astype(np.float32)[None, :]
+        w -= w.mean()                                    # mean-centered over the whole block
         b = np.float32(rng.uniform(-1.0, 1.0))
         use_pad = bool(rng.integers(0, 2))
-        kernels.append((c, w, d, b, use_pad))
+        kernels.append((chans, w, d, b, use_pad))
     return kernels
 
 
@@ -96,11 +117,19 @@ def _dilated_conv(series: np.ndarray, w: np.ndarray, d: int, use_pad: bool) -> n
 
 
 def _transform(X: np.ndarray, kernels) -> np.ndarray:
-    """X [n, C, M] -> features [n, 2*n_kernels] = (PPV, max) per kernel."""
+    """X [n, C, M] -> features [n, 2*n_kernels] = (PPV, max) per kernel.
+
+    Each kernel spans `chans` (1 band for univariate, a subset for multivariate); the per-band
+    dilated convolutions share (klen, d, pad) so they align and are SUMMED before pooling.
+    """
     n = X.shape[0]
     feats = np.empty((n, 2 * len(kernels)), dtype=np.float32)
-    for ki, (c, w, d, b, use_pad) in enumerate(kernels):
-        conv = _dilated_conv(X[:, c, :], w, d, use_pad) + b
+    for ki, (chans, w, d, b, use_pad) in enumerate(kernels):
+        conv = None
+        for ci, ch in enumerate(chans):
+            c = _dilated_conv(X[:, ch, :], w[ci], d, use_pad)
+            conv = c if conv is None else conv + c
+        conv = conv + b
         feats[:, 2 * ki] = (conv > 0).mean(axis=1)       # PPV
         feats[:, 2 * ki + 1] = conv.max(axis=1)          # max
     return feats
@@ -126,6 +155,8 @@ def run_rocket_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     rk = cfg.get("rocket") or {}
     n_kernels = int(rk.get("n_kernels", 2000))
     lengths = rk.get("kernel_lengths", [3, 5, 7])
+    multivariate = bool(rk.get("multivariate", False))
+    max_channels = int(rk.get("max_channels", 9))
 
     n_splits = 2 if smoke else s["n_splits"]
     n_repeats = 1 if smoke else s["n_repeats"]
@@ -151,9 +182,12 @@ def run_rocket_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     X0, _ = to_inputs(test_cube[:1], mean, std, schema, channels_cfg, ex_mean, ex_std,
                       relative_time=rel)
     n_channels = X0.shape[2]
-    kernels = _make_kernels(n_kernels, n_channels, schema.n_months, lengths, cfg["seed"])
-    log.info("rocket: %d kernels x (PPV,max) = %d features | %d input channels/month | lengths=%s",
-             n_kernels, 2 * n_kernels, n_channels, lengths)
+    kernels = _make_kernels(n_kernels, n_channels, schema.n_months, lengths, cfg["seed"],
+                            multivariate=multivariate, max_channels=max_channels)
+    log.info("rocket: %d kernels x (PPV,max) = %d features | %d input channels/month | lengths=%s "
+             "| %s", n_kernels, 2 * n_kernels, n_channels, lengths,
+             f"MULTIVARIATE (band subsets, max_channels={min(max_channels, n_channels)})"
+             if multivariate else "univariate (1 band/kernel)")
 
     Fte = _feats(test_cube, kernels)                     # test features (fixed across folds)
 

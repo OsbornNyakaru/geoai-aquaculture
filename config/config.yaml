@@ -225,6 +225,12 @@ seq:
 rocket:
   n_kernels: 2000          # -> 4000 features (PPV, max per kernel). 200 in --smoke.
   kernel_lengths: [3, 5, 7]  # bounded by the 12-month series length
+  # iter23: multivariate kernels span a random SUBSET of the 24 channels (subset size
+  # ~2^U(0,log2 max_channels)), summing per-band convs before pooling -> a single kernel can encode
+  # a cross-band pond signature (low VH AND low NDVI AND low NDWI) the univariate form cannot. false
+  # reproduces the iter22 univariate member bit-for-bit.
+  multivariate: false
+  max_channels: 9          # cap on bands per multivariate kernel (ROCKET default 9)
 
 run:
   smoke_subsample: 300     # rows used in --smoke

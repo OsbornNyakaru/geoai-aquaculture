@@ -349,7 +349,8 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *mean_min screened* | 0.649 | **0.898566** (c_meanmin) | ➖ within noise |
 | 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *ρ=0.9928, not decorrelated* | 0.649 | **not submitted** | ❌ lane closed |
 | 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
-| 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | champion_rocketblend5 | 0.649 | **pending upload** | 🎯 first ρ<0.90 member |
+| 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | submission_champion_rocketblend5.csv | 0.649 | **0.885661** | 🎯 first ρ<0.90 member; blend tied cluster (weak member) |
+| 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen first* | 0.649 | **pending** | — |
 
 ---
 
@@ -515,6 +516,48 @@ drag?) and the finalist candidate. Read on the paste-back:
 
 Note per project law: a public score *below* 0.8955 is expected and fine — we optimise the unseen
 721-row private slice, and a ρ=0.87 member is the best private-variance-reduction lever available.
+
+### rocketblend5 uploaded → LB 0.885661
+
+| artifact | public LB | vs archblend4 |
+|---|---|---|
+| champion single seed (lucky) | 0.8955 | +0.0009 |
+| **champion_archblend4** | **0.894643** | — |
+| seed-average (5 champion seeds) | 0.88653 | −0.0080 |
+| **champion_rocketblend5** | **0.885661** | **−0.0090 (within σ_public)** |
+
+**Read: level PRESERVED, no gain.** rocketblend5 cleared the 0.885 non-collapse line and landed
+essentially AT the seed-average consensus (−0.0008), i.e. −0.009 below archblend4 but inside the
+±0.013 public noise — a statistical **tie at the reliable level**. The decorrelation milestone is
+real (first ρ<0.90 member ever) but it did **not** translate into a measurable blend gain, because
+the member is genuinely weaker (−0.040): the diversity benefit and the level cost cancel, which is
+exactly why the blend sits at the consensus level rather than above it. **Decorrelation is necessary
+but not sufficient — the member must also be competitive.**
+
+**Finalist bookkeeping.** `champion_archblend4` (0.8946) stays the leading finalist (highest reliable
+public, lowest variance). `champion_rocketblend5` (0.8857) is banked as a candidate DIVERSE second
+finalist: it is tied on public but carries a genuinely independent (ρ0.87) component, so for the
+private slice it hedges the transformer-cluster's shared errors better than `seedavg5` (a pure-
+transformer ρ0.95 pool) does. Final pair decided at the end.
+
+## iter23 — MULTIVARIATE ROCKET: make the decorrelated member competitive (staged)
+
+**The mechanism.** iter22's ROCKET is UNIVARIATE — each random kernel convolves ONE band. So it can
+never encode a cross-band signature like "low VH **and** low NDVI **and** low NDWI", which is the
+actual pond fingerprint; the Transformer captures exactly that via attention across bands. iter23
+switches to **multivariate kernels**: each kernel spans a random SUBSET of the 24 channels (subset
+size drawn ~2^U(0,log2·max_channels), ROCKET-multivariate recipe), summing the per-channel dilated
+convs before PPV/max. This adds cross-band interaction the univariate version structurally lacks — a
+GENUINE-signal upgrade (should raise ATC-F1 / true transfer), not just capacity to overfit source.
+
+**0-submission screen.** Re-run univariate `c_rocket` (paired baseline) + multivariate `c_rocket_mv`,
+2 seeds each. Decision from the paste:
+- **c_rocket_mv ATC-F1 clearly > c_rocket AND ρ(mv, xview) still < ~0.90** → the decorrelated member
+  is now competitive → blend it (`champion_rocketblend5_mv`) and spend ONE submission; a blend that
+  finally beats the cluster would be the first real LEVEL gain since the GBDT→Transformer swap.
+- **ATC-F1 flat / ρ jumps toward the cluster** → multivariate didn't help transfer (or bought
+  strength by re-correlating). ROCKET's lane is then exhausted; lock `champion_archblend4` +
+  `champion_rocketblend5` as the diverse finalist pair and pivot to the Phase-Two writeup.
 
 ## iter22 — ROCKET, a genuinely different model class (staged)
 
