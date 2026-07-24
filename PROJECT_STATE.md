@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-23 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter21 STAGED — INSTANCE-EXPANSION via per-epoch view resampling (the genuinely-untested strong form; code-review found fixed-K expansion was already tested as k4=0.8665). Paired control = seq_a_reltime (0.8908). iter20 CLOSED the pooling lane (mean_min ρ=0.9928 with champion, a rank-twin). Research triaged in RESPONSE_09/10.**
+- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter22 STAGED — ROCKET, a genuinely DIFFERENT model class (random conv kernels + linear; `src/rocket_model.py`, smoke-tested locally). iter21 CLOSED instance-expansion (per-epoch resampling raised OOF like k4=0.8665; the offline screen even went VOID — ATC-F1 fell to 14/15 as one anchor pair flipped between runs). Every in-family lane is now closed; ROCKET is the last lever of the model-class species that cleared the floor. The Colab run spends 0 subs: it prints the free cross-model rank-corr go/no-go (ρ<0.90 → blend it; ρ≥0.94 → search finished → writeup).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,11 +31,13 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter19 (DISPERSION POOLING screen), then paste back the
-   RETRO-FIT + GATE, the SEED SPREAD, and the SCREEN lines for `c_meanmin` / `c_meanstd` /
-   `c_moments`. Submit a pooling variant only if ≥2 cleared estimators beat champion AND the margin
-   exceeds that estimator's seed sd. Separately: upload `submission_champion_archblend4.csv` once
-   (bank the lowest-variance finalist).**
+3. **Current next action: `Run all` → iter22 (ROCKET, a different model class — go/no-go, 0 subs).
+   Paste back: the two `c_rocket` fold lines + its `run:` summary; the RETRO-FIT + GATE and the
+   SCREEN line for `c_rocket`; and BOTH `arch_blend` correlation matrices. The 'rocket' row of the
+   5-member matrix (4b) is the whole decision: ρ(rocket, xview) < ~0.90 AND rocket ATC-F1 within
+   ~0.05 of champion → upload `champion_rocketblend5` (first real ensemble-level artifact + best
+   diverse finalist); ρ ≥ ~0.94 → the architecture search is finished, lock `champion_archblend4`
+   and pivot to the Phase-Two reproducibility/novelty writeup. The run itself spends 0 submissions.**
 
    **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
    ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model

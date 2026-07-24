@@ -75,8 +75,9 @@ def main() -> None:
     ap.add_argument("--full", action="store_true", help="full run (default)")
     ap.add_argument("--name", default=None, help="experiment name for logs")
     ap.add_argument("--no-cache", action="store_true", help="ignore data cache")
-    ap.add_argument("--model", default="gbdt", choices=["gbdt", "seq"],
-                    help="gbdt = LGBM/XGB/CatBoost ensemble; seq = temporal Transformer")
+    ap.add_argument("--model", default="gbdt", choices=["gbdt", "seq", "rocket"],
+                    help="gbdt = LGBM/XGB/CatBoost ensemble; seq = temporal Transformer; "
+                         "rocket = random-convolution (ROCKET) + linear classifier")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                     help="override a config entry by dotted path, e.g. "
                          "--set seq.consistency_lambda=0 --set seq.relative_time=false. "
@@ -117,6 +118,15 @@ def main() -> None:
                   + (5 if _ch.get("indices") else 0)
                   + (schema.n_bands if _ch.get("rank") else 0))
         cv.n_features = 2 * schema.n_bands + _extra
+    elif args.model == "rocket":
+        from src.rocket_model import run_rocket_cv
+        oof_prob, p_test_raw, fold_scores, test_per_fold = run_rocket_cv(
+            train_cube, y, test_cube, schema, wd, cfg, smoke=smoke)
+        cv = _CV()
+        cv.oof_prob, cv.y, cv.fold_scores = oof_prob, y, fold_scores
+        cv.test_per_fold = test_per_fold
+        # feature count = 2 features (PPV, max) per random kernel.
+        cv.n_features = 2 * int((cfg.get("rocket") or {}).get("n_kernels", 2000))
     else:
         # Masking-aware OOF, then fit the full ensemble on all augmented views.
         cv = run_cv(train_cube, y, schema, wd, cfg, smoke=smoke)

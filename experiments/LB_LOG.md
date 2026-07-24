@@ -348,7 +348,8 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 18 | 2026-07-23 | **GRAND ENSEMBLE** — cross-architecture rank-blend (reltime/nope/l3/xview) | *marginal ρ=0.94* | 0.649 | **0.894643** | ✅ leading finalist |
 | 19 | 2026-07-23 | **DISPERSION POOLING** — mean_min / mean_std / moments (replace masked-mean) | *mean_min screened* | 0.649 | **0.898566** (c_meanmin) | ➖ within noise |
 | 20 | 2026-07-23 | **mean_min AS ENSEMBLE MEMBER** — pooling-axis diversity; archblend5 | *ρ=0.9928, not decorrelated* | 0.649 | **not submitted** | ❌ lane closed |
-| 21 | 2026-07-23 | **INSTANCE-EXPANSION** — each masked sub-window = an independent training example | *screen first* | 0.649 | **pending** | — |
+| 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
+| 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | *staged* | 0.649 | **pending** | — |
 
 ---
 
@@ -427,15 +428,71 @@ paired LB, a lucky draw). Consequences:
 ensemble/representation lane inside this model class is EXHAUSTED for buying *level*. Only a genuine
 data-model or model-class change can now move the needle. Pivot to instance-expansion.
 
-## iter21 — instance-expansion (staged)
+## iter21 RESULT — instance-expansion is inert, and the arbiter failed its own retro-fit
 
-The cross-exam's #1 lever: treat each `(row, masked sub-window)` as an INDEPENDENT training example
-(own BCE, no owner-grouping, no cross-view coupling), aggregate per-row at inference. It is the only
-proposal that is BOTH a data-model change (the category that cleared our floor: GBDT→Transformer
-+0.052) AND directly matched to the designed masking trap (test rows literally ARE partial windows).
-Unverified competitor lead ~0.914 AUC with "each month a training data point." In tension with our
-winning COUPLING mechanism (cross-view λ), so a genuine alternative regime. Screen with ATC-F1 (whose
-*sign* we now trust, magnitude discounted after mean_min over-predicted) before any submission.
+The cross-exam's #1 data-model lever: treat each `(row, masked sub-window)` as an INDEPENDENT
+training example via PER-EPOCH resampling (fresh masked windows every epoch → ~K·epochs distinct
+instances, not K fixed). Paired control = `seq_a_reltime` (K=2 FIXED views) so the ATC-F1 gap would
+isolate resampling alone.
+
+**Two findings, both HOLD-confirming:**
+
+**1. Same OOF-inflation signature as the fixed-view flop.** Resampling was hypothesised to LOWER OOF
+while improving transfer. It did the opposite:
+
+| run | OOF | seed |
+|---|---|---|
+| `c_iexp_rs2` | 0.98205 | 42 |
+| `c_iexp_rs2_s7` | 0.98292 | 7 |
+| `c_iexp_rs6` | 0.98235 | 42 |
+| `c_iexp_rs6_s7` | 0.98384 | 7 |
+| — champion `seq_a_xview` | 0.97523 | 42 |
+| — paired control `seq_a_reltime` | 0.98041 | 42 |
+| — `seq_a_k4` (fixed-view twin, LB **0.8665**) | 0.98419 | 42 |
+
+Every instance-expansion arm sits at ≈0.982–0.984 OOF — the **exact `seq_a_k4` fingerprint**, and
+k4 scored one of our worst LBs (0.8665). Higher OOF has been anti-correlated with LB throughout.
+Resampling did not rescue the mechanism; it reproduced the overfit-the-source signature. The
+data-model lane (in-family) is now measured closed.
+
+**2. The offline screen went VOID — ATC-F1 failed its OWN retro-fit this run.** For the first time
+since iter11, ATC-F1 dropped below the gate: **14/15 concordant, ρ = +0.929** (was 15/15, ρ +0.964).
+Cause: a single anchor pair (`l3` LB 0.8921 vs `xview` LB 0.8955) *flipped ATC-F1 ordering* between
+Colab runs — `l3` 0.8391 now edged `xview` 0.7709. Pure run-to-run prediction noise. So no estimator
+cleared → the screen was SKIPPED and `c_iexp` was never scored.
+
+**This is the seed-variance thesis reaching the estimator itself.** At the sub-0.01 resolution where
+instance-expansion would live, even our best lie-detector is not reproducible run-to-run. That is
+*confirmation*, not contradiction: it re-proves that small probes are unresolvable offline **and**
+online, and that only model-class-sized effects (~0.05) are measurable with this budget. `archblend4`
+(0.8946) remains the leading finalist; no submission spent.
+
+**Lane status after iter21:** positional ✅closed, objective ✅closed, pooling ✅closed (rank-twins),
+foundation-model/SSL ✅closed (adv-AUC 0.97), instance-expansion ✅closed. The ONLY unspent lever of
+the right species (a *different model class*, like the GBDT→Transformer swap that cleared the floor)
+is a decorrelated non-transformer member (MiniRocket/Hydra/ROCKET) — cross-exam's #2.
+
+## iter22 — ROCKET, a genuinely different model class (staged)
+
+The last lever of the right species. `src/rocket_model.py` (from-scratch, pure numpy + sklearn, no
+new dependency, no external data → rules-safe like the Transformer): a bank of **random** convolution
+kernels over the 12-month sequence, each summarized by PPV + max, then a plain **linear** classifier.
+No attention, no learned representation → **decorrelated from the Transformer by construction.** It
+consumes the *identical* representation the champion sees (`to_inputs` over the same `_mask_views`
+augmentation), so the ONLY difference is the estimator — which makes the cross-model rank-correlation
+a clean go/no-go. Smoke-tested locally end-to-end (raw CSVs + torch present here): valid submission,
+OOF AUC 0.943 on a 300-row/200-kernel smoke — the model learns.
+
+**The Colab run spends 0 submissions.** It regenerates the 7 known-LB anchors + 5 champion seeds (so
+the retro-fit gate + seed floor stay valid), runs ROCKET at 2 seeds (for DIS + a seed-collapsed
+finalist), screens it, then prints the **`arch_blend` correlation matrix** with ROCKET as a 5th
+member. Decision from the paste:
+- **ρ(rocket, xview) < ~0.90 AND rocket ATC-F1 within ~0.05 of champion** → decorrelated + competent
+  → first real ensemble-**level** artifact since the Transformer swap; upload `champion_rocketblend5`
+  (or `champion_xview_rocket`), also the best diverse finalist for the 721-row private slice.
+- **ρ < 0.90 but rocket weak** → decorrelated but would drag an equal-weight blend; down-weight/hold.
+- **ρ ≥ ~0.94** → even a foreign model class ranks these rows the same → the architecture search is
+  **genuinely finished**; lock `champion_archblend4` (0.8946) and pivot to the Phase-Two writeup.
 
 ## iter20 — mean_min as a decorrelated ensemble member (RESULT above)
 

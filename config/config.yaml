@@ -216,6 +216,16 @@ seq:
                            # (+0.0047, our champion) informative on every row instead of vacuous
                            # where the two windows overlap. Exactly zero capacity change.
 
+# ---- ROCKET random-convolution member (rules-safe, from-scratch; run via --model rocket) ----
+# iter22: a DIFFERENT model class over the same 12-month sequence. Random kernels + PPV/max pooling
+# + a linear classifier -- no attention, no learned representation -- so it decorrelates from the
+# Transformer by construction. It reuses the seq masking augmentation (K/R) and to_inputs
+# representation, so the ONLY difference from the champion is the estimator, making the cross-model
+# rank-correlation (tools/arch_blend.py) a clean go/no-go for whether it adds ensemble LEVEL.
+rocket:
+  n_kernels: 2000          # -> 4000 features (PPV, max per kernel). 200 in --smoke.
+  kernel_lengths: [3, 5, 7]  # bounded by the 12-month series length
+
 run:
   smoke_subsample: 300     # rows used in --smoke
   smoke_trees: 100         # trees per model in --smoke
