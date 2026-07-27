@@ -111,6 +111,40 @@ def to_inputs(cube: np.ndarray, mean: np.ndarray, std: np.ndarray,
         s2_obs = (~np.isnan(cube[:, :, s2_idx])).any(axis=2, keepdims=True)
         miss = np.concatenate([1.0 - s1_obs, 1.0 - s2_obs], axis=2).astype(np.float32)
 
+    drop = ch.get("drop_bands") or []
+    if drop:
+        # CAPACITY-REDUCING BAND DELETION (iter25). Derived from the Phase-A 2-D screen
+        # (`tools/shift_audit.py`), which scores every band on two axes: A = how well that
+        # band ALONE separates masked-train from test (shift), T = how well it ALONE predicts
+        # the label (signal). The rule -- high A AND low T -> delete, because the channel is a
+        # pure shift-carrier costing nothing to remove. A one-axis rule ("drop the most
+        # adversarially-important") would delete VH/amplitude first, which we PROVED is the
+        # primary signal (c_rank collapsed OOF 0.975 -> 0.86); the second axis is what
+        # protects it. See gemini_loop/RESEARCH_11.md 2.2.
+        #
+        # MEASURED (seed 42, logistic read-out, masked+left-aligned):
+        #   VV     A=0.5907  T=0.7801   <- top shift-carrier; VH dominates it on signal (0.8302)
+        #   blue   A=0.5344  T=0.5963   <- barely predictive, and the most Rayleigh-scattered
+        #                                  band, so the most aerosol/illumination sensitive
+        # VV is independently the SAR literature's rejected channel: it is wind-sensitive, its
+        # water threshold drifts 2.6 dB/yr vs VH's 2.1, and VH is preferred because its
+        # backscatter histogram is cleanly bimodal (Ottinger 2017/2019; Li 2018 Dongting).
+        # Two independent routes -- our own data and published physics -- name the same channel.
+        #
+        # HONEST CAVEAT: VV's T sits 0.0001 BELOW the median, so its quadrant assignment is a
+        # knife-edge by this screen alone. The physics is what breaks the tie. Also note the
+        # screen is a per-band LINEAR read-out; a band with weak marginal signal could still
+        # matter through the cross-band attention the champion actually uses.
+        keep = [i for i, b in enumerate(schema.bands) if b not in drop]
+        dropped = [b for b in schema.bands if b in drop]
+        vals = vals[:, :, keep]
+        # `compact_missing` has already collapsed `miss` to 2 summary channels that are not
+        # per-band, so band-indexing it would be wrong. Leave it alone in that case.
+        if not ch.get("compact_missing"):
+            miss = miss[:, :, keep]
+        log.info("seq drop_bands: removed %s -> %d bands (%d value + %d missing channels)",
+                 dropped, len(keep), len(keep), miss.shape[2])
+
     parts = [vals, miss]
     if channels_cfg and ex_mean is not None:
         ex = _raw_extra_channels(cube, schema, channels_cfg)

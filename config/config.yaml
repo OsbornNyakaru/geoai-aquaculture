@@ -198,6 +198,19 @@ seq:
                              # scene, so 10 of 24 channels are near-duplicates; and cloud frequency
                              # is CLIMATOLOGICAL, making the block a wide handle on calendar season
                              # -- the phase-locked axis whose deletion won +0.0128. Capacity-REDUCING.
+    # iter25 candidate. Delete whole BANDS (value + missing-indicator channel each), chosen by the
+    # Phase-A 2-D shift screen in tools/shift_audit.py: A = how well the band ALONE separates
+    # masked-train from test, T = how well it ALONE predicts the label. Only high-A/low-T bands are
+    # free deletions. Measured (seed 42, masked + left-aligned):
+    #   VV   A=0.5907 T=0.7801  <- top shift-carrier; VH dominates it on signal (0.8302)
+    #   blue A=0.5344 T=0.5963  <- barely predictive; most Rayleigh-scattered, so most aerosol-sensitive
+    #   VH   A=0.5622 T=0.8302  <- REPAIR, never delete: this is our proven primary signal
+    # A one-axis rule (drop the most adversarially-important) would delete amplitude first, which
+    # c_rank proved fatal (OOF 0.975 -> 0.86). Independently, the SAR literature rejects VV: it is
+    # wind-sensitive, drifts 2.6 dB/yr vs VH's 2.1, and VH's histogram is cleanly bimodal
+    # (Ottinger 2017/2019; Li 2018 Dongting). Capacity-REDUCING. See gemini_loop/RESEARCH_11.md 2.2.
+    # NOTE the flag lives HERE under seq.channels for the same reason compact_missing does.
+    drop_bands: []           # e.g. ["VV"] or ["VV","blue"]; [] = off (champion default)
 
   # ---- iter12 offline-screen candidates (all default OFF = the exact 0.8955 champion) ----
   # Screened with the estimators that CLEARED the iter11 retro-fit (ATC-F1 rho=+0.964 at 15/15;

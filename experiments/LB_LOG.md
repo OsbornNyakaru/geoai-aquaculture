@@ -353,6 +353,78 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen VOID→exhausted* | 0.649 | **not submitted** | ❌ strength⊥diversity tradeoff |
 | 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **0.879123** | ❌ **−0.0155 vs archblend4 (SIGNIFICANT, paired); cross-class blending CLOSED** |
 
+| 25 | 2026-07-27 | **Phase-A shift audit** (`tools/shift_audit.py`) — indicator probe + 2-D band screen | *local, no cloud run* | — | **n/a — 0 subs** | ✅ 1 lane CLOSED, 1 lane OPENED |
+
+---
+
+## iter25 PHASE-A — two results for zero submissions, computed locally in minutes
+
+Round-11 research (8 agents, `gemini_loop/RESEARCH_11.md`) produced two testable predictions. Both
+were tested **locally on the cached cubes** — no Colab run, no submission, ~3 minutes.
+
+### 🔴 Result 1 — the missing-indicator deletion lane is CLOSED (three agents were wrong)
+
+Three independent agents predicted our per-band missing-indicator channels were a shifted nuisance,
+via a specific and plausible mechanism: we deleted absolute time by left-aligning windows, but cloud
+gaps encode absolute season, so the model could have recovered the month-of-year that relative-time
+reframing removed. Measured, **masked-train vs test, left-aligned** (so window length is matched and
+cannot be what is detected):
+
+| probe | adv-AUC |
+|---|---|
+| P1 values only | **0.8915** |
+| **P2 ALL missing-indicators only** | **0.4758** ← below chance |
+| P3 values + indicators (what the champion eats) | 0.8943 |
+| P4 S2-cloud indicators only | 0.4744 |
+| P5 per-month S2-gap count only | 0.4815 |
+| **what indicators ADD over values (P3−P1)** | **+0.0028** |
+
+**The indicators carry essentially zero train/test information.** The reason is in our own code:
+`apply_mask` (`src/features.py:85-92`) already applies S2 dropout at rates **measured off the test
+set**, so the train indicator distribution was matched to test by construction. A previous session
+solved this without recording it as solved. Lane closed, zero submissions spent.
+
+*(Also note this is NOT iter13's `compact_missing`, which was 24→14 and failed. Full deletion would
+have been 24→12. Neither is now worth running.)*
+
+### 🟢 Result 2 — the shift is in the VALUES, and it is DISTRIBUTED
+
+P1 = 0.8915 on masked, left-aligned values vs **0.965–0.976** for Presto on raw pixels: masking +
+left-alignment already removed a real chunk of the shift, but a large signal-side component remains.
+
+The 2-D screen scores each band on **A** (separates train/test) and **T** (predicts label) — the Uber
+drop rule (arXiv:2004.03045, +3.9% AUC) with a second axis added so it cannot delete amplitude, which
+`c_rank` proved fatal:
+
+| band | A (shift) | T (label) | quadrant |
+|---|---|---|---|
+| **VV** | **0.5907** | 0.7801 | **free deletion** — top shift-carrier, VH dominates it on signal |
+| VH | 0.5622 | **0.8302** | REPAIR, never delete — the primary signal |
+| nir | 0.5462 | 0.8063 | REPAIR |
+| **blue** | **0.5344** | 0.5963 | **free deletion** — barely predictive |
+| re3 / re2 | 0.53 / 0.53 | 0.80 / 0.79 | REPAIR |
+| nira / swir1 | 0.51 / 0.49 | 0.81 / 0.78 | KEEP (core) |
+| swir2 / red / green / re1 | ≤0.50 | 0.76 / 0.49 / 0.65 / 0.57 | dead weight |
+
+**Max single-band A is 0.59 against a joint 0.89 ⇒ the shift is DISTRIBUTED, not concentrated.** Band
+deletion cannot collapse it and we should not expect it to. This independently confirms the standing
+claim in `tools/adversarial_check.py` that chasing adv-AUC 0.5 by feature selection is futile.
+
+**But two routes independently name VV.** Our data: top shift-carrier, dominated by VH on signal. The
+SAR literature: VV is wind-sensitive, its water threshold drifts **2.6 dB/yr vs VH's 2.1**, and VH is
+preferred because its backscatter histogram is cleanly bimodal (Ottinger 2017/2019; Li 2018, Dongting).
+Deleting it is **capacity-REDUCING** — the only change-class that has ever won here.
+
+**Honest caveats.** VV's T sits **0.0001 below the median** — a knife-edge, so the physics breaks the
+tie, not the screen. The screen is a per-band *linear* read-out; a band with weak marginal signal could
+still matter through the cross-band attention the champion actually uses. And per Khani & Liang
+(arXiv:2012.04104), removing a feature can *hurt* via noise amplification in exactly our regime (few
+rows, correlated features, one dominant signal) — this lane has a real downside regime.
+
+**→ iter25 staged:** `c_dropvv`, `c_dropblue`, `c_dropvvblue` at 2 seeds each, 0 submissions. Wired via
+a new `seq.channels.drop_bands` flag, smoke-verified end-to-end (width 24→20 **and** the independently
+computed `n_features` agrees — the double-check iter12's silent no-op defeated).
+
 ---
 
 ## iter18 result — architecture pooling is MARGINAL, not a level lever

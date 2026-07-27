@@ -117,7 +117,15 @@ def main() -> None:
                   + (schema.n_bands if _ch.get("deltas") else 0)
                   + (5 if _ch.get("indices") else 0)
                   + (schema.n_bands if _ch.get("rank") else 0))
-        cv.n_features = 2 * schema.n_bands + _extra
+        # iter25: drop_bands removes both the value AND the missing-indicator channel for each
+        # dropped band, so the base width is 2*(n_bands - n_dropped). Keeping this in sync
+        # matters: the iter12 `c_compact` bug was a silent no-op precisely because this
+        # independently-computed count agreed with the WRONG answer and nothing caught it.
+        _n_kept = schema.n_bands - len([b for b in (_ch.get("drop_bands") or [])
+                                        if b in schema.bands])
+        cv.n_features = (2 if not _ch.get("compact_missing") else 1) * _n_kept + _extra
+        if _ch.get("compact_missing"):
+            cv.n_features = _n_kept + 2 + _extra
     elif args.model == "rocket":
         from src.rocket_model import run_rocket_cv
         oof_prob, p_test_raw, fold_scores, test_per_fold = run_rocket_cv(

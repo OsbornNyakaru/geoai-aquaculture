@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-27 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643, now unchallenged.** · **Loop state: 🏁 ARCHITECTURE SEARCH CLOSED. iter24 ran and FAILED, significantly: `champion_gbdtblend5` = 0.879123, −0.0155 vs archblend4 on a strongly PAIRED comparison (4/5 shared members, identical 309 rows) → ≥2.5σ, not noise. The result INVERTS its own hypothesis: the GBDT was equally decorrelated as ROCKET (ρ 0.849 vs 0.850) but ~4× stronger (−0.011 vs −0.040 LB), and its blend cost NEARLY TWICE AS MUCH (−0.0155 vs −0.0090). Cross-model-class blending is now closed with n=2 across maximally different families. THE LAW: under a rank-only metric with a PINNED threshold, a decorrelated member's reordering near the cut costs more level than its independence buys back — only rank-twins (ρ>0.93, same class) pool without loss, and those buy variance, never level. METHODOLOGICAL LESSON: the screen said `g_gbdt votes=1/2 → HOLD` and was RIGHT; it was overridden by extending iter18's "read the matrix not the screen" rule beyond its derivation (within-class pooling, where members are equally competent). NEXT ACTION: Phase-Two reproducibility/novelty writeup — 35% of the top-5 rubric, does not exist yet, deadline 2026-08-16. Do NOT upload `champion_xview_gbdt` (½ weight on the member that just cost −0.0155 at ⅕).**
+- **Last updated:** 2026-07-27 (Phase-A audit) · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643, now unchallenged.** · **Loop state: 🏁 ARCHITECTURE SEARCH CLOSED. iter24 ran and FAILED, significantly: `champion_gbdtblend5` = 0.879123, −0.0155 vs archblend4 on a strongly PAIRED comparison (4/5 shared members, identical 309 rows) → ≥2.5σ, not noise. The result INVERTS its own hypothesis: the GBDT was equally decorrelated as ROCKET (ρ 0.849 vs 0.850) but ~4× stronger (−0.011 vs −0.040 LB), and its blend cost NEARLY TWICE AS MUCH (−0.0155 vs −0.0090). Cross-model-class blending is now closed with n=2 across maximally different families. THE LAW: under a rank-only metric with a PINNED threshold, a decorrelated member's reordering near the cut costs more level than its independence buys back — only rank-twins (ρ>0.93, same class) pool without loss, and those buy variance, never level. METHODOLOGICAL LESSON: the screen said `g_gbdt votes=1/2 → HOLD` and was RIGHT; it was overridden by extending iter18's "read the matrix not the screen" rule beyond its derivation (within-class pooling, where members are equally competent). NEXT ACTION: Phase-Two reproducibility/novelty writeup — 35% of the top-5 rubric, does not exist yet, deadline 2026-08-16. Do NOT upload `champion_xview_gbdt` (½ weight on the member that just cost −0.0155 at ⅕).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,7 +31,25 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: the PHASE-TWO WRITEUP.** The architecture search is finished — iter24 closed
+3. **Current next action: `Run all` → iter25 (band-deletion screen, 0 submissions), and START the
+   Phase-Two writeup in parallel.** Round-11 research (8 agents → `gemini_loop/RESEARCH_11.md`) plus a
+   local Phase-A audit (`tools/shift_audit.py`, ~3 min, zero submissions) closed one lane and opened
+   another:
+   - **CLOSED:** the per-band missing-indicator deletion three agents predicted. Indicators alone
+     separate masked-train from test at adv-AUC **0.4758** (below chance) and add **+0.0028** over
+     values — because `apply_mask` already applies S2 dropout at rates measured off test, so the
+     distribution was matched by construction. No submission spent.
+   - **OPENED:** the shift lives in the VALUES (adv-AUC **0.8915** masked+left-aligned, vs 0.965–0.976
+     for Presto on raw pixels). The 2-D screen (A=shift, T=signal) names **VV** (A 0.5907, T 0.7801 —
+     top shift-carrier, dominated by VH's 0.8302) and **blue** (A 0.5344, T 0.5963) as free deletions.
+     **The SAR literature independently rejects VV** (wind-sensitive; threshold drifts 2.6 dB/yr vs
+     VH's 2.1; VH's histogram is cleanly bimodal — Ottinger 2017/2019, Li 2018). Capacity-REDUCING.
+   - **Temper expectations:** max single-band A is 0.59 vs a joint 0.89, so the shift is DISTRIBUTED
+     and band deletion cannot collapse it. VV's T is 0.0001 below the median — a knife-edge.
+   Paste back the logged `seq input width` per candidate (MUST be 22/23/20, not 24), the gate, the
+   three SCREEN lines, and the arch_blend diag rows.
+
+4. **Then: the PHASE-TWO WRITEUP.** The architecture search is finished — iter24 closed
    the last model class, and cross-class blending is closed with n=2. No modelling lane remains that
    is sized to the ~0.010 measurement floor. **35% of the final score for a top-5 finish is the
    reproducibility/novelty review, and that deliverable does not exist yet.** With the 2026-08-16
