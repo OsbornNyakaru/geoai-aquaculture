@@ -351,7 +351,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
 | 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | submission_champion_rocketblend5.csv | 0.649 | **0.885661** | 🎯 first ρ<0.90 member; blend tied cluster (weak member) |
 | 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen VOID→exhausted* | 0.649 | **not submitted** | ❌ strength⊥diversity tradeoff |
-| 24 | 2026-07-24 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | *screen first* | 0.649 | **pending** | — |
+| 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **pending upload** | 🎯 **decorrelated AND competent** |
 
 ---
 
@@ -570,6 +570,81 @@ rocket *toward* the transformer, not to a new place.
 marginal, indistinguishable from archblend4. The ROCKET lane is closed. Finalist pair remains
 `champion_archblend4` (0.8946) + `champion_rocketblend5` (0.8857, the UNIVARIATE-rocket blend — our
 most decorrelated artifact, ρ0.87 member, the better private-slice hedge).
+
+## iter24 RESULT — the GBDT is DECORRELATED **and** COMPETENT: the profile ROCKET could not reach
+
+Estimators re-certified cleanly for the sixth time (ATC-F1 **15/15 ρ+0.964 PASS**; DIS **5/5 ρ+1.000
+PASS**; ATC −0.429, DIV −0.857, MARG −0.321 all FAIL exactly as before). Seed floor unchanged:
+ATC-F1 sd 0.0576 == ±0.0094 LB. The iter21 wobble did not recur — note the gate's |ΔLB|>0.01 filter
+is doing real work here: `l3` (ATC-F1 0.8134) still outranks `xview` (0.8075) against their LB order,
+but that pair's |ΔLB| is only 0.0034, so it is correctly excluded as unresolvable rather than
+counted as a miss.
+
+### Both pre-committed Branch-A conditions are met
+
+| condition | threshold | measured | |
+|---|---|---|---|
+| ρ(gbdt, xview) | < ~0.90 | **0.8734** | ✅ |
+| gbdt ATC-F1 vs champion | within ~0.02 LB | **−0.0676 (−0.0110 LB)** | ✅ |
+
+Screen line: `g_gbdt  ATCF1 −0.0676 (−0.0110 LB)  DIS +0.0107 (+0.0178 LB)  votes=1/2 → HOLD`.
+That HOLD governs submitting the GBDT **standalone**, which we are not doing. Per the pre-committed
+instrument rule (iter18, and the tool's own printed DECISION), an ensemble call is read off the
+**correlation matrix**, not the screen — the screen's ±0.0094 LB resolution is coarser than any
+ensemble gain by construction.
+
+### The comparison that matters — GBDT vs ROCKET as members
+
+| member | ρ to xview | mean ρ to cluster | ATC-F1 vs champ | seed rank-corr |
+|---|---|---|---|---|
+| ROCKET (iter22) | 0.8665 | ~0.850 | **−0.2462 (−0.0401 LB)** | 0.9248 |
+| **GBDT (iter24)** | **0.8734** | **0.8489** | **−0.0676 (−0.0110 LB)** | **0.9795** |
+
+**Equally decorrelated, ~4× less weak.** ROCKET bought its diversity by being blind to cross-band
+structure; the GBDT is decorrelated while natively *using* that structure — its diversity comes from
+discarding temporal ORDER instead. That is the representation-diversity profile iter24 was designed
+to test, and it is the first member ever to satisfy both halves.
+
+**Independent corroboration of the competence estimate.** ATC-F1 puts the GBDT at −0.0110 LB below
+champion. The historical GBDT standalone anchor is **0.8780** vs the champion's *reliable* ≈0.8865 —
+a gap of **−0.0085**. Two unrelated routes agree the GBDT sits ≈0.01 below the champion. The −0.011
+margin does sit just *outside* the ±0.0094 seed floor, so read it as a real-but-small competence
+gap, not as a tie.
+
+### A genuinely new finding: the seed lottery is a TRANSFORMER property, not a task property
+
+| model class | seed rank-corr | independent error component |
+|---|---|---|
+| Transformer (`seq_a_xview`, n=5 seeds) | 0.9511 | 0.0489 |
+| **GBDT (`g_gbdt`, n=2 seeds)** | **0.9795** | **0.0205** |
+
+The GBDT is **~2.4× more seed-stable**. The 0.0191 LB seed swing that voided nine of our verdicts is
+a property of the from-scratch Transformer, not of this dataset. (Caveat: one seed pair vs ten, so
+directional not definitive.) This makes a GBDT-containing blend more *reproducible*, which matters
+for the unseen private slice and for the Phase-Two reproducibility rubric.
+
+### The blend matrices — and why `gbdtblend5` is the right artifact
+
+| artifact | members | mean ρ | min ρ | variance factor (1+ρ(M−1))/M |
+|---|---|---|---|---|
+| `champion_archblend4` | 4 transformers | 0.9395 | 0.9097 | 0.9546 |
+| **`champion_gbdtblend5`** | **4 transformers + gbdt** | **0.9110** | **0.8309** | **0.9288** ← lowest |
+| `champion_xview_gbdt` | xview + gbdt | 0.8734 | 0.8734 | 0.9367 |
+
+`archblend4` reproduced its iter18 matrix **exactly** (0.9395 / 0.9097) — the framework is stable.
+The 2-way is the only one to trip the tool's automatic *"POOL IT"* verdict, but the 5-way is the
+better artifact on **both** axes: lower variance factor (0.9288 vs 0.9367) *and* one-fifth the level
+exposure to the −0.011 member instead of one-half.
+
+**Honest expectation, from the rocketblend5 precedent.** rocketblend5 had mean ρ 0.9118 — essentially
+identical to gbdtblend5's 0.9110 — and landed −0.009 below archblend4, consistent with ⅕·(−0.040).
+The same arithmetic here gives ⅕·(−0.011) ≈ **−0.002**, i.e. gbdtblend5 ≈ **0.892–0.897**: a public
+tie with archblend4. **We are not buying a public number.** We are buying the lowest-variance,
+most-decorrelated artifact available, built from a member that is both competent and seed-stable —
+and a submitted score is *required* for finalist eligibility.
+
+**Decision: upload `submission_champion_gbdtblend5.csv`.** The one submission the pre-committed rule
+authorises. This is the final architecture screen; whatever it returns, the search is closed.
 
 ## iter24 — GBDT as the decorrelated member: the last untested model class (staged)
 

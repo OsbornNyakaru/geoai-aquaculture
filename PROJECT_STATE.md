@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-24 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter24 STAGED — GBDT as the decorrelated member (the LAST untested model class; final architecture screen). iter23 closed ROCKET: multivariate lifted ATC-F1 only within noise (+0.035 < seed sd 0.058) AND re-correlated the member ρ0.87→0.91 — proving decorrelation⊥strength IN THAT FAMILY (its diversity was a symptom of being blind to cross-band structure). GBDT is the opposite: strong on cross-feature structure, diverse via a different REPRESENTATION (aggregates, no temporal order). Prior: GBDT ρ≈0.849 to seq, LB 0.8780 (−0.018, ≈1 seed swing → void). 0-sub screen; ρ<0.90 AND ATC-F1 near champion → blend+submit; else architecture search DONE → Phase-Two writeup. Finalist pair: archblend4 (0.8946) + rocketblend5 (0.8857, uni-rocket, most decorrelated artifact).**
+- **Last updated:** 2026-07-27 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter24 RAN — the GBDT is the FIRST member ever to be DECORRELATED *and* COMPETENT. ρ(gbdt,xview)=0.8734 (<0.90 ✅) and ATC-F1 −0.0110 LB (within 0.02 ✅) — both pre-committed Branch-A conditions met. Equally decorrelated as ROCKET (mean ρ to cluster 0.849 vs 0.850) but ~4× less weak (−0.011 vs −0.040 LB), because its diversity comes from discarding temporal ORDER rather than from blindness to cross-band structure. `champion_gbdtblend5` has the lowest variance factor we have ever built (0.9288, vs archblend4's 0.9546). NEW FINDING: GBDT seed rank-corr 0.9795 vs Transformer 0.9511 → the 0.019 seed lottery is a TRANSFORMER property, not a task property. NEXT ACTION: upload `submission_champion_gbdtblend5.csv` (the one authorised submission), paste the LB. Architecture search closes either way → Phase-Two writeup (35% of the top-5 rubric).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,16 +31,22 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter24 (GBDT decorrelated-member screen — 0 submissions; the
-   FINAL architecture screen).** Paste back: the `run: g_gbdt` summary; the RETRO-FIT + GATE and the
-   SCREEN line for g_gbdt; and the 4b arch_blend matrix (the 'gbdt' row is the decision). **ρ(gbdt,
-   xview) < ~0.90 AND gbdt ATC-F1 within ~0.02 LB of champion** → decorrelated AND competent (the
-   profile ROCKET couldn't reach) → I upload `champion_gbdtblend5`; a blend beating the cluster = first
-   LEVEL gain since the GBDT→Transformer swap. **ρ ≥ ~0.90 OR gbdt ATC-F1 far below champion** → the
-   last model class is closed, the architecture search is DONE → lock `champion_archblend4` (0.8946) +
-   `champion_rocketblend5` (0.8857) and pivot to the Phase-Two reproducibility/novelty writeup (35% of
-   the top-5 rubric). iter23 recorded: multivariate ROCKET re-correlated ρ0.87→0.91 for a within-noise
-   ATC-F1 gain → ROCKET lane exhausted (decorrelation⊥strength).
+3. **Current next action: UPLOAD `submissions/submission_champion_gbdtblend5.csv` to Zindi and paste
+   the public LB.** iter24 ran on 2026-07-27 and cleared BOTH pre-committed Branch-A conditions
+   (ρ(gbdt,xview)=0.8734 < 0.90; gbdt ATC-F1 −0.0110 LB, within the ±0.02 bar), so the rule authorises
+   exactly one submission. Expect **≈0.892–0.897 — a public TIE with archblend4** (0.8946); by the
+   rocketblend5 precedent the ⅕-weight level cost is only ≈−0.002. **We are not buying a public
+   number**: gbdtblend5 is the lowest-variance artifact in the project (factor 0.9288 vs archblend4's
+   0.9546) built on the only decorrelated-AND-competent member we have ever found, and a submitted
+   score is *required* for finalist eligibility. Read: **≥0.895** → first level gain since the
+   GBDT→Transformer swap, it becomes finalist #1; **≈0.885–0.894** → tie, bank it as the diverse
+   finalist over rocketblend5 (better member: −0.011 vs −0.040, and seed-stabler); **<0.88** → the
+   member dragged it, keep archblend4 + rocketblend5. **Either way the architecture search is CLOSED
+   after this** → pivot to the Phase-Two reproducibility/novelty writeup (35% of the top-5 rubric),
+   which does not exist yet and is now the highest-value remaining work. Deadline 2026-08-16.
+   `champion_xview_gbdt` (2-way, ρ 0.8734, the only artifact to trip the tool's automatic "POOL IT")
+   is the optional second upload if a second finalist-eligible diverse artifact is wanted; the 5-way
+   is better on both variance factor and level exposure.
 
    **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
    ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model
@@ -289,7 +295,9 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 12 | queued: dispersion pooling `mean ⊕ std` (Ottinger permanence/low-std physics) | | | not yet run |
 | 13 | queued: focal loss γ=3 / FLSD-53, keep λ=1, refit δ | | | not yet run |
 | — | gated on iter11 PASS: fold-ensemble deletion → group-DRO → VH−VV → AUC surrogate | | | gated |
-| — | endgame: prevalence sweep · designate finalists (xview + NoPE) · reproduction README | | | not yet run |
+| 18–23 | ensemble/model-class lanes — full results in `experiments/LB_LOG.md` | | 0.8946 / 0.8986 / 0.8857 | archblend4 = leading finalist; ROCKET decorrelated but −0.040 weak |
+| 24 | **GBDT as decorrelated member** (ρ 0.8734, ATC-F1 −0.0110 LB) | 0.98319 | **pending upload** | 🎯 **first member DECORRELATED *and* COMPETENT**; `gbdtblend5` variance factor 0.9288 (best ever) |
+| — | endgame: designate finalists MANUALLY on Zindi (default = 2 best public, which is NOT what we want) · Phase-Two reproducibility/novelty writeup | | | **next, after iter24's LB** |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
 capacity* (extra model/channels/augmentation) and *robustness moves* (TTA) that don't transfer. A
@@ -344,6 +352,20 @@ submission. Lesson: don't probe inside the noise; hunt changes big enough to cle
    the 0.8908 winner's OOF (0.9811) was *lower* than the old champion's (0.9827).
 3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise. Only
    probe changes plausibly large enough to clear it; don't A/B inside the noise band.
+4. **An ensemble member must be decorrelated AND competent — and the two are not always in tension**
+   (iter22–24). ROCKET was decorrelated (ρ0.87) but −0.040 weak, and making it competent
+   (multivariate) re-correlated it to ρ0.91 → within *that* family, diversity was a symptom of
+   blindness. The GBDT breaks the tradeoff: **equally decorrelated (ρ0.8734) but only −0.011 weak**,
+   because its diversity comes from discarding temporal ORDER rather than from ignoring cross-band
+   structure. The lesson is not "decorrelation⊥strength" in general — it is **ask WHERE a member's
+   diversity comes from.** Diversity-by-blindness costs level; diversity-by-different-representation
+   does not.
+5. **The 0.019 seed lottery is a TRANSFORMER property, not a task property** (iter24). Seed
+   rank-correlation: Transformer **0.9511** vs GBDT **0.9795** — the GBDT's seed-independent error
+   component is ~2.4× smaller. Our whole "seed noise voids the ledger" finding is a statement about
+   the from-scratch Transformer under this data regime, not about the dataset. (n=1 seed pair vs 10,
+   so directional.) Consequence: a GBDT-containing blend is more *reproducible*, which is worth real
+   points on the private slice and in the Phase-Two rubric.
 
 **Do not re-propose (tried & failed, or rule-illegal):** GBDT+seq blend *(but see the caveat below —
 the blend was badly constructed, not proof that blending fails)* · `per_cell_detrend` and the
