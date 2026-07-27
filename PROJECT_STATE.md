@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-27 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643.** · **Loop state: iter24 RAN — the GBDT is the FIRST member ever to be DECORRELATED *and* COMPETENT. ρ(gbdt,xview)=0.8734 (<0.90 ✅) and ATC-F1 −0.0110 LB (within 0.02 ✅) — both pre-committed Branch-A conditions met. Equally decorrelated as ROCKET (mean ρ to cluster 0.849 vs 0.850) but ~4× less weak (−0.011 vs −0.040 LB), because its diversity comes from discarding temporal ORDER rather than from blindness to cross-band structure. `champion_gbdtblend5` has the lowest variance factor we have ever built (0.9288, vs archblend4's 0.9546). NEW FINDING: GBDT seed rank-corr 0.9795 vs Transformer 0.9511 → the 0.019 seed lottery is a TRANSFORMER property, not a task property. NEXT ACTION: upload `submission_champion_gbdtblend5.csv` (the one authorised submission), paste the LB. Architecture search closes either way → Phase-Two writeup (35% of the top-5 rubric).**
+- **Last updated:** 2026-07-27 · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643, now unchallenged.** · **Loop state: 🏁 ARCHITECTURE SEARCH CLOSED. iter24 ran and FAILED, significantly: `champion_gbdtblend5` = 0.879123, −0.0155 vs archblend4 on a strongly PAIRED comparison (4/5 shared members, identical 309 rows) → ≥2.5σ, not noise. The result INVERTS its own hypothesis: the GBDT was equally decorrelated as ROCKET (ρ 0.849 vs 0.850) but ~4× stronger (−0.011 vs −0.040 LB), and its blend cost NEARLY TWICE AS MUCH (−0.0155 vs −0.0090). Cross-model-class blending is now closed with n=2 across maximally different families. THE LAW: under a rank-only metric with a PINNED threshold, a decorrelated member's reordering near the cut costs more level than its independence buys back — only rank-twins (ρ>0.93, same class) pool without loss, and those buy variance, never level. METHODOLOGICAL LESSON: the screen said `g_gbdt votes=1/2 → HOLD` and was RIGHT; it was overridden by extending iter18's "read the matrix not the screen" rule beyond its derivation (within-class pooling, where members are equally competent). NEXT ACTION: Phase-Two reproducibility/novelty writeup — 35% of the top-5 rubric, does not exist yet, deadline 2026-08-16. Do NOT upload `champion_xview_gbdt` (½ weight on the member that just cost −0.0155 at ⅕).**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,22 +31,22 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: UPLOAD `submissions/submission_champion_gbdtblend5.csv` to Zindi and paste
-   the public LB.** iter24 ran on 2026-07-27 and cleared BOTH pre-committed Branch-A conditions
-   (ρ(gbdt,xview)=0.8734 < 0.90; gbdt ATC-F1 −0.0110 LB, within the ±0.02 bar), so the rule authorises
-   exactly one submission. Expect **≈0.892–0.897 — a public TIE with archblend4** (0.8946); by the
-   rocketblend5 precedent the ⅕-weight level cost is only ≈−0.002. **We are not buying a public
-   number**: gbdtblend5 is the lowest-variance artifact in the project (factor 0.9288 vs archblend4's
-   0.9546) built on the only decorrelated-AND-competent member we have ever found, and a submitted
-   score is *required* for finalist eligibility. Read: **≥0.895** → first level gain since the
-   GBDT→Transformer swap, it becomes finalist #1; **≈0.885–0.894** → tie, bank it as the diverse
-   finalist over rocketblend5 (better member: −0.011 vs −0.040, and seed-stabler); **<0.88** → the
-   member dragged it, keep archblend4 + rocketblend5. **Either way the architecture search is CLOSED
-   after this** → pivot to the Phase-Two reproducibility/novelty writeup (35% of the top-5 rubric),
-   which does not exist yet and is now the highest-value remaining work. Deadline 2026-08-16.
-   `champion_xview_gbdt` (2-way, ρ 0.8734, the only artifact to trip the tool's automatic "POOL IT")
-   is the optional second upload if a second finalist-eligible diverse artifact is wanted; the 5-way
-   is better on both variance factor and level exposure.
+3. **Current next action: the PHASE-TWO WRITEUP.** The architecture search is finished — iter24 closed
+   the last model class, and cross-class blending is closed with n=2. No modelling lane remains that
+   is sized to the ~0.010 measurement floor. **35% of the final score for a top-5 finish is the
+   reproducibility/novelty review, and that deliverable does not exist yet.** With the 2026-08-16
+   deadline this is now, by a wide margin, the highest-expected-value work available. Raw material to
+   REUSE (not rewrite): `README.md`, `JOURNEY.md`, `experiments/reproduce_champion.sh`, and the full
+   ledger in `experiments/LB_LOG.md`. Lead with what is genuinely novel and already evidenced in-repo:
+   the **measured 0.0191 seed variance** and the intellectual honesty of voiding nine of our own
+   verdicts with it; the **offline LB-predicting validator** (`tools/offline_validate.py` — ATC-F1
+   retro-fit to known-LB anchors, permutation-null gate, seed-noise floor) that let ~14 iterations be
+   screened at zero submission cost; the **rank-only metric proof** and the prevalence pin; the
+   **pinned-threshold ensemble law** from iter22/24; and the **adversarial-AUC 0.97 shift evidence**
+   proving the OOF↔LB gap is irreducible covariate shift, not leakage.
+   **Endgame task, do NOT leave to the last day:** designate the two finalists MANUALLY on Zindi. The
+   default is the two best *public* scores, which is wrong here — the public max (0.8955, and
+   c_meanmin 0.8986) are lucky single-seed draws. See §3 for the pair and the open question.
 
    **iter18 result — the architecture ensemble is MARGINAL.** Cross-architecture rank-corr
    ρ=0.9395 (≈ the 0.9511 seed baseline): the four tied transformer variants are the same model
@@ -214,6 +214,31 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   `seq.K: 2`, `seq.relative_time: true`, `seq.pos_encoding: learned`, `seq.consistency_lambda: 1.0`,
   all `seq.channels.*: false`, `seq.tta.enable: false`, `calibration.prevalence_target: 0.649`.
 - **Best public LB: 0.8955** (0.8780 → +0.0128 relative-time → 0.8908 → +0.0047 cross-view invariance).
+
+### 🏁 Final artifact board (all submitted; architecture search closed 2026-07-27)
+
+| artifact | public LB | what it is | seed luck? |
+|---|---|---|---|
+| `c_meanmin` | 0.898566 | min-pool variant, single seed | ⚠️ yes |
+| `seq_a_xview` | 0.8955 | champion, seed 42 | ⚠️ **known lucky draw** |
+| **`champion_archblend4`** | **0.894643** | 4 transformers, seed+arch pooled | ✅ **none — lowest variance** |
+| `champion_seedavg5` | 0.886530 | 5 champion seeds pooled | ✅ none |
+| `champion_rocketblend5` | 0.885661 | ⅕ ROCKET (ρ0.87 member) | ✅ none |
+| `champion_gbdtblend5` | 0.879123 | ⅕ GBDT | ✅ none |
+
+**Finalist #1 = `champion_archblend4`, settled.** Highest reliable public *and* the lowest-variance
+construction; nothing from iterations 18–24 challenged it.
+
+**Finalist #2 is the one open decision (due before 2026-08-16).** The hedge thesis that favoured
+`rocketblend5` — "buy a genuinely independent component to insure against a shared private-slice
+failure of the transformer cluster" — is **weakened by iter24**, which showed foreign members cost
+real level (−0.009 and −0.016) rather than trading level for variance. Candidates:
+- `champion_rocketblend5` (0.8857) — the only true diversity hedge; costs ≈−0.009 expected.
+- `champion_seedavg5` (0.8865) — no level cost, but largely redundant with archblend4 (a subset of
+  its pooling).
+- `c_meanmin` (0.8986) — highest public after the lucky champion, but ρ=0.9928 to xview → a rank-twin
+  that hedges **nothing**; its public edge is itself a single-seed draw.
+Decide near the deadline, not now; the reasoning above is the input.
 - **Target RECALIBRATED 2026-07-22.** Forum scores of 0.953 / "0.98+" were posted **before the
   25 Jun data reset**, i.e. earned on the **leaked** data — ignore them. The live competitive band is
   the "90s club" (thread dated 14 Jul, post-reset): roughly **0.90–0.95**. We sit just below the bar,
@@ -296,7 +321,7 @@ Round-04 Deep Research triaged in `gemini_loop/RESPONSE_04.md`. Rejected proven 
 | 13 | queued: focal loss γ=3 / FLSD-53, keep λ=1, refit δ | | | not yet run |
 | — | gated on iter11 PASS: fold-ensemble deletion → group-DRO → VH−VV → AUC surrogate | | | gated |
 | 18–23 | ensemble/model-class lanes — full results in `experiments/LB_LOG.md` | | 0.8946 / 0.8986 / 0.8857 | archblend4 = leading finalist; ROCKET decorrelated but −0.040 weak |
-| 24 | **GBDT as decorrelated member** (ρ 0.8734, ATC-F1 −0.0110 LB) | 0.98319 | **pending upload** | 🎯 **first member DECORRELATED *and* COMPETENT**; `gbdtblend5` variance factor 0.9288 (best ever) |
+| 24 | **GBDT as decorrelated member** (ρ 0.8734, ATC-F1 −0.0110 LB) → `champion_gbdtblend5` | 0.98319 | **0.879123** | ❌ **−0.0155 vs archblend4, PAIRED (4/5 shared members) → ≥2.5σ, significant.** Stronger member cost ~2× more than ROCKET's → cross-class blending CLOSED, n=2 |
 | — | endgame: designate finalists MANUALLY on Zindi (default = 2 best public, which is NOT what we want) · Phase-Two reproducibility/novelty writeup | | | **next, after iter24's LB** |
 
 **The design compass (refined through iter7):** it is not "never change the model" — it is *added
@@ -352,23 +377,38 @@ submission. Lesson: don't probe inside the noise; hunt changes big enough to cle
    the 0.8908 winner's OOF (0.9811) was *lower* than the old champion's (0.9827).
 3. **Measurement resolution is the binding constraint** — 309-row public LB, ±0.01 noise. Only
    probe changes plausibly large enough to clear it; don't A/B inside the noise band.
-4. **An ensemble member must be decorrelated AND competent — and the two are not always in tension**
-   (iter22–24). ROCKET was decorrelated (ρ0.87) but −0.040 weak, and making it competent
-   (multivariate) re-correlated it to ρ0.91 → within *that* family, diversity was a symptom of
-   blindness. The GBDT breaks the tradeoff: **equally decorrelated (ρ0.8734) but only −0.011 weak**,
-   because its diversity comes from discarding temporal ORDER rather than from ignoring cross-band
-   structure. The lesson is not "decorrelation⊥strength" in general — it is **ask WHERE a member's
-   diversity comes from.** Diversity-by-blindness costs level; diversity-by-different-representation
-   does not.
-5. **The 0.019 seed lottery is a TRANSFORMER property, not a task property** (iter24). Seed
+4. **🚨 CROSS-MODEL-CLASS BLENDING DOES NOT WORK HERE — closed with n=2 (iter22, iter24).** Both
+   foreign members we could build (random-kernel ROCKET, mature tree ensemble) reached ρ≈0.85
+   decorrelation, and **both dragged the blend below the pure-transformer pool**: rocketblend5 −0.0090,
+   gbdtblend5 −0.0155 vs `archblend4`. The iter22 repair ("decorrelated is necessary but not
+   sufficient — the member must also be competent") is itself **REFUTED**: the GBDT *was* competent
+   (−0.011 vs ROCKET's −0.040, equally decorrelated) and its blend cost **nearly twice as much**. The
+   correct, stronger statement:
+   > Under a rank-only metric with a **pinned threshold**, a decorrelated member's reordering of rows
+   > *near the cut* costs more level than its independence buys back. Only near-rank-twins (ρ>0.93,
+   > i.e. the same model class) pool without loss — and those buy variance reduction, never level.
+   Corollary: "blend level ≈ weighted mean of member levels" is **false** under rank-averaging; do not
+   size a member's weight from that arithmetic (it is what mispredicted iter24 by 0.013).
+5. **Do not extend a rule past its derivation.** iter18's *"for ensemble calls read the correlation
+   matrix, not the screen"* was derived for pooling **within** the transformer class, where all
+   members are equally competent and decorrelation is the only free variable. iter24 applied it to a
+   blend containing a **weaker foreign member** and overrode a correct `votes=1/2 → HOLD`. Where member
+   competence is the deciding variable, the screen is the right instrument. Related: **ATC-F1's
+   MAGNITUDE is unreliable (~3× overstated, iter19)** — trust its sign only. A gate phrased as
+   "ATC-F1 within 0.02 LB" silently trusts the magnitude; corrected by 3×, iter24's −0.011 reading is
+   ≈−0.033 ≈ ROCKET's −0.040, which predicts the observed drag exactly.
+6. **The 0.019 seed lottery is a TRANSFORMER property, not a task property** (iter24). Seed
    rank-correlation: Transformer **0.9511** vs GBDT **0.9795** — the GBDT's seed-independent error
    component is ~2.4× smaller. Our whole "seed noise voids the ledger" finding is a statement about
    the from-scratch Transformer under this data regime, not about the dataset. (n=1 seed pair vs 10,
-   so directional.) Consequence: a GBDT-containing blend is more *reproducible*, which is worth real
-   points on the private slice and in the Phase-Two rubric.
+   so directional.) This survives iter24's failure — it is a property of the *member*, measured
+   independently of the blend — and is worth stating in the Phase-Two writeup.
 
-**Do not re-propose (tried & failed, or rule-illegal):** GBDT+seq blend *(but see the caveat below —
-the blend was badly constructed, not proof that blending fails)* · `per_cell_detrend` and the
+**Do not re-propose (tried & failed, or rule-illegal):** **GBDT+seq blending — now CLOSED PROPERLY
+(iter24, LB 0.879123, −0.0155 paired), superseding the old "badly constructed, not proof" caveat;
+the iter2 blend WAS badly constructed, and the clean re-measurement with a pinned prevalence, a
+two-level rank-blend and seed-pooled members still lost** · cross-class blending generally (ROCKET
+iter22 −0.0090, GBDT iter24 −0.0155) · `per_cell_detrend` and the
 additive-channel family (`deltas`/`indices`/`rank`, now low-prior) · K>2 augmentation · BBSE/EM
 prior estimation · WIF / fixed-threshold water features · temperature scaling ·
 importance-weighting / DANN for TRAINING (ESS collapse @ adversarial AUC 0.99) · OOF meta-stacking ·

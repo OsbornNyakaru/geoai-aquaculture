@@ -351,7 +351,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 21 | 2026-07-24 | **INSTANCE-EXPANSION** — per-epoch view resampling (each masked sub-window an independent example) | *screen VOID* | 0.649 | **not submitted** | ❌ inert (OOF↑ like k4) |
 | 22 | 2026-07-24 | **ROCKET member** — different model class (random conv kernels + linear); go/no-go rank-corr vs champion | submission_champion_rocketblend5.csv | 0.649 | **0.885661** | 🎯 first ρ<0.90 member; blend tied cluster (weak member) |
 | 23 | 2026-07-24 | **MULTIVARIATE ROCKET** — kernels span random band SUBSETS (cross-band signature) | *screen VOID→exhausted* | 0.649 | **not submitted** | ❌ strength⊥diversity tradeoff |
-| 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **pending upload** | 🎯 **decorrelated AND competent** |
+| 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **0.879123** | ❌ **−0.0155 vs archblend4 (SIGNIFICANT, paired); cross-class blending CLOSED** |
 
 ---
 
@@ -645,6 +645,74 @@ and a submitted score is *required* for finalist eligibility.
 
 **Decision: upload `submission_champion_gbdtblend5.csv`.** The one submission the pre-committed rule
 authorises. This is the final architecture screen; whatever it returns, the search is closed.
+
+### gbdtblend5 uploaded → LB 0.879123. The prediction was WRONG and the screen was RIGHT.
+
+| artifact | public LB | vs archblend4 |
+|---|---|---|
+| `champion_archblend4` (4 transformers) | **0.894643** | — |
+| `champion_seedavg5` | 0.886530 | −0.0081 |
+| `champion_rocketblend5` (⅕ ROCKET, −0.040 member) | 0.885661 | −0.0090 |
+| **`champion_gbdtblend5` (⅕ GBDT, −0.011 member)** | **0.879123** | **−0.0155** |
+
+**Predicted 0.892–0.897, measured 0.8791 — the forecast missed by ~0.013.** And unlike most deltas
+in this ledger, **this one is significant**: archblend4 and gbdtblend5 share 4 of their 5 members at
+⅘ weight and were scored on the identical 309 public rows, so this is a strongly *paired* comparison
+(paired SE ≈0.006 for merely ρ0.9 variants; these are far more correlated than that). −0.0155 is
+≥2.5σ. This is not seed noise.
+
+### The result inverts the hypothesis it was built to test
+
+| blend | member weakness | member ρ to cluster | blend cost vs archblend4 |
+|---|---|---|---|
+| rocketblend5 | −0.040 LB | 0.850 | −0.0090 |
+| **gbdtblend5** | **−0.011 LB** | 0.849 | **−0.0155** |
+
+**The *stronger*, equally-decorrelated member cost NEARLY TWICE AS MUCH.** The linear model that
+justified this submission — "blend level ≈ weighted mean of member levels, so ⅕·(−0.011) ≈ −0.002" —
+is refuted outright. Level does not compose linearly under rank-averaging with a pinned threshold:
+`TargetF1` is scored at a fixed 0.649 cut, so what matters is not a member's average quality but how
+much it **reorders rows near the cut** — and a genuinely decorrelated member reshuffles exactly there.
+Decorrelation is not a free variance reduction; at a pinned threshold it is itself the damage.
+
+Note the coincidence worth flagging: **0.8791 ≈ the historical GBDT standalone anchor (0.8780).** A
+⅘-transformer blend landed at its ⅕-weight member's own level. Whatever the mechanism, the GBDT
+influenced the final ordering far out of proportion to its nominal weight.
+
+### 🚨 The methodological lesson — the screen was right and I overrode it
+
+The offline screen returned **`g_gbdt  votes=1/2 → HOLD`**. I set that aside by invoking the iter18
+rule *"read the correlation matrix, not the screen, for ensemble calls."* **That rule was derived for
+pooling WITHIN the transformer class**, where every member is equally competent and the only question
+is decorrelation. Extending it to a blend containing a **weaker foreign member** was the error: there,
+member competence is exactly what determines the outcome, and the screen is the instrument that
+measures it. The 1/2 vote was real information.
+
+Compounding it: the Branch-A gate ("ATC-F1 within ~0.02 LB of champion") leaned on an estimator whose
+**magnitude is known-unreliable** — iter19 already established ATC-F1 is directionally right but ~3×
+overstated. A −0.011 ATC-F1 reading is not evidence of a −0.011 model. Corrected by that factor it is
+≈−0.033, i.e. essentially ROCKET's −0.040, which predicts precisely the drag we observed.
+
+**Cost: 1 submission of ~79. Cheap, and it bought a definitive negative.**
+
+### What is now established (n=2, across maximally different model families)
+
+**Cross-model-class blending does not work on this task, at any member strength.** Two independent
+foreign classes — random-kernel ROCKET and a mature tree ensemble — both at ρ≈0.85 decorrelation,
+both dragged the blend below the pure-transformer pool. The iter22 repair ("decorrelation is
+necessary but not sufficient; the member must also be competent") is itself now refuted: we found a
+competent decorrelated member and it did *worse*. The correct statement is stronger and simpler:
+
+> **Under a rank-only metric with a pinned threshold, a decorrelated member's reordering near the cut
+> costs more level than its independence buys back. Only members that are near rank-twins (ρ>0.93 —
+> i.e. same model class) can be pooled without loss, and those buy variance reduction, never level.**
+
+That closes the ensemble frontier completely, and with it the architecture search — every model class
+has now been tested. `champion_archblend4` (0.894643) stands as the leading finalist, unchallenged by
+anything built in iterations 18–24.
+
+**`champion_xview_gbdt` must NOT be uploaded.** It puts ½ weight on the member that just cost −0.0155
+at ⅕ weight; the extrapolation is strongly negative and there is nothing left to learn from it.
 
 ## iter24 — GBDT as the decorrelated member: the last untested model class (staged)
 
