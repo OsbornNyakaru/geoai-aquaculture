@@ -1,8 +1,9 @@
 # RESEARCH_11 — round-11 synthesis + implementation plan (2026-07-27)
 
-Eight parallel Opus-5 research agents (Google Scholar / arXiv / competition forensics). Six reported
-at time of writing; SAR-physics and tabular-foundation-model agents still running. This file is the
-**triaged synthesis and the executable plan**, not the raw reports.
+Eight parallel Opus-5 research agents (Google Scholar / arXiv / competition forensics). **All eight
+reported.** This file is the **triaged synthesis and the executable plan**, not the raw reports.
+Every load-bearing quantitative claim below was re-derived or re-verified against our own code before
+being written down — three agent claims failed that check and are marked ❌.
 
 > **Framing correction, stated once.** The target of "0.98 LB" is the **pre-reset, leaked-data**
 > number (forum posts of 0.953 / "0.98+" predate the 25 Jun reset). It is not on this board. The live
@@ -91,7 +92,16 @@ is an entirely ordinary amount of reshuffling for a ρ≈0.85 member at ⅕ weig
 
 Ranked by how many independent agents reached them and how cheap they are to act on.
 
-### 2.1 ✅✅✅✅ The CV lies because of **REGIME** mismatch, not just period mismatch (4 agents)
+### 2.1 ✅✅✅✅✅✅ The CV lies because of **REGIME** mismatch, not just period mismatch (6 of 8 agents)
+
+**This is the single most agreed-upon finding of the entire round.** Six independent agents, from six
+different literatures, converged on it unprompted. Two said it outright as their headline:
+
+> *"The highest-expected-value item in this report is not TabPFN. It is **window matching** — making
+> your train rows' observation process identical to your test rows'. If you take one thing, take that."*
+> — tabular-foundation-model agent
+>
+> *"[Window matching] may matter more than any individual feature in this report."* — SAR-physics agent
 
 Our CV folds see **12 full months**; test rows see **4–6 consecutive months** plus per-band cloud
 holes. **Our CV is therefore scoring a different, easier task** — which explains both the 0.975→0.89
@@ -191,6 +201,71 @@ rank-average, never probability-average.**
 
 ---
 
+### 2.6 ✅ Why Presto failed — and the one lane it does NOT close
+
+We recorded Presto's death (adversarial AUC 0.97 on frozen embeddings) as closing "the foundation-model
+frontier." The mechanism is sharper than that, and the conclusion is narrower:
+
+> **Reconstruction objectives are *required* to retain nuisance; label-conditioned predictive
+> objectives are not.** Presto is masked-reconstruction SSL — its loss rewards retaining every bit that
+> helps reconstruct masked timesteps, and seasonal phase is enormously reconstruction-relevant. Nothing
+> in a reconstruction loss penalises keeping nuisance. **TabPFN is meta-trained on p(y | x, D_context)**:
+> a query row's representation is computed *conditional on the labelled context*, so anything not
+> useful for predicting y is attenuated by the objective. That is a discriminative bottleneck a
+> reconstruction encoder does not have.
+
+So the Presto negative is evidence about **SSL encoders** (Prithvi, SatMAE, Clay will all behave the
+same), **not** about tabular foundation models. There is a **zero-submission replication** that settles
+it on our data: extract TabPFN embeddings, run the adversarial train-vs-test AUC on them — the exact
+experiment shape that killed Presto. ≈0.97 ⇒ the mechanism is wrong here, close the lane. Materially
+lower ⇒ confirmed.
+
+**But two results bound how much this can pay:**
+- **Zhao et al. (ICML 2019) prove an impossibility:** when marginal *label* distributions differ across
+  domains, minimising source error *while forcing an invariant representation* **increases** target
+  error. We have 40%→65% label shift. **Aligning p(x) is provably the wrong objective for us.** Our
+  prevalence pin is the theoretically correct response to the label component; "normalise the shift" is
+  not, and this retroactively justifies our DANN/CORAL failures as more than bad luck.
+- **Honest arithmetic on TabPFN:** Nature's "+0.187" is a *normalised* score, not raw AUC. Converted,
+  the credible expectation over a tuned GBDT at n≈1,800 is **+0.005 to +0.02 in-distribution** — the
+  same order as our 0.019 seed floor. **Do not fund it expecting a new champion.**
+
+**Where it does fit:** TabPFN is the first candidate that would pass the *corrected* member gate from
+§2.5. Predicted standalone 0.87–0.895 puts it within ~1σ_seed of the champion — the **level-gap** test
+that ROCKET (−0.040) and GBDT (−0.011→worse) both failed. Its inductive bias comes from a synthetic
+causal prior rather than from our train period, which is the only thing in this whole search not fitted
+to the shifted distribution. Conditional GO, ~2 submissions, gated on the embedding probe above.
+
+### 2.7 📉 The ceiling — why 0.98 is not merely gone, but structurally unreachable
+
+The pond-mapping literature stands on three legs. **Two are amputated for us and the third is
+rule-barred:**
+
+| leg | what it buys | available to us? |
+|---|---|---|
+| pixel-wise temporal permanence (median VH) | the water mask | ✅ **the only leg we have — and we already found it** |
+| **shape**: compactness, area, perimeter, LSI, dike detection, GLCM texture | ***the entire pond-vs-natural-water separation*** | ❌ lat/lon stripped, isolated pixels, no neighbourhood |
+| DEM / OSM / JRC surface-water overlays | removes lakes, reservoirs, rivers | ❌ external data, rule-barred |
+
+Ottinger (2022), verbatim: *"The compact shapes … of aquaculture ponds are a characteristic and
+**defining** feature for the distinction between natural standing waters and managed aquaculture ponds."*
+And Phan et al., ground-truthed: at ~10 days after sowing, **flooded rice reads VV −13 dB, VH −22 dB —
+i.e. open-water values.** At a single date our positives and our hardest negatives are radiometrically
+identical; only the joint over months separates them.
+
+**Published 89–95% overall accuracies are therefore not a target we can hit** — they are earned with
+the two legs we don't have. This is an independent, physics-based confirmation that the 0.98 figure
+belonged to the leaked data, and it is strong Phase-D writeup material.
+
+**Geography caveat, stated honestly:** this literature is overwhelmingly coastal East/SE Asian
+*intensive* aquaculture (Mekong, Pearl, Red River deltas, Jiangsu). The FAO/ITU framing suggests our
+data may be African smallholder — smaller ponds, less intensive feeding, more rain-fed drawdown. That
+**weakens the eutrophication/red-edge signal (B5/B4)** and weakens the "permanently full" assumption.
+No quantitative African pond-mapping study was found to calibrate against. Treat B5/B4's effect size as
+unvalidated for our setting.
+
+---
+
 ## 3. ⚠️ RULE RISK — address before the code review (35% of the top-5 score)
 
 Forum thread 33912: participants state the rules say threshold tuning is **strictly forbidden** and
@@ -225,6 +300,8 @@ Nothing below Phase A is trustworthy until Phase A lands. Every item is free.
 | A4 | **Estimator admissibility audit.** Any offline estimator must be invariant to a strictly-increasing warp of the scores; feed it PIT ranks, never raw scores. | Confirms ATC-F1 admissible; auto-rejects future confidence-based estimators |
 | A5 | **AV-holdout.** Sort train rows by OOF `p_test` from A2; top 25–30% (~500 rows) become a held-out validation set, stratified to the pinned prevalence. | From here report **3 numbers** per experiment: masked-CV, AV-holdout, adversarial AUC |
 | A6 | **Time-consistency screen** (Deotte, IEEE-CIS 1st): single-feature models trained on months 1–6, validated on 7–12, and reverse. Delete features that flip sign or fall to ~0.5. | Catches period-memorizers that A2 misses — a *different* filter |
+| A7 | **n-bias audit.** Any statistic whose *expectation* depends on observation count is a train/test shift **we are manufacturing ourselves** on top of the designed one. Safe (Class A): mean, median, interior quantiles, std, **any fraction/proportion** — these are fixed-degree U-statistics, exactly unbiased at every n. Poison (Class B): **min, max, range, p10/p90 at n=4–6, all run-lengths, all counts, autocorrelations, argmax/argmin**. Verified by Monte Carlo: L-moments flat to 3 dp across n=4→12 while **`max` drifts +49%** and `sd` +12%. | Three agents flagged this independently. Replace Class-B stats with **L-moments** (λ₁,λ₂ are in physical units and *monotone in amplitude* — this is NOT the rank transform that killed us) |
+| A8 | **TabPFN-embedding probe** (§2.6): extract embeddings, run adversarial train-vs-test AUC — the exact experiment that killed Presto. | ≈0.97 ⇒ close the tabular-foundation-model lane; materially lower ⇒ Phase C3 unlocks |
 
 ### Phase B — The two cheap, decisive submissions (2 submissions, ~1 day)
 
@@ -239,20 +316,45 @@ Nothing below Phase A is trustworthy until Phase A lands. Every item is free.
 lane with the only documented effect size (+3.9% AUC, Uber). Build the battery *first*, then run the
 2-D drop rule (§2.2) over it:
 
-- *Build (shift-survivors):* cross-band ratios computed **within a single month** then aggregated
-  (NDWI, MNDWI, NDVI, NDMI, VH/VV, VH−VV) — ratios cancel multiplicative atmospheric/illumination
-  drift, which is `sdv`'s "prefer relative/ratio-style features"; **window-relative** order statistics
-  (min/max/median/IQR/p10/p90/std over the observed window only) — order-invariant, so immune to the
-  unresolved calendar-alignment question (thread 34056, still unanswered); **within-row** rank/z-score
-  of each band against that row's own observed months; run-length and persistence features (fraction
-  of observed months with NDWI>0, longest wet run) — the pond-vs-paddy physical discriminator;
-  cross-band **correlations** over the window (dimensionless).
+- *Build (shift-survivors), in priority order:*
+  1. **`median_t(VH_dB)`** — the literature's #1 discriminator, and it is *our own* primary signal
+     formalized. Ottinger explicitly chooses **median over mean** because harvest drain-downs and wind
+     are outliers that drag the mean, and **VH over VV** because VH's histogram is cleanly bimodal.
+     **We currently pool with masked-MEAN.** Switching to median is capacity-neutral — our permitted class.
+  2. **`max_t[(VH−VV)(t+1) − (VH−VV)(t)]`** — max month-to-month rise in the cross-pol ratio. Rice
+     sweeps VH/VV through a **10 dB** range across its cycle (−13→−3 dB); ponds never sweep (stable
+     −3 to −6 dB). Calendar-free, and Phan et al. **explicitly endorse this statistic for truncated
+     windows**, which is our exact regime. A *negative-class* (rice) detector, so plausibly decorrelated.
+  3. **`WF = fraction of observed months with VH < τ`** (τ from Otsu on our own pooled histogram, never
+     hardcoded) — a **ratio**, therefore n-unbiased and comparable across train n=12 and test n=4–6,
+     which almost nothing else is.
+  4. **`median_t(B5/B4)`** (2BDA / NDCI) — see the correction below.
+- *⚠️ CORRECTION to an earlier draft of this plan, and to the forum advice it came from.* I originally
+  listed NDWI/MNDWI/AWEI in this battery on the strength of `chiwai`'s forum post. **The SAR-physics
+  agent refuted that mechanistically and I verified the algebra numerically:**
+
+  | index | verdict |
+  |---|---|
+  | **SDWI** = `ln(10·V·H) − 8` | **exactly affine in (VV_dB + VH_dB)** — verified to 1e-15. Zero new information. |
+  | **AWEI** (both forms) | exactly **linear** in reflectance. Zero new information. |
+  | **EVI** | over water all reflectances <0.1 ⇒ denominator ≈ 1, so EVI ≈ `2.5(NIR−Red)` to within ~10% — verified. **This mechanistically explains our −0.075 WIF/EVI loss:** we paid a full channel for a near-linear map. |
+  | **NDWI / MNDWI** | non-linear, **but ill-conditioned exactly where our positives live.** Over water SWIR ≈ 0.00–0.02, so it is 0/0-conditioned and dominated by atmospheric-correction residual — the thing that shifts. Verified: a 0.007 reflectance wobble moves MNDWI **0.667 → 0.887 (+33%)**. |
+  | **`B5/B4`** | ✅ non-linear, **well-conditioned** (both bands 0.02–0.10 over water), aquaculture-*specific* (eutrophic managed ponds show a red-edge bump at ~705 nm; clear natural water does not), and atmospherically self-cancelling (665/705 nm are near-common-mode). Verified: pond 1.33 vs clear water 0.75. |
+
+  So `sdv`'s "prefer relative/ratio features" is right in spirit but **NDWI/MNDWI are the wrong ratios
+  for this problem.** `B5/B4` is the right one — and it is the one discriminator that separates *pond
+  water from natural water* without shape, which is what the whole SAR literature outsources to geometry.
 - *Do NOT build:* raw absolute reflectance per calendar month; anything keyed to a month index;
   **whole-year features (12-month amplitude, annual phenology, Fourier fits)** — computable in train,
-  **not computable in test**, and almost certainly a major source of the 0.975 CV.
-- *Nuance that reconciles this with our own law:* `sdv`'s "relative over absolute" is about **cross-band
+  **not computable in test**, and almost certainly a major source of the 0.975 CV; **drain-spike
+  detectors** (the dry period is calendar-locked to a regional culture calendar, the spike is only
+  ~2–5 dB and only in wind-contaminated VV, and monthly compositing largely averages it away).
+- *Nuance that reconciles this with our own law:* "relative over absolute" here means **cross-band
   ratios within a month**, NOT within-series ranking across months. Our `c_rank` collapse was the
   latter. These are compatible — do not conflate them.
+- *One more cheap capacity-reducing test:* **delete VV entirely.** VV is the wind-sensitive channel
+  (Dongting: VV threshold drifts 2.6 dB/yr vs VH's 2.1; VV lost ~1 point of OA to wind). Our law
+  predicts deleting a shifted channel helps. Costs nothing to screen.
 
 **C2 — Optimize the two columns independently** (§1a). Serve `TargetF1` (0.6, precision@k, local at the
 cut) and `TargetRAUC` (0.4, global ranking) from different models, chosen by masked-CV + AV-holdout.
