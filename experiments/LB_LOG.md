@@ -355,6 +355,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 
 | 25 | 2026-07-27 | **Phase-A shift audit** (`tools/shift_audit.py`) — indicator probe + 2-D band screen | *local, no cloud run* | — | **n/a — 0 subs** | ✅ 1 lane CLOSED, 1 lane OPENED |
 | 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **0.884217** | ❌ −0.0113 paired vs the seed-42 champion. **The screen was wrong in SIGN.** Deletion lane CLOSED; ATC-F1 exposed as within-family only |
+| 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
 
 ---
 
@@ -472,6 +473,61 @@ first level gain since the GBDT→Transformer swap; **0.890–0.907** = unresolv
 **Note on `archblend4`.** Its 4 members are unchanged, so the artifact is identical to the 0.894643
 upload — **do not re-submit it.** The printed "mean pairwise ρ = 0.9345" is contaminated by the two
 `--diag-extra` columns; archblend4's own 4-member mean is **0.9524**.
+
+### iter27 LB = 0.889686 — compliance cost ≈ 0.006, i.e. nothing
+
+**The single most important result in the project's endgame.** We removed a rules violation
+(§ the prevalence pin) that had been credited with ≈+0.07, and paid **−0.0058**.
+
+```
+pinned  seq_a_xview (seed 42)   0.895500
+LEGAL   seq_a_xview (seed 42)   0.889686
+                                --------
+paired delta                    -0.005814     PAIRED: same config, same seed, same folds,
+                                              ONLY the operating point differs.
+```
+
+Under our own measurement protocol (RESEARCH_07 §5b) a paired A/B is **SUGGESTIVE at ≥0.006**
+and CONFIDENT at ≥0.012. **0.0058 does not even reach suggestive** — it is indistinguishable
+from zero at our resolution.
+
+**Better framing still:** our *reliable* pinned level was **0.8865** (5-seed pooled). The legal
+**single-seed** champion scores **0.8897**, i.e. above it. The compliance cost is not merely
+small, it is lost inside seed noise.
+
+**Why the pin was worthless, quantified.** The free `compliance_diff` predicted the answer as a
+function of one unknown — the precision of the 104 rows the pin added. Inverting the observed
+delta on that sweep:
+
+```
+observed d(score)                          -0.005814
+implied precision of the 104 flipped rows   0.492
+```
+
+**The pin was adding 104 positives that were ~49% correct — coin flips.** It bought volume, not
+accuracy. This is exactly the prediction we committed in advance ("marginal rows at a
+near-optimal cut are close to coin flips, so 0.50–0.65 is the realistic band"), landing at the
+optimistic edge of it. First prediction in three that was right, and it was right because it was
+derived from the F1 algebra rather than from an estimator.
+
+**Where the ≈+0.07 came from.** Iteration 02, on the **superseded GBDT**, where the model's own
+probabilities were badly scaled and the prior sweep was doing real work. The transformer
+calibrates itself to a 0.5476 positive rate unaided; the extra 0.10 of prevalence the pin forced
+on top was noise. **We carried a GBDT-era constant for 25 iterations without re-measuring it.**
+
+**⚠️ CONSEQUENCE FOR THE ENDGAME — every artifact on the finalist board is now unusable.** All
+six previously submitted artifacts (`c_meanmin`, `seq_a_xview` 0.8955, `champion_archblend4`,
+`champion_seedavg5`, `champion_rocketblend5`, `champion_gbdtblend5`) were produced by the
+rules-violating path. **None of them can be designated.** The legal board starts here, with
+exactly one entry:
+
+| legal artifact | LB | note |
+|---|---|---|
+| `seq_a_xview` (legal, seed 42) | **0.889686** | the only scored legal artifact we have |
+
+Rebuilding a legal `champion_archblend4` is now the top priority, since it was finalist #1.
+
+---
 
 ### iter26 LB = 0.884217 — the screen was WRONG IN SIGN, and that is the finding
 

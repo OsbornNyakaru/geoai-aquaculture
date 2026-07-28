@@ -321,9 +321,37 @@ One honest note on magnitude: the ≈+0.07 attributed to the pin was measured in
 superseded GBDT model class**. Its value on the current transformer is **unmeasured**, and the true
 cost of compliance may be materially smaller.
 
-**Status:** disclosed here; remediation (calibration fit on training folds only, then a literal 0.5
-cut) is the top item on our work list, and we have asked the organizers for clarification on forum
-thread 33912.
+**Status: FIXED, and it cost us almost nothing.** `calibration.compliance_mode: legal` is now the
+default and the only shippable path: Platt calibration fit on training out-of-fold predictions only,
+a literal 0.5 cut, and genuine calibrated probabilities in both columns. Platt rather than isotonic
+because it is strictly monotone — the ranking is preserved exactly, so ROC-AUC is bit-identical while
+the output becomes a real probability. The realized positive rate is **reported, never targeted**;
+`calibrate_legal()` deliberately takes no config object, so no prevalence constant can enter it.
+
+Measured on the leaderboard, same config, same seed, same folds, only the operating point changed:
+
+| | public LB |
+|---|---|
+| pinned (rules-violating) | 0.895500 |
+| **legal** | **0.889686** |
+| paired delta | **−0.0058** |
+
+Our own measurement protocol calls a paired A/B *suggestive* only at ≥0.006. **The cost of
+compliance does not reach that threshold** — and our reliable pinned level was 0.8865, so the legal
+single-seed model scores *above* the level the illegal pipeline actually sustained.
+
+**Why the violation was worth so little.** The cost depends entirely on the precision of the rows the
+pin added. Inverting the observed delta on that curve gives **0.492** — the pin was adding 104
+positives that were about **49% correct, i.e. coin flips.** It bought volume, not accuracy. The
+≈+0.07 it was once credited with was measured in iteration 02 on the **superseded GBDT**, whose raw
+probabilities were badly scaled; the transformer calibrates itself to a 0.548 positive rate unaided.
+**We carried a GBDT-era constant for 25 iterations without re-measuring it** — which is the same
+methodological error as §4, in a different guise.
+
+**A reviewer can verify the fix from the submission file alone**, without running our code:
+`TargetF1 == (TargetRAUC >= 0.5)` on every row. That is the entire compliance claim.
+
+We have also asked the organizers for clarification on forum thread 33912.
 
 **Reproducibility caveat, stated plainly.** A single seed (42) drives all RNGs and per-`(row, view)`
 seeds are derived deterministically, so the masking augmentation is exactly reproducible. However,
