@@ -357,6 +357,33 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **0.884217** | ❌ −0.0113 paired vs the seed-42 champion. **The screen was wrong in SIGN.** Deletion lane CLOSED; ATC-F1 exposed as within-family only |
 | 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
 | 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
+| 29 | 2026-07-28 | **BIGGER LEGAL POOL** — archblend6 = archblend4 + `seq_a_k4` + `seq_a_base` (the 2 weakest members) | submission_champion_archblend6.csv | — | **0.894899** | ❌ **−0.0047 paired vs archblend4 (0.899643)**, shares 4/6 members. Adding the 2 weakest members DRAGGED the blend. "Weak members become assets under a literal cut" **REFUTED** — the level-gap gate SURVIVES the legal regime. **archblend4 stays finalist #1; aggressive pooling CLOSED** |
+
+---
+
+## iter29 — a bigger pool does NOT win: the level-gap gate survives the legal cut
+
+`archblend6` (archblend4 + the two weakest same-class members, `seq_a_k4` and `seq_a_base`) scored
+**0.894899 vs archblend4's 0.899643 → −0.0047, strongly paired** (4 of 6 members shared, identical
+309 public rows). Below our 0.006 "suggestive" line in magnitude, but the direction is unambiguous and
+it is the *known-weakest* members that were added.
+
+**The hypothesis is refuted.** iter29 tested whether removing the pin turned weak members into
+assets — the idea being that a literal 0.5 cut also averages *calibration* (where members disagree),
+so a weak-but-differently-calibrated member might now help. It did not: the two weak members
+(pinned-era 0.8665 / 0.8780, i.e. −0.029 / −0.018 in level) still dragged the pool down. **The
+"weak members drag" gate survives the regime change.**
+
+**What this does and does NOT overturn.** It does NOT touch iter28's real win: legal pooling of the
+FOUR tied-strong members buys +0.0100 of level through calibration diversity. That stands. iter29
+just says the diversity dividend is only cashable among members of *comparable competence* — you
+cannot extend it downward to incompetent members. **Refined law: legal pooling buys level via
+calibration diversity, but only across members within ~one seed-swing of each other in level.**
+
+**Consequence: `champion_archblend4` (0.899643) is final for the same-class ensemble lane, and
+aggressive within-class pooling is closed.** The only pooling gain left would come from a member that
+is *both* competent *and* genuinely different — i.e. a different model class that isn't weak. That is
+exactly the CatBoost/tree question, which the pin-era rejection never tested legally (see UPDATE_13).
 
 ---
 
