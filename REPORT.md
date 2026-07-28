@@ -9,7 +9,9 @@
 We classify isolated 10 m ground cells as *managed aquaculture pond* from a 12-month × 12-band
 Sentinel-1/Sentinel-2 time series, under a **deliberately constructed temporal covariate shift**:
 training rows are fully observed, test rows expose only a consecutive 4–6 month window from a
-different period and region.
+different time period. (The organizers state the *temporal* shift explicitly. Earlier drafts of this
+report also asserted a *regional* shift; we could not source that statement and have withdrawn it —
+the shift we can evidence is temporal plus the observation-window difference.)
 
 The submitted model is a **from-scratch temporal Transformer** — 2 layers, 4 heads, ~64-dim, trained
 on masking-augmented views of each training row, with a cross-view invariance penalty and an
