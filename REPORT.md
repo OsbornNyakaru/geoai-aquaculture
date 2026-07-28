@@ -258,13 +258,19 @@ a submission or a screened experiment, and each is reproducible from `experiment
 | **Seed averaging as a climber** | ➖ variance only | lands *at* the member mean (predicted 0.886, got 0.88653) |
 | **Temperature scaling / TTA / focal loss** | ➖ invisible or inside noise | see the rank-only argument below |
 
-**A law we derived from the blending failures.** Under a metric scored at a **pinned threshold**, the
-standard error-ambiguity decomposition that justifies ensemble diversity **does not apply** — there
-is no ambiguity decomposition for 0-1 loss. The cut acts as a filter that selects specifically for
-*bad* diversity: a decorrelated member's disagreements are concentrated near the decision boundary,
-which is exactly where rows flip. Our two foreign-member blends lost **monotonically in the member's
-own level deficit**, not in its correlation. **Gate ensemble members on level gap, not on
-decorrelation** — and always rank-average, never probability-average.
+**What the blending failures do and do not show.** Under a metric scored at a pinned threshold, the
+error-ambiguity decomposition that justifies ensemble diversity **does not apply** — there is no such
+decomposition for 0-1 loss (Brown & Kuncheva, MCS 2010, distinguish "good" from "bad" diversity for
+exactly this reason). Our two foreign-member blends lost **monotonically in the member's own level
+deficit**, so we gate members on **level gap, not decorrelation**, and always rank-average rather
+than probability-average.
+
+**We flag a limitation in our own evidence.** Both members were also *weaker* (−0.040 and −0.011),
+so member strength and member diversity are **perfectly confounded at n=2**. What we demonstrated is
+that a weak member hurts; the stronger claim that *diversity itself* is harmful is **not identified**
+by our experiment, and an earlier draft of this report overstated it. Untested and plausible: a
+diverse member could hurt the F1 **set** while helping the AUC **ranking** — we have never measured
+the two columns separately.
 
 **The metric is rank-only — with one important scope condition.** After the prevalence pin fixes the
 predicted-positive count, `F1 = 2·TP/(P̂+P)` is monotone in precision@k, a functional of the test
@@ -278,18 +284,46 @@ decision, which we did not appreciate until late (§7).
 
 ## 7. ⚠️ Limitations, and a rule question we raise against ourselves
 
-**The prevalence pin.** Our operating point applies a monotone logit shift so the realized test
-positive rate lands at 0.649. We have documented this as *prevalence correction* (allowed) rather
-than *threshold tuning* (forbidden), on the grounds that the cut stays literally at 0.5 and the
-ranking column is untouched. **We want to flag that this reading is defensible but untested.** Forum
-thread 33912 records participants stating the rules forbid threshold tuning outright; the organizers
-have not responded, and at least two participants have said they are self-limiting because of it.
+**🔴 The prevalence pin is a rules violation. We are reporting it against ourselves.**
 
-We think the honest position is that our construction is *functionally* equivalent to choosing a
-threshold, even though it is implemented as a prevalence correction, and we would rather say so than
-have a reviewer find it. The defensible reconstruction — class-weighted training so a literal 0.5
-lands near the target prevalence, plus calibration fit on **training data only** — is specified but
-**not yet implemented**, and it is the top item on our remaining work list.
+We read the rules page directly on 2026-07-28. It states, verbatim:
+
+> *"Setting a probability threshold is strictly forbidden. Your binary target should be based on the
+> default threshold of 0.5."* … *"do not set thresholds (or round your probabilities) to improve your
+> place on the leaderboard."* … *"Zindi will need the raw probabilities. This will allow the clients
+> to set thresholds to their own needs."*
+
+Earlier revisions of this repo argued our construction was *prevalence correction* (allowed) rather
+than *threshold tuning* (forbidden), because the cut stays literally at 0.5. **That argument does not
+survive reading the rule, and we withdraw it.** Two distinct problems:
+
+**(a) `TargetF1`.** `src/calibration.py:50-66` computes `thresh = quantile(logit(p), 1 − π̂)` and
+shifts by `−thresh` so that threshold lands at 0.5. Our own docstring says it: *"hitting an EXACT
+target prevalence **is a threshold on the logits**."* The literal 0.5 in the comparison is cosmetic.
+Worse, **π̂ = 0.649 was not derived from training data** — it was swept against *leaderboard feedback*
+(iteration 02: 0.7561 → peak 0.8260 at realized ≈0.65) and we kept the peak. Elkan (IJCAI 2001)
+formalizes the equivalence: for calibrated models, cost-sensitive reweighting and threshold shifting
+are the same operation.
+
+**(b) `TargetRAUC`.** `src/calibration.py:78-82` returns `(rank + 0.5)/n` — **uniformly spaced ranks,
+not probabilities.** A client thresholding our column at 0.8 receives "the top 20% of rows," which has
+no probabilistic meaning. This defeats the stated rationale of the raw-probabilities rule. Because
+ROC-AUC is invariant to any strictly monotone transform, **emitting genuine calibrated probabilities
+here costs us nothing on the metric** — this is a free compliance fix and there is no argument
+against it.
+
+**Why we are disclosing rather than quietly hoping.** The final score is 65% private LB + 35% code
+review **of the top 5 only**. If we do not reach the top 5, the pin was worth nothing. If we do, our
+code is read by exactly the people who wrote the rule. **The gain is only cashable in the scenario
+that triggers the review that would void it.** There is no branch on which keeping it pays.
+
+One honest note on magnitude: the ≈+0.07 attributed to the pin was measured in iteration 02 **on the
+superseded GBDT model class**. Its value on the current transformer is **unmeasured**, and the true
+cost of compliance may be materially smaller.
+
+**Status:** disclosed here; remediation (calibration fit on training folds only, then a literal 0.5
+cut) is the top item on our work list, and we have asked the organizers for clarification on forum
+thread 33912.
 
 **Reproducibility caveat, stated plainly.** A single seed (42) drives all RNGs and per-`(row, view)`
 seeds are derived deterministically, so the masking augmentation is exactly reproducible. However,
