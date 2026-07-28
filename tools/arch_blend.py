@@ -19,13 +19,18 @@ THE GO/NO-GO IS FREE AND PRINTED FIRST: the pairwise rank-correlation matrix acr
                                                  variance-AND-bias reducing move with bounded
                                                  downside (the blend lands between its members).
 
-METHOD -- two-level rank averaging, equal weight per architecture
-    Level 1: within each architecture, rank-average its seed replicates (kills seed noise).
-    Level 2: rank-average the per-architecture vectors with EQUAL weight (so a config that happens
-             to have 5 seed runs does not outvote one with a single run).
-    Rank (not probability) averaging because the leaderboard is rank-only after the prevalence pin,
-    and because per-architecture calibration drifts hard (t_star ranges 0.435 -> 0.500 across the
-    cluster) while the ORDER is the quantity we actually want to pool.
+METHOD (CHANGED 2026-07-28 when the prevalence pin was removed as a rules violation)
+    Level 1: within each architecture, average its seed replicates' RAW probabilities (same
+             config, same scale, so level is meaningful).
+    Level 2: Platt-calibrate each architecture on its OWN out-of-fold predictions, then average
+             those probabilities with EQUAL weight per architecture. Cut at a literal 0.5.
+
+    We used to rank-average at both levels, which was correct WHILE the prevalence pin existed
+    (the pin re-derived the cut, so only ORDER mattered). Under a literal 0.5 cut the LEVEL is
+    the whole TargetF1 column, and ranking each member's OOF and test separately erases the
+    train-vs-test level difference -- collapsing the positive rate onto the train prior (0.422
+    observed) instead of ~0.55. The rank matrix is still computed, but ONLY for the correlation
+    diagnostic, which is a statement about order.
 
 USAGE
     python tools/arch_blend.py --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview \
@@ -43,7 +48,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.calibration import calibrate_legal  # noqa: E402
+from src.calibration import calibrated_pool  # noqa: E402
 from src.utils import get_logger, load_config, resolve_path  # noqa: E402
 
 log = get_logger()
@@ -164,12 +169,26 @@ def main() -> None:
         raise SystemExit("no test_ids found on any member bundle; cannot write a submission")
 
     # ---- RULES-COMPLIANT operating point ----
-    # Platt fit on the pooled TRAINING OOF only, then a literal 0.5 cut, with real
-    # probabilities in TargetRAUC. `grand_oof` is pooled by the same construction as
-    # `grand_test`, so the calibrator is fit on what it is applied to. See
-    # src/calibration.py and REPORT.md section 7.
+    # Calibrate each member on its OWN out-of-fold predictions, then average those
+    # probabilities. NOT rank-averaging: under a literal 0.5 cut the LEVEL is the whole
+    # TargetF1 column, and ranking each member's OOF and test separately erases the very
+    # train-vs-test level difference the cut depends on. See calibrated_pool() for the full
+    # argument and REPORT.md section 7. (`grand_test`/`grand_oof` above stay rank-pooled --
+    # they feed the correlation diagnostic, which is about ORDER only.)
     log.info("")
-    target_f1, target_rauc, _cdiag = calibrate_legal(y, grand_oof, grand_test)
+    log.info("=== LEGAL POOL: per-member calibration, then probability average ===")
+    _members = []
+    for m in args.members:
+        _files = _seed_bundles(preds_dir, m)
+        # Within a member, seeds share a scale, so pool their RAW probabilities (level intact).
+        _oof_m = np.vstack([np.load(f, allow_pickle=True)["oof_prob"] for f in _files]).mean(axis=0)
+        _test_m = np.vstack([np.load(f, allow_pickle=True)["p_test_raw"] for f in _files]).mean(axis=0)
+        _members.append((y, _oof_m, _test_m))
+    p_pooled, _pdiag = calibrated_pool(_members)
+    target_f1 = (p_pooled >= 0.5).astype(int)
+    target_rauc = p_pooled
+    log.info("POOLED: %d members | test pos-rate %.4f (train prior %.4f)",
+             _pdiag["n_members"], float(target_f1.mean()), float(np.mean(y)))
 
     sub = pd.DataFrame({"ID": ids, "TargetF1": target_f1, "TargetRAUC": target_rauc})
     sample = pd.read_csv(resolve_path(cfg, "raw_dir") / "SampleSubmission.csv")

@@ -26,10 +26,17 @@ EXPECT THE PUBLIC SCORE TO FALL, AND WANT IT TO.
     that actually decides the competition and that we never get to see. Chasing the public number
     here is precisely the mistake that produces a shake-up.
 
-METHOD
-    Rank-average the per-seed test probabilities, then apply the standard prevalence pin.
-    Rank averaging (not probability averaging) because the metric only sees order, and because
-    per-seed probability calibration drifts while order is the quantity we actually want to pool.
+METHOD (CHANGED 2026-07-28 when the prevalence pin was removed as a rules violation)
+    Calibrate each seed on its OWN out-of-fold predictions (Platt), then average those
+    probabilities, then cut at a literal 0.5.
+
+    We used to rank-average and then pin the prevalence. That was right WHILE the pin existed:
+    it re-derived the cut afterwards, so only the ORDER mattered and ranks were the scale-free
+    way to pool seeds whose calibration drifts. Under a literal 0.5 cut the LEVEL is the entire
+    TargetF1 column, and rank-transforming each seed's OOF and test SEPARATELY erases the
+    train-vs-test level difference -- driving the positive rate back to the train prior (0.402
+    observed) instead of the model's honest estimate (~0.55). Per-seed calibration puts every
+    seed on the common probability scale that ranking was only ever a proxy for.
 
 USAGE
     python tools/seed_average.py --variant seq_a_xview --name champion_seedavg
@@ -47,7 +54,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.calibration import calibrate_legal  # noqa: E402
+from src.calibration import calibrated_pool  # noqa: E402
 from src.utils import get_logger, load_config, resolve_path  # noqa: E402
 
 log = get_logger()
@@ -98,14 +105,12 @@ def main() -> None:
                          f"Run the seed replicates first.")
 
     log.info("Seed-averaging %d bundles for %r:", len(files), args.variant)
-    mats, oof_mats, ids, y = [], [], None, None
+    mats, raw_oof, raw_test, ids, y = [], [], [], None, None
     for f in files:
         d = np.load(f, allow_pickle=True)
-        mats.append(_ranks(d["p_test_raw"]))
-        # Pool the OOF exactly as we pool the test scores, so the calibrator is fit on the
-        # SAME construction it will be applied to. Without this we would be calibrating the
-        # pooled test vector with a single member's curve.
-        oof_mats.append(_ranks(d["oof_prob"]))
+        mats.append(_ranks(d["p_test_raw"]))        # for the rank-disagreement diagnostic
+        raw_oof.append(np.asarray(d["oof_prob"]))   # RAW: level intact, for calibration
+        raw_test.append(np.asarray(d["p_test_raw"]))
         if y is None:
             y = d["y"]
         tid = d["test_ids"] if "test_ids" in d.files else None
@@ -130,12 +135,19 @@ def main() -> None:
         log.info("Pairwise rank correlation between seeds: mean=%.4f min=%.4f "
                  "(1.0 would mean the seed changes nothing)", float(np.mean(cs)), float(np.min(cs)))
 
-    p_avg = R.mean(axis=0)
-    oof_avg = np.vstack(oof_mats).mean(axis=0)
+    p_avg = R.mean(axis=0)          # rank-pooled: used ONLY for the disagreement diagnostic
 
-    # RULES-COMPLIANT operating point: Platt fit on the pooled TRAINING OOF only, then a
-    # literal 0.5 cut, with real probabilities in TargetRAUC. See src/calibration.py.
-    target_f1, target_rauc, _cdiag = calibrate_legal(y, oof_avg, p_avg)
+    # RULES-COMPLIANT operating point. Calibrate each SEED on its own OOF, then average the
+    # probabilities -- NOT the ranks. Under a literal 0.5 cut the level is the whole TargetF1
+    # column, and rank-transforming each seed's OOF and test separately erases the train-vs-test
+    # level difference, collapsing the positive rate onto the train prior. See calibrated_pool().
+    log.info("")
+    log.info("=== LEGAL POOL: per-seed calibration, then probability average ===")
+    p_pooled, pdiag = calibrated_pool([(y, o, t) for o, t in zip(raw_oof, raw_test)])
+    target_f1 = (p_pooled >= 0.5).astype(int)
+    target_rauc = p_pooled
+    log.info("POOLED: %d seeds | test pos-rate %.4f (train prior %.4f)",
+             pdiag["n_members"], float(target_f1.mean()), float(np.mean(y)))
 
     sub = pd.DataFrame({"ID": ids, "TargetF1": target_f1,
                         "TargetRAUC": target_rauc})

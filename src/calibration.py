@@ -137,6 +137,41 @@ def platt_calibrate(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray
     return (lr.predict_proba(z_oof)[:, 1], lr.predict_proba(z_test)[:, 1], slope)
 
 
+def calibrated_pool(members, log_each: bool = True) -> Tuple[np.ndarray, Dict]:
+    """Pool several models by averaging their INDIVIDUALLY CALIBRATED probabilities.
+
+    `members` is an iterable of (y_oof, p_oof, p_test) triples.
+
+    WHY NOT RANK-AVERAGE. Under the old prevalence pin we always rank-averaged, because the
+    pin re-derived the cut afterwards and so only the ORDER mattered; normalized ranks were
+    the scale-free way to pool models with drifting calibration. **That reasoning dies with
+    the pin.** Under a literal 0.5 cut the LEVEL is the entire TargetF1 column.
+
+    A rank transform maps a member's OOF and its test scores to uniform [0,1] SEPARATELY.
+    That destroys exactly the information we need: our models score test rows higher than
+    train rows (test really is more pond-rich), and ranking each set on its own erases that
+    difference. Calibrating the pooled ranks then drives the positive rate back to the TRAIN
+    prior (~0.402 observed) instead of the model's honest test estimate (~0.55).
+
+    So: calibrate each member on ITS OWN out-of-fold predictions first -- which puts every
+    member on the common, meaningful probability scale that rank-averaging was a proxy for --
+    then average those probabilities. Level is preserved, members remain commensurable, and
+    a single vector serves both columns.
+    """
+    cal_test, cal_oof, slopes = [], [], []
+    for i, (y_m, oof_m, test_m) in enumerate(members):
+        o_cal, t_cal, slope = platt_calibrate(y_m, oof_m, test_m)
+        cal_test.append(t_cal)
+        cal_oof.append(o_cal)
+        slopes.append(slope)
+        if log_each:
+            log.info("  member %d: Platt slope=%.3f | its own test pos-rate %.3f",
+                     i, slope, float((t_cal >= 0.5).mean()))
+    p_test = np.vstack(cal_test).mean(axis=0)
+    p_oof = np.vstack(cal_oof).mean(axis=0)
+    return p_test, {"p_oof_pooled": p_oof, "slopes": slopes, "n_members": len(slopes)}
+
+
 def calibrate_legal(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray
                     ) -> Tuple[np.ndarray, np.ndarray, Dict]:
     """RULES-COMPLIANT operating point. Returns (target_f1, target_rauc, diagnostics).
