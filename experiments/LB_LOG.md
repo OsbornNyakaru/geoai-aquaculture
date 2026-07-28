@@ -354,7 +354,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **0.879123** | ❌ **−0.0155 vs archblend4 (SIGNIFICANT, paired); cross-class blending CLOSED** |
 
 | 25 | 2026-07-27 | **Phase-A shift audit** (`tools/shift_audit.py`) — indicator probe + 2-D band screen | *local, no cloud run* | — | **n/a — 0 subs** | ✅ 1 lane CLOSED, 1 lane OPENED |
-| 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **PENDING** | 🎯 first candidate to clear the pre-committed rule since iter9 (2/2 votes, ATC-F1 above the champion's best-of-5 seed draw) |
+| 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **0.884217** | ❌ −0.0113 paired vs the seed-42 champion. **The screen was wrong in SIGN.** Deletion lane CLOSED; ATC-F1 exposed as within-family only |
 
 ---
 
@@ -472,6 +472,59 @@ first level gain since the GBDT→Transformer swap; **0.890–0.907** = unresolv
 **Note on `archblend4`.** Its 4 members are unchanged, so the artifact is identical to the 0.894643
 upload — **do not re-submit it.** The printed "mean pairwise ρ = 0.9345" is contaminated by the two
 `--diag-extra` columns; archblend4's own 4-member mean is **0.9524**.
+
+### iter26 LB = 0.884217 — the screen was WRONG IN SIGN, and that is the finding
+
+**Result.** `c_dropvv` = **0.884217** vs the seed-42 champion anchor 0.8955 → **−0.0113, paired**
+(same seed, same folds, one variable). Under the RESEARCH_07 §5b protocol that is **SUGGESTIVE**
+(≥0.006) but not CONFIDENT (≥0.012). Against my pre-committed bands it lands at the very bottom of
+"unresolved" (0.890–0.907), 0.0007 above the "confident loss" line — so strictly it did not confirm a
+loss, but it decisively **failed to confirm the gain the screen predicted.**
+
+**Deletion lane: CLOSED.** Cost 1 submission. Combined with the Phase-A finding that the shift is
+distributed (max single-band A 0.59 vs joint 0.89), **feature-space deletion cannot beat this shift.**
+
+**The real result is about the instrument, not the band.** ATC-F1 predicted **+0.0902 (2/2 votes, 1.57
+seed-sd, above the champion's best-of-five seed draw)** and the LB came back **negative**. That is the
+first time a SUBMIT call was followed and failed.
+
+**Diagnosis — the retro-fit was only ever certified within one family.** All 7 original anchors are
+architecture/objective variants at an **identical 24-channel input width**. `c_dropvv` is the first
+candidate that changed the **input representation** (22 channels). Adding it as an 8th anchor:
+
+```
+n=7 (original)     rho=+0.964   gate=15/15
+n=8 (+c_dropvv)    rho=+0.738   gate=17/18
+only discordant informative pair: (xview, dropvv)
+```
+
+**ρ collapses 0.964 → 0.738 on a single point, and that point is the only out-of-family one.**
+
+**⚠️ And the GATE DID NOT CATCH IT — 17/18 still reads PASS.** The gate counts concordance over pairs
+with |ΔLB| > 0.010, which is dominated by easy pairs (detrend at 0.8266 is trivially rankable). It is
+**not a sufficient guard**, and we have now been shown that at the cost of a submission.
+
+**⛔ CARRY-FORWARD, THIS IS THE EXPENSIVE PART.** The next planned experiment — the **ratio-feature
+battery** — is *also* a representation change, i.e. **out-of-family in exactly the same way**. Screening
+it with ATC-F1 would repeat this error verbatim. **Ratio candidates must be tested on the LB directly**,
+one variable, seed-paired, or the screen must first be re-certified against `c_dropvv`.
+
+**Why this submission was not wasted.** It bought the **only anchor we have off the 24-channel
+manifold** — the sole datapoint capable of detecting out-of-family estimator failure. It is now in
+`experiments/anchors.tsv` and any future estimator must rank it correctly to be trusted.
+
+**My prediction was wrong again, in the same direction.** I said ≈0.900; actual 0.884217 (−0.016).
+At iter24 I said 0.892–0.897; actual 0.879123 (−0.014). **Two consecutive over-predictions of ~0.015,
+both on out-of-family candidates.** This is a systematic optimism bias, not two independent misses:
+in both cases I trusted an ATC-F1 margin computed outside the family it was fitted on. The 3× discount
+we apply to ATC-F1's magnitude is calibrated in-family and is **not** sufficient out-of-family, where
+the estimator is not merely inflated but can be **sign-wrong**.
+
+**Budget check.** ~78 submissions, 19 days. Submissions are no longer the binding constraint —
+**measurement noise is.** Seed averaging cannot fix it: with seed rank-corr 0.9511, the variance
+reduction factor is (1+0.9511·4)/5 = **0.961**, so pooling 5 seeds moves sd only 0.0191 → 0.0187.
+**Effects below ~0.02 are unmeasurable on the public slice by any construction available to us.** The
+leader is ≈+0.05 ahead. Hunt that lever; stop buying 0.005s.
 
 ---
 

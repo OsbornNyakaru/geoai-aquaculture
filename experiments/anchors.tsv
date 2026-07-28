@@ -11,3 +11,11 @@ seq_a_reltime	0.8908
 seq_a_nope	0.8917
 seq_a_l3	0.8921
 seq_a_xview	0.8955
+# --- added 2026-07-28 (iter26). THE FIRST ANCHOR OFF THE 24-CHANNEL MANIFOLD. ---
+# Anchors 1-7 are all architecture/objective variants at IDENTICAL 24-channel input width,
+# so the retro-fit only ever certified ATC-F1 WITHIN that family. c_dropvv (22 channels) is
+# the first anchor that changes the INPUT REPRESENTATION -- and ATC-F1 got it wrong in SIGN
+# (screened SUBMIT at +0.0902, 2/2 votes; actual LB -0.0113 vs the seed-42 champion).
+# Keeping it here is the point: it is the only anchor that can detect out-of-family failure,
+# and any future estimator must rank it correctly to be trusted on a representation change.
+c_dropvv	0.884217
