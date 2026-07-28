@@ -358,7 +358,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
 | 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
 | 29 | 2026-07-28 | **BIGGER LEGAL POOL** — archblend6 = archblend4 + `seq_a_k4` + `seq_a_base` (the 2 weakest members) | submission_champion_archblend6.csv | — | **0.894899** | ❌ **−0.0047 paired vs archblend4 (0.899643)**, shares 4/6 members. Adding the 2 weakest members DRAGGED the blend. "Weak members become assets under a literal cut" **REFUTED** — the level-gap gate SURVIVES the legal regime. **archblend4 stays finalist #1; aggressive pooling CLOSED** |
-| 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | *staged* | 0.649→legal | **pending** | — |
+| 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | catblend5 + c_catboost | legal | **pending upload** | 🎯 first COMPETENT + DECORRELATED member (ρ~0.80, AUC 0.995) |
 
 ---
 
@@ -418,6 +418,41 @@ Platt neutralizes it, which would be a real methodological result either way.
 *tree*, re-testing our Transformer-only −0.075 veto), `c_catboost_spw`; then `champion_archblend4`
 (control, must reproduce 0.5670/0.899643) and **`champion_catblend5`** = the 4 transformers + legal
 CatBoost, whose LB vs 0.899643 is the main event. Up to 2 uploads (catblend5, c_catboost standalone).
+
+### iter30 RAN 2026-07-28 — offline result: the best blend-member profile of the whole project
+
+**Control valid:** archblend4 rebuilt to pos-rate **0.5670** exactly → the comparison is live.
+
+**🎯 CatBoost is the first member that is BOTH competent AND genuinely decorrelated:**
+
+| | OOF AUC | ρ to transformer cluster | verdict |
+|---|---|---|---|
+| transformers (reltime/nope/l3/xview) | ~0.989 | 0.94–0.97 (rank-twins) | — |
+| ROCKET (iter22) | ~0.99 | 0.82–0.87 | decorrelated but **−0.040 weak** |
+| pin-era GBDT (iter24) | — | ~0.85 | dragged −0.0155 (under the pin) |
+| **legal CatBoost (iter30)** | **0.9953** | **0.79–0.83** | **decorrelated AND strong** |
+
+`catboost ↔ {reltime 0.820, nope 0.791, l3 0.798, xview 0.832}` — the lowest correlation to the
+cluster we have ever gotten from a member whose AUC (0.9953) actually **exceeds** the transformers'.
+catblend5 mean ρ = **0.8747** (vs archblend4's 0.9524) → "POOL IT: level gain is available." iter28
+proved legal pooling of decorrelated-competent members buys level (+0.0100); this member is far more
+decorrelated, so the blend should gain more. **catblend5 pos-rate 0.5689 (≈ archblend4's 0.567) — the
+operating point is preserved, so CatBoost's under-selection does NOT collapse the blend.**
+
+**Two clean secondary findings, both 0 extra submissions:**
+- **Under-selection is real and NOT legally fixable.** CatBoost is so well-calibrated (Platt slope
+  6.76) that its literal-0.5 cut lands at pos-rate **0.403 = the train prior**, far under the ~0.649
+  test prevalence. `c_catboost_spw` (class weight 2.2) moved it to **0.402 — unchanged**: Platt-on-OOF
+  neutralized the class weight exactly as Elkan (IJCAI 2001) predicts. So standalone CatBoost's F1
+  column is capped by under-selection; its value is RANKING + decorrelation inside a blend. Drop spw.
+- **S2 spectral indices marginally HELP a tree** (c_catboost 0.9792 vs c_catboost_noidx 0.9773 OOF-
+  combined; AUC 0.99529 vs 0.99462) — the opposite sign to the Transformer's −0.075, consistent with
+  "trees split on indices directly." Tiny and OOF-blind, so not decisive, but the veto does not
+  transfer to trees. ρ(catboost, noidx)=0.965 (near-twins), ρ(catboost, spw)=0.979.
+
+**Decision: upload `champion_catblend5` (the main event) + `c_catboost` standalone (anchors whether
+the ranking strength survives the under-selection to LB). Prediction: catblend5 > archblend4's
+0.899643** — first competent, genuinely decorrelated member, operating point preserved.
 
 ## iter25 PHASE-A — two results for zero submissions, computed locally in minutes
 
