@@ -356,6 +356,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 25 | 2026-07-27 | **Phase-A shift audit** (`tools/shift_audit.py`) — indicator probe + 2-D band screen | *local, no cloud run* | — | **n/a — 0 subs** | ✅ 1 lane CLOSED, 1 lane OPENED |
 | 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **0.884217** | ❌ −0.0113 paired vs the seed-42 champion. **The screen was wrong in SIGN.** Deletion lane CLOSED; ATC-F1 exposed as within-family only |
 | 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
+| 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
 
 ---
 
@@ -473,6 +474,60 @@ first level gain since the GBDT→Transformer swap; **0.890–0.907** = unresolv
 **Note on `archblend4`.** Its 4 members are unchanged, so the artifact is identical to the 0.894643
 upload — **do not re-submit it.** The printed "mean pairwise ρ = 0.9345" is contaminated by the two
 `--diag-extra` columns; archblend4's own 4-member mean is **0.9524**.
+
+### iter28 LB = 0.899643 — 🏆 BEST PUBLIC SCORE EVER, AND IT IS LEGAL
+
+`champion_archblend4`, rebuilt through the compliant path, scored **0.899642643** — higher than
+anything we have ever submitted, including the illegal artifacts.
+
+| artifact | operating point | LB |
+|---|---|---|
+| `c_meanmin` | pinned (illegal) | 0.898566 ← previous best ever |
+| **`champion_archblend4`** | **LEGAL** | **0.899643** ← new best, and eligible |
+| `champion_archblend4` | pinned (illegal) | 0.894643 |
+| `seq_a_xview` | LEGAL | 0.889686 |
+| `seq_a_xview` | pinned (illegal) | 0.895500 |
+
+**Going legal made this artifact BETTER by +0.005.** We did not trade score for compliance here; we
+gained on both.
+
+#### 🔑 The finding: the prevalence pin was SUPPRESSING the ensemble
+
+The same comparison under the two operating points:
+
+```
+pinned:   archblend4 - champion  =  -0.000857     pooling bought NOTHING
+legal:    archblend4 - champion  =  +0.009957     pooling buys LEVEL
+```
+
+**Mechanism.** Under the pin, every member's operating point was overwritten to a fixed 0.649, so
+pooling could only affect **order** — and at mean ρ = 0.9524 there is almost no independent order
+information left to average. Under a literal 0.5 cut, pooling *also* averages the members'
+**calibration**, and calibration error is far less correlated across members than ranking is. The
+members' individual legal positive rates were **0.581 / 0.570 / 0.534 / 0.586** — a spread of 0.052
+that the pin was collapsing to a single number and discarding.
+
+So iteration 18's verdict — *"architecture pooling is MARGINAL, not a level lever"* — was **an
+artifact of the operating point, not a property of the ensemble.** It was measured under the pin,
+where the only available gain was order-pooling.
+
+#### ⚠️ The correlation go/no-go is now wrong, and it nearly cost us this result
+
+`arch_blend`'s printed verdict was **"SKIP: as correlated as seeds → no level gain"** at ρ = 0.9524.
+It was wrong. That heuristic measures **rank** correlation, which predicts *order*-pooling gain and
+is silent about *calibration*-pooling gain.
+
+We uploaded anyway — but for a weaker reason than the outcome justifies. The stated reason was "we
+need a legal pooled artifact regardless of level." The actual result is that pooling now buys level
+outright. **Right call, wrong rationale**, and worth recording as such.
+
+**This is the FOURTH instance of the same failure mode: a rule derived under the pin, applied outside
+it.** The others were iter24 (ensemble gate), iter26 (ATC-F1's anchor family), and the blender
+rank-pooling bug. Several other ensemble rules were derived under the pin and are now **unverified**,
+most importantly the *"gate members on level gap, not correlation"* rule — that too was measured when
+only order mattered.
+
+---
 
 ### iter27 LB = 0.889686 — compliance cost ≈ 0.006, i.e. nothing
 
