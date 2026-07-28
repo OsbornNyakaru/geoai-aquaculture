@@ -31,8 +31,31 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: rebuild the LEGAL finalist artifacts (archblend4 first), then the
-   Phase-Two writeup.**
+3. **Current next action: (a) DESIGNATE the two legal finalists on Zindi — the irreversible
+   deadline item; (b) the Phase-Two writeup, which is 35% of a top-5 score and whose reproduction
+   claim is still UNVERIFIED; (c) optionally one ensemble probe, see below.**
+
+   **🏆 2026-07-28 — WE ARE LEGAL *AND* AT OUR BEST SCORE EVER.** `champion_archblend4` rebuilt
+   through the compliant path = **0.899643**, above every artifact we have ever submitted
+   (previous best `c_meanmin` 0.898566, illegal). Going legal made it **+0.005 BETTER** than its own
+   pinned version. Finalist #2 is `seq_a_xview` (legal) = 0.889686.
+
+   **⛔ DESIGNATE MANUALLY.** Zindi's default is your two best *public* scores — and several of
+   those are the INELIGIBLE pinned artifacts. Do this with days to spare, not on 2026-08-16.
+
+   **🔑 The pin was suppressing the ensemble** (see LB_LOG iter28). Pinned archblend4−champion =
+   −0.0009; legal = +0.0100. The pin overwrote every member's operating point to 0.649, so pooling
+   could only average ORDER (ρ=0.9524 — nothing there). A literal 0.5 cut also averages
+   CALIBRATION, where the members genuinely disagreed (pos-rates 0.534–0.586). **This means several
+   pin-era ensemble rules are now UNVERIFIED and must be re-derived before use** — including "gate
+   members on level gap, not correlation" and the rank-correlation go/no-go, which printed SKIP at
+   ρ=0.9524 and was wrong.
+
+   **The one cheap probe worth running:** if pooling now buys level through *calibration* diversity,
+   a LARGER pool should help. Test `archblend6` (add `seq_a_k4`, `seq_a_base` — whose legal pos-rates
+   0.534/0.530 sit at the edge of the current spread) against archblend4's 0.899643. One submission,
+   and it directly tests whether the pin-era "weak members drag" rule survives. Do NOT let this
+   displace the writeup.
 
    **✅ 2026-07-28 — WE ARE NOW RULES-COMPLIANT, AND IT COST 0.0058.** The prevalence pin was an
    explicit rules violation (verified verbatim on the live rules page: *"Setting a probability

@@ -33,9 +33,10 @@ instrument fails. Sections 4–6 are that work. It is the part we would want a r
 
 | quantity | value |
 |---|---|
-| best single public score | 0.8955 — **a lucky seed, not our level** |
-| **reliable level** (5-seed pooled) | **0.8865** |
-| designated primary artifact | `champion_archblend4` = **0.894643** |
+| **best public score (LEGAL)** | **0.899643** — `champion_archblend4` |
+| second finalist (LEGAL) | 0.889686 — `seq_a_xview`, single seed |
+| historical best under the rules-violating pin | 0.898566 — *ineligible, see §7* |
+| **reliable single-model level** (5-seed pooled) | ≈0.8865 |
 | **measured seed-to-seed sd** | **0.0191** — larger than 9 of our own 11 recorded effects |
 | submissions spent | 26 of 100 |
 
@@ -264,6 +265,15 @@ decomposition for 0-1 loss (Brown & Kuncheva, MCS 2010, distinguish "good" from 
 exactly this reason). Our two foreign-member blends lost **monotonically in the member's own level
 deficit**, so we gate members on **level gap, not decorrelation**, and always rank-average rather
 than probability-average.
+
+**⚠️ And a second limitation, discovered late: every one of these blending results was measured
+under the prevalence pin.** When we removed the pin (§7), the same 4-architecture pool went from
+−0.0009 against its best member to **+0.0100** — pooling started buying *level* where it had bought
+nothing. The mechanism is that the pin overwrote every member's operating point to a common value,
+so pooling could only average the **ranking** (mean ρ = 0.9524, almost nothing independent left);
+a literal 0.5 cut also averages the members' **calibration**, where they genuinely disagreed
+(positive rates 0.534–0.586). **Ensemble conclusions drawn under a pinned threshold do not transfer
+to an unpinned one**, and ours were all drawn under the pin.
 
 **We flag a limitation in our own evidence.** Both members were also *weaker* (−0.040 and −0.011),
 so member strength and member diversity are **perfectly confounded at n=2**. What we demonstrated is
