@@ -358,6 +358,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
 | 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
 | 29 | 2026-07-28 | **BIGGER LEGAL POOL** — archblend6 = archblend4 + `seq_a_k4` + `seq_a_base` (the 2 weakest members) | submission_champion_archblend6.csv | — | **0.894899** | ❌ **−0.0047 paired vs archblend4 (0.899643)**, shares 4/6 members. Adding the 2 weakest members DRAGGED the blend. "Weak members become assets under a literal cut" **REFUTED** — the level-gap gate SURVIVES the legal regime. **archblend4 stays finalist #1; aggressive pooling CLOSED** |
+| 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | *staged* | 0.649→legal | **pending** | — |
 
 ---
 
@@ -386,6 +387,37 @@ is *both* competent *and* genuinely different — i.e. a different model class t
 exactly the CatBoost/tree question, which the pin-era rejection never tested legally (see UPDATE_13).
 
 ---
+
+## iter30 — the legal CatBoost lane (staged), grounded in RESEARCH_14
+
+The different-bias member iter29 says we need. Three research lines converge (RESEARCH_14,
+UPDATE_13): the LB leader (~0.94) uses plain CatBoost ("model isn't the bottleneck"); the closest
+analogous WINNER (Zindi AgriFieldNet) is CatBoost+LGBM+XGB on temporal-aggregated indices; Farm Pin's
+winner kept a weaker Random-Forest member purely for its *different bias* (+1%). Our pin-era GBDT
+rejection (−0.0155) is void — it was measured under the pin, which erased calibration (now ~60% of
+the metric).
+
+**Built this iteration (all behind default-off flags — nothing existing changes):**
+- `features.n_invariant_only` — restricts every aggregate to statistics unbiased at every window
+  length (mean/median/std/interior-quantiles/fractions), dropping the min/max/range/window-position/
+  count/run-length **shift-carriers** the old GBDT matrix was full of. This is the one adaptation the
+  crop winners didn't need (they had full series; we have the 4–6-month masking trap). Feature count
+  falls 130→**78**.
+- `features.vh_cdf_profile` — `F(τ)=fraction of observed VH months < τ` at τ∈{−22..−19} dB: the
+  Ottinger permanence detector as a legal Class-A fraction, not affine-spanned by the bands.
+- `models.catboost.boosting_type=Ordered` — the small-n permutation lever.
+- Runs through the LEGAL calibration (Platt-on-OOF + literal 0.5). Smoke-verified compliant.
+
+**Smoke finding to carry:** legal CatBoost is well-calibrated (Platt slope ~4.4) so its 0.5 cut
+**under-selects** — pos-rate ~0.40 vs the transformer's 0.548 and true ~0.649. Its F1 column may look
+weak standalone; its RANKING and different bias are what it brings to the blend. `c_catboost_spw`
+(class weight 2.2) tests whether the under-selection is legally fixable — Elkan (IJCAI 2001) predicts
+Platt neutralizes it, which would be a real methodological result either way.
+
+**Arms:** `c_catboost` (full legal recipe), `c_catboost_noidx` (S2 indices off — do indices help a
+*tree*, re-testing our Transformer-only −0.075 veto), `c_catboost_spw`; then `champion_archblend4`
+(control, must reproduce 0.5670/0.899643) and **`champion_catblend5`** = the 4 transformers + legal
+CatBoost, whose LB vs 0.899643 is the main event. Up to 2 uploads (catblend5, c_catboost standalone).
 
 ## iter25 PHASE-A — two results for zero submissions, computed locally in minutes
 

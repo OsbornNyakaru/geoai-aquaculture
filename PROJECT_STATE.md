@@ -31,9 +31,16 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: (a) DESIGNATE the two legal finalists on Zindi — the irreversible
-   deadline item; (b) the Phase-Two writeup, which is 35% of a top-5 score and whose reproduction
-   claim is still UNVERIFIED; (c) optionally one ensemble probe, see below.**
+3. **Current next action: `Run all` → iter30 (the LEGAL CATBOOST lane) on Colab, up to 2 uploads.**
+   iter29 result: bigger pool (archblend6, +k4+base) LOST −0.0047 → within-class pooling CLOSED, the
+   level-gap gate survives the legal cut, `archblend4` (0.899643) stays finalist #1. The only pooling
+   gain left needs a competent + different model class → iter30 = legal CatBoost (n-invariant features
+   + VH-CDF permanence + ordered boosting; smoke-verified legal, n_features 78), tested standalone and
+   as the different-bias member in `champion_catblend5` (vs 0.899643). Grounded in
+   `gemini_loop/RESEARCH_14_WEBSEARCH.md` (analogous-winner + feature evidence) while the UPDATE_13
+   CatBoost deep-research (Q1–Q4) is still out. **Still open and deadline-bound regardless of iter30:**
+   (a) DESIGNATE the two legal finalists on Zindi (irreversible); (b) the Phase-Two writeup (35% of a
+   top-5 score, reproduction claim still UNVERIFIED).
 
    **🏆 2026-07-28 — WE ARE LEGAL *AND* AT OUR BEST SCORE EVER.** `champion_archblend4` rebuilt
    through the compliant path = **0.899643**, above every artifact we have ever submitted

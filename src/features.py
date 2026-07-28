@@ -165,6 +165,13 @@ def compute_features(cube_row: np.ndarray, schema: Schema, cfg: dict
     feats: List[float] = []
     names: List[str] = []
     aggs = cfg["features"]["aggregates"]
+    # Legal n-invariant mode: keep only aggregates that are unbiased at every window length.
+    # min/max/range are biased by n (extremes grow with sample size); mean/median/std/quantiles are
+    # not. Interior percentiles below are quantile estimators and stay. See RESEARCH_14 §5.
+    n_inv = bool(cfg["features"].get("n_invariant_only", False))
+    _SAFE_AGGS = ("mean", "median", "std")
+    if n_inv:
+        aggs = [a for a in aggs if a in _SAFE_AGGS]
     active = ~np.isnan(cube_row).all(axis=1)   # [M] active months
     n_active = int(active.sum())
 
@@ -197,26 +204,41 @@ def compute_features(cube_row: np.ndarray, schema: Schema, cfg: dict
                 feats.append(val if np.isfinite(val) else np.nan)
                 names.append(f"{band.lower()}_p{q}")
 
-    # C: raw band temporal aggregates (mean/median/min/max/std)
+    # B2: VH permanence CDF profile — F(tau) = fraction of OBSERVED VH months below tau (dB).
+    # A fraction is n-invariant (Class-A); an indicator is not affine-spanned by the bands, so it
+    # escapes the dead water-index degeneracy. VH in dB straight off the cube (pre-standardization).
+    if cfg["features"].get("vh_cdf_profile", False):
+        vh = _band(cube_row, schema, "VH")
+        obs = np.isfinite(vh)
+        n_obs = int(obs.sum())
+        for tau in cfg["features"].get("cdf_taus", [-21.0]):
+            frac = float(np.mean(vh[obs] < float(tau))) if n_obs > 0 else np.nan
+            feats.append(frac)
+            names.append(f"vh_cdf_lt{int(round(float(tau)))}")
+
+    # C: raw band temporal aggregates. n-invariant mode drops min/max (n-biased extremes).
     if cfg["features"].get("raw_band_aggregates", True):
+        _raw_aggs = ("mean", "median", "std") if n_inv else ("mean", "median", "min", "max", "std")
         for band in schema.bands:
             s = _band(cube_row, schema, band)
-            for agg in ("mean", "median", "min", "max", "std"):
+            for agg in _raw_aggs:
                 fn = _AGGS[agg]
                 with np.errstate(all="ignore"):
                     val = float(fn(s, axis=0)) if np.isfinite(s).any() else np.nan
                 feats.append(val if np.isfinite(val) else np.nan)
                 names.append(f"raw_{band}_{agg}")
 
-    # D: window meta
-    if cfg["features"].get("window_meta", True):
+    # D: window meta. ALL of these are shift-carriers (start/end/center = calendar position;
+    # n_active = raw window-length count), so the legal n-invariant mode drops the block entirely.
+    if cfg["features"].get("window_meta", True) and not n_inv:
         idx = np.where(active)[0]
         start = int(idx[0]) if len(idx) else -1
         end = int(idx[-1]) if len(idx) else -1
         feats += [float(n_active), float(start), float(end), float((start + end) / 2.0)]
         names += ["meta_n_active", "meta_start", "meta_end", "meta_center"]
 
-    # E: S1-present/S2-masked asymmetry
+    # E: S1-present/S2-masked asymmetry. The COUNT and the m06/m10 calendar flags are n-dependent /
+    # calendar-specific; only the FRACTION is Class-A, so n-invariant mode keeps just that.
     if cfg["features"].get("asymmetry_flags", True):
         s1_idx = [schema.bands.index(x) for x in S1_BANDS if x in schema.bands]
         s2_idx = [schema.bands.index(x) for x in S2_BANDS if x in schema.bands]
@@ -224,13 +246,17 @@ def compute_features(cube_row: np.ndarray, schema: Schema, cfg: dict
         s2_masked = np.isnan(cube_row[:, s2_idx]).all(axis=1)
         gap = s1_present & s2_masked        # [M]
         n_gap = int(gap.sum())
-        feats += [float(n_gap), float(n_gap / max(n_active, 1))]
-        names += ["asym_gap_count", "asym_gap_frac"]
-        for month in ("06", "10"):
-            if month in schema.months:
-                mi = schema.months.index(month)
-                feats.append(float(gap[mi]))
-                names.append(f"asym_gap_m{month}")
+        if n_inv:
+            feats.append(float(n_gap / max(n_active, 1)))
+            names.append("asym_gap_frac")
+        else:
+            feats += [float(n_gap), float(n_gap / max(n_active, 1))]
+            names += ["asym_gap_count", "asym_gap_frac"]
+            for month in ("06", "10"):
+                if month in schema.months:
+                    mi = schema.months.index(month)
+                    feats.append(float(gap[mi]))
+                    names.append(f"asym_gap_m{month}")
 
     # F: Water Inundation Frequency (WIF). Per active-S2 month, a water-presence
     # decision rule; managed ponds stay flooded across the window, seasonal
@@ -261,9 +287,14 @@ def compute_features(cube_row: np.ndarray, schema: Schema, cfg: dict
         for w in water:
             cur = cur + 1 if w else 0
             longest = max(longest, cur)
-        feats += [float(wif), float(wif / max(n_valid, 1)), float(longest),
-                  float(n_valid)]
-        names += ["wif_count", "wif_frac", "wif_longest_run", "wif_n_valid_s2"]
+        if n_inv:
+            # count, longest-run and n_valid are all n-dependent; only the fraction is Class-A.
+            feats.append(float(wif / max(n_valid, 1)))
+            names.append("wif_frac")
+        else:
+            feats += [float(wif), float(wif / max(n_valid, 1)), float(longest),
+                      float(n_valid)]
+            names += ["wif_count", "wif_frac", "wif_longest_run", "wif_n_valid_s2"]
 
     return np.array(feats, dtype=np.float32), names
 
