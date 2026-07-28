@@ -47,7 +47,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.calibration import score_for_auc, target_prevalence_shift  # noqa: E402
+from src.calibration import calibrate_legal  # noqa: E402
 from src.utils import get_logger, load_config, resolve_path  # noqa: E402
 
 log = get_logger()
@@ -98,10 +98,16 @@ def main() -> None:
                          f"Run the seed replicates first.")
 
     log.info("Seed-averaging %d bundles for %r:", len(files), args.variant)
-    mats, ids = [], None
+    mats, oof_mats, ids, y = [], [], None, None
     for f in files:
         d = np.load(f, allow_pickle=True)
         mats.append(_ranks(d["p_test_raw"]))
+        # Pool the OOF exactly as we pool the test scores, so the calibrator is fit on the
+        # SAME construction it will be applied to. Without this we would be calibrating the
+        # pooled test vector with a single member's curve.
+        oof_mats.append(_ranks(d["oof_prob"]))
+        if y is None:
+            y = d["y"]
         tid = d["test_ids"] if "test_ids" in d.files else None
         if ids is None:
             ids = tid
@@ -125,13 +131,14 @@ def main() -> None:
                  "(1.0 would mean the seed changes nothing)", float(np.mean(cs)), float(np.min(cs)))
 
     p_avg = R.mean(axis=0)
-    p_shift, delta = target_prevalence_shift(p_avg, prevalence)
-    target_f1 = (p_shift >= 0.5).astype(int)
-    log.info("Prevalence pin: target=%.3f delta=%.3f | pooled pos-rate %.3f -> %.3f",
-             prevalence, delta, float((p_avg >= 0.5).mean()), float(target_f1.mean()))
+    oof_avg = np.vstack(oof_mats).mean(axis=0)
+
+    # RULES-COMPLIANT operating point: Platt fit on the pooled TRAINING OOF only, then a
+    # literal 0.5 cut, with real probabilities in TargetRAUC. See src/calibration.py.
+    target_f1, target_rauc, _cdiag = calibrate_legal(y, oof_avg, p_avg)
 
     sub = pd.DataFrame({"ID": ids, "TargetF1": target_f1,
-                        "TargetRAUC": score_for_auc(p_avg)})
+                        "TargetRAUC": target_rauc})
     sample = pd.read_csv(resolve_path(cfg, "raw_dir") / "SampleSubmission.csv")
     order = {i: k for k, i in enumerate(sample["ID"])}
     sub = sub.sort_values("ID", key=lambda s: s.map(order)).reset_index(drop=True)

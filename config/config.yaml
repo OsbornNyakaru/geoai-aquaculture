@@ -106,7 +106,19 @@ models:
     verbose: false
 
 calibration:
-  method: logit_shift      # logit_shift | isotonic
+  # ---- RULES COMPLIANCE. Read before changing. ----
+  # legal  (DEFAULT, the only shippable mode): Platt calibration fit on TRAINING out-of-fold
+  #        predictions only, then a LITERAL 0.5 cut. Both columns carry real calibrated
+  #        probabilities. Nothing below this line (method/prior_adjust/prevalence_target/
+  #        assumed_test_prior) is read in this mode.
+  # pinned (⚠️ VIOLATES THE RULES — historical reproduction ONLY): the prevalence-pin path that
+  #        produced every score in experiments/anchors.tsv. Keeps the anchors reproducible so the
+  #        offline validator's retro-fit stays valid. DO NOT SUBMIT ITS OUTPUT.
+  #        Verbatim rule: "Setting a probability threshold is strictly forbidden. Your binary
+  #        target should be based on the default threshold of 0.5." See REPORT.md section 7.
+  compliance_mode: legal   # legal | pinned
+
+  method: logit_shift      # logit_shift | isotonic   (pinned mode only)
   t_grid_lo: 0.05
   t_grid_hi: 0.95
   t_grid_step: 0.005

@@ -43,7 +43,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.calibration import score_for_auc, target_prevalence_shift  # noqa: E402
+from src.calibration import calibrate_legal  # noqa: E402
 from src.utils import get_logger, load_config, resolve_path  # noqa: E402
 
 log = get_logger()
@@ -163,14 +163,15 @@ def main() -> None:
     if ids is None:
         raise SystemExit("no test_ids found on any member bundle; cannot write a submission")
 
-    # ---- Prevalence pin, identical operating point to every other submission ----
-    p_shift, delta = target_prevalence_shift(grand_test, prevalence)
-    target_f1 = (p_shift >= 0.5).astype(int)
+    # ---- RULES-COMPLIANT operating point ----
+    # Platt fit on the pooled TRAINING OOF only, then a literal 0.5 cut, with real
+    # probabilities in TargetRAUC. `grand_oof` is pooled by the same construction as
+    # `grand_test`, so the calibrator is fit on what it is applied to. See
+    # src/calibration.py and REPORT.md section 7.
     log.info("")
-    log.info("Prevalence pin: target=%.3f delta=%.3f | blended pos-rate %.3f -> %.3f",
-             prevalence, delta, float((grand_test >= 0.5).mean()), float(target_f1.mean()))
+    target_f1, target_rauc, _cdiag = calibrate_legal(y, grand_oof, grand_test)
 
-    sub = pd.DataFrame({"ID": ids, "TargetF1": target_f1, "TargetRAUC": score_for_auc(grand_test)})
+    sub = pd.DataFrame({"ID": ids, "TargetF1": target_f1, "TargetRAUC": target_rauc})
     sample = pd.read_csv(resolve_path(cfg, "raw_dir") / "SampleSubmission.csv")
     order = {i: k for k, i in enumerate(sample["ID"])}
     sub = sub.sort_values("ID", key=lambda s: s.map(order)).reset_index(drop=True)

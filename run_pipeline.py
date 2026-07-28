@@ -18,8 +18,8 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")  # silence benign sklearn feature-name notes
 
-from src.calibration import (calibrate_for_f1, estimate_test_prior_bbse,
-                             find_tstar, score_for_auc)
+from src.calibration import (calibrate_for_f1, calibrate_legal,
+                             estimate_test_prior_bbse, find_tstar, score_for_auc)
 from src.data import load_bundle
 from src.features import build_test_matrix, build_train_matrix
 from src.models import Ensemble
@@ -164,20 +164,35 @@ def main() -> None:
                 round(min(max(q_hat + 0.05, 0.05), 0.95), 2),
             ]
 
-    # ---- Fixed-0.5 calibration for TargetF1; monotone score for TargetRAUC ----
-    target_f1, t_star, diag = calibrate_for_f1(cv.y, cv.oof_prob, p_test_raw, cfg)
-    target_rauc = score_for_auc(p_test_raw)
+    # ---- Operating point. `legal` is the default and the only shippable mode. ----
+    _mode = cfg["calibration"].get("compliance_mode", "legal")
+    if _mode == "legal":
+        # Train-only Platt calibration, literal 0.5 cut, real probabilities in BOTH columns.
+        # No cfg is passed in, so no prevalence target or LB-derived constant can leak in.
+        target_f1, target_rauc, diag = calibrate_legal(cv.y, cv.oof_prob, p_test_raw)
+        t_star = 0.5
+        _oof_f1 = diag["oof_f1_at_0.5"]
+    elif _mode == "pinned":
+        log.warning("⚠️  compliance_mode='pinned' VIOLATES THE COMPETITION RULES (threshold "
+                    "tuning + non-probability RAUC column). Legitimate use is reproducing the "
+                    "historical anchors in experiments/anchors.tsv. DO NOT SUBMIT THIS.")
+        target_f1, t_star, diag = calibrate_for_f1(cv.y, cv.oof_prob, p_test_raw, cfg)
+        target_rauc = score_for_auc(p_test_raw)
+        _oof_f1 = diag["oof_f1_at_0.5_after"]
+    else:
+        raise ValueError(f"calibration.compliance_mode must be 'legal' or 'pinned', got {_mode!r}")
 
-    # Headline metrics reflect the CALIBRATED submission: F1 from the shifted
-    # OOF at 0.5; AUC is invariant to the monotone shift (use raw).
+    # Headline metrics reflect the submitted columns. AUC is taken from the raw score
+    # because every transform above is strictly monotone, so the ranking is identical.
     m = {
-        "f1": diag["oof_f1_at_0.5_after"],
+        "f1": _oof_f1,
         "auc": m_raw["auc"],
-        "combined": 0.6 * diag["oof_f1_at_0.5_after"] + 0.4 * m_raw["auc"],
+        "combined": 0.6 * _oof_f1 + 0.4 * m_raw["auc"],
     }
-    log.info("t_star=%.4f | calibrated OOF: f1@0.5=%.4f auc=%.4f combined=%.4f | prior-sens=%s",
-             t_star, m["f1"], m["auc"], m["combined"],
-             {k: round(v, 3) for k, v in diag["prior_sensitivity"].items()})
+    log.info("mode=%s t_star=%.4f | OOF: f1@0.5=%.4f auc=%.4f combined=%.4f",
+             _mode, t_star, m["f1"], m["auc"], m["combined"])
+    if "prior_sensitivity" in diag:
+        log.info("prior-sens=%s", {k: round(v, 3) for k, v in diag["prior_sensitivity"].items()})
 
     # ---- Write + validate submission ----
     sub_df = pd.DataFrame({

@@ -1,16 +1,31 @@
-"""Fixed-0.5 calibration for the TargetF1 column.
+"""Operating point for the two submission columns.
 
-The competition forbids choosing a probability threshold — TargetF1 is scored
-at a hard 0.5. The only legal lever is a MONOTONE transform of the probability
-so that its F1-optimal operating point lands exactly at 0.5. We find
-t* = argmax_t F1(y, p >= t) on out-of-fold predictions, then apply the logit
-shift  p' = sigmoid(logit(p) - logit(t*))  which sends p=t* to p'=0.5 while
-preserving the ranking. Because the shift is strictly monotone,
-(p' >= 0.5) == (p >= t*), so the F1-optimal decision is expressed legally.
+TWO MODES, selected by `calibration.compliance_mode`.
 
-TargetRAUC is handled separately (score_for_auc): AUC is invariant to any
-strictly monotone map, so we keep the raw ranked score with maximal spread and
-never apply isotonic (which would flatten ties and can hurt AUC).
+`legal` (DEFAULT) — see calibrate_legal(). Platt calibration fit on TRAINING out-of-fold
+predictions only, then a LITERAL 0.5 cut. Both columns come from the same strictly-monotone
+calibrated probability, so TargetRAUC is a genuine probability and AUC is unchanged.
+
+`pinned` (⚠️ NON-COMPLIANT, historical) — see calibrate_for_f1() and score_for_auc(). This
+is what produced every score in experiments/anchors.tsv and it VIOLATES THE RULES on two
+counts. It is retained solely so the historical anchors remain reproducible; do not ship it.
+
+    Rules, verbatim (zindi.africa/.../rules, read 2026-07-28):
+      "Setting a probability threshold is strictly forbidden. Your binary target should be
+       based on the default threshold of 0.5."
+      "...do not set thresholds (or round your probabilities) to improve your place on the
+       leaderboard."
+      "Zindi will need the raw probabilities. This will allow the clients to set thresholds
+       to their own needs."
+
+    (a) TargetF1: target_prevalence_shift() computes a quantile of the logits and shifts so
+        that quantile lands at 0.5 -- its own docstring calls this "a threshold on the
+        logits". The prevalence constant 0.649 was moreover swept against LEADERBOARD
+        FEEDBACK (iteration 02), not derived from training data.
+    (b) TargetRAUC: score_for_auc() emits uniformly-spaced ranks, which are not
+        probabilities.
+
+    See REPORT.md section 7 and gemini_loop/RESPONSE_13.md.
 """
 from __future__ import annotations
 
@@ -76,10 +91,84 @@ def fit_isotonic(y: np.ndarray, p_oof: np.ndarray):
 
 
 def score_for_auc(p_raw: np.ndarray) -> np.ndarray:
-    """TargetRAUC: strictly-monotone rank transform, maximal unique spread."""
+    """TargetRAUC via a rank transform. ⚠️ NON-COMPLIANT — historical use only.
+
+    The rules require RAW PROBABILITIES in the probability column, verbatim: "Zindi will
+    need the raw probabilities. This will allow the clients to set thresholds to their own
+    needs." This function returns uniformly-spaced ranks in [0,1], which are not
+    probabilities at all — a client thresholding the column at 0.8 gets "the top 20% of
+    rows". Retained ONLY so `calibration.compliance_mode: pinned` can reproduce the
+    historical anchors in experiments/anchors.tsv. Use platt_calibrate() instead.
+    """
     p = np.asarray(p_raw, dtype=float)
     order = np.argsort(np.argsort(p))
     return (order + 0.5) / len(p)
+
+
+def platt_calibrate(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray
+                    ) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Platt scaling fit on TRAINING out-of-fold predictions ONLY.
+
+    This is the rules-compliant calibrator. Two properties make it the right choice here:
+
+    1. It is fit exclusively on (y_oof, p_oof) — training data. Nothing about the test set
+       or the leaderboard enters, so the resulting 0.5 cut has a clean provenance.
+    2. It is **strictly monotone** in the raw score (a 1-D logistic on the logit), so the
+       ranking is preserved EXACTLY and ROC-AUC is bit-identical to the raw score's. Unlike
+       isotonic regression it creates no ties, and ties are scored as half-credit by AUC.
+
+    So emitting these as TargetRAUC costs nothing on the metric while replacing rank
+    surrogates with genuine probabilities. Returns (p_oof_cal, p_test_cal, slope).
+    """
+    from sklearn.linear_model import LogisticRegression
+
+    z_oof = _logit(np.asarray(p_oof, dtype=float)).reshape(-1, 1)
+    z_test = _logit(np.asarray(p_test, dtype=float)).reshape(-1, 1)
+    lr = LogisticRegression(C=1e6, solver="lbfgs", max_iter=1000)  # ~unregularized Platt
+    lr.fit(z_oof, np.asarray(y_oof).astype(int))
+    slope = float(lr.coef_[0][0])
+    if slope <= 0:
+        # A non-positive slope would REVERSE the ranking and destroy AUC. It means the OOF
+        # scores are anti-correlated with the labels, which is a modelling failure, not a
+        # calibration one -- fail loudly rather than silently shipping an inverted column.
+        raise ValueError(
+            f"Platt slope is {slope:.4f} <= 0: calibration would invert the ranking. "
+            "Refusing to produce a submission.")
+    return (lr.predict_proba(z_oof)[:, 1], lr.predict_proba(z_test)[:, 1], slope)
+
+
+def calibrate_legal(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray
+                    ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+    """RULES-COMPLIANT operating point. Returns (target_f1, target_rauc, diagnostics).
+
+    The rules state, verbatim: "Setting a probability threshold is strictly forbidden. Your
+    binary target should be based on the default threshold of 0.5." and "do not set
+    thresholds (or round your probabilities) to improve your place on the leaderboard".
+
+    So: calibrate on TRAINING data only, then cut at a LITERAL 0.5. No test-set quantity,
+    no leaderboard-derived constant, and no prevalence target enters this function -- by
+    construction, since it does not take `cfg`. The realized positive rate is whatever the
+    calibrated model says it is; it is REPORTED, never targeted.
+
+    Both columns come from the same strictly-monotone calibrated probability, so TargetRAUC
+    is a real probability and its AUC is identical to the raw score's.
+    """
+    p_oof_cal, p_test_cal, slope = platt_calibrate(y_oof, p_oof, p_test)
+    target_f1 = (p_test_cal >= 0.5).astype(int)
+
+    diagnostics = {
+        "mode": "legal",
+        "platt_slope": slope,
+        "oof_f1_at_0.5": f1_at(np.asarray(y_oof), p_oof_cal, 0.5),
+        "test_pos_rate": float(target_f1.mean()),      # reported, NOT targeted
+        "train_prior": float(np.mean(y_oof)),
+        "p_oof_final": p_oof_cal,
+    }
+    log.info("LEGAL calibration: Platt fit on OOF train only (slope=%.3f) | literal 0.5 cut "
+             "| realized test pos-rate %.3f (train prior %.3f) | OOF f1@0.5=%.4f",
+             slope, diagnostics["test_pos_rate"], diagnostics["train_prior"],
+             diagnostics["oof_f1_at_0.5"])
+    return target_f1, p_test_cal, diagnostics
 
 
 def prior_sensitivity(y: np.ndarray, p_shifted: np.ndarray, priors, base_prior: float
