@@ -161,10 +161,11 @@ def main() -> None:
     sub.to_csv(out, index=False)
     log.info("Wrote %s  (%d rows, pos-rate %.3f)", out, len(sub), float(sub["TargetF1"].mean()))
     log.info("")
-    log.info("REMINDER: a LOWER public score than 0.8955 is the EXPECTED and DESIRABLE outcome "
-             "here. 0.8955 is the better of two draws from a distribution with sd ~0.013 and is "
-             "probably an upward fluctuation; the pooled submission trades that luck for "
-             "reliability on the unseen 721-row private slice.")
+    log.info(
+        "REMINDER: a LOWER public score than the best single seed is the EXPECTED and DESIRABLE "
+        "outcome. The pooled artifact trades one lucky RNG draw for reliability on the unseen "
+        "721-row private slice. Note the pinned 0.8955 is no longer a valid comparator -- it was "
+        "scored under the rules-violating operating point. The legal champion is 0.889686.")
 
 
 if __name__ == "__main__":
