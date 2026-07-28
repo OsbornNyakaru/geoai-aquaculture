@@ -354,6 +354,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 24 | 2026-07-27 | **GBDT as decorrelated member** — trees on aggregate features (a different class, not the ROCKET family) | submission_champion_gbdtblend5.csv | 0.649 | **0.879123** | ❌ **−0.0155 vs archblend4 (SIGNIFICANT, paired); cross-class blending CLOSED** |
 
 | 25 | 2026-07-27 | **Phase-A shift audit** (`tools/shift_audit.py`) — indicator probe + 2-D band screen | *local, no cloud run* | — | **n/a — 0 subs** | ✅ 1 lane CLOSED, 1 lane OPENED |
+| 26 | 2026-07-28 | **BAND DELETION** — drop VV (top shift-carrier, dominated by VH on signal); capacity-REDUCING | submission_c_dropvv.csv | 0.649 | **PENDING** | 🎯 first candidate to clear the pre-committed rule since iter9 (2/2 votes, ATC-F1 above the champion's best-of-5 seed draw) |
 
 ---
 
@@ -424,6 +425,53 @@ rows, correlated features, one dominant signal) — this lane has a real downsid
 **→ iter25 staged:** `c_dropvv`, `c_dropblue`, `c_dropvvblue` at 2 seeds each, 0 submissions. Wired via
 a new `seq.channels.drop_bands` flag, smoke-verified end-to-end (width 24→20 **and** the independently
 computed `n_features` agrees — the double-check iter12's silent no-op defeated).
+
+---
+
+## iter25 RESULT — the first candidate to clear the pre-committed rule since iter9
+
+**Integrity checks, all PASS.**
+- Widths logged: `c_dropvv` **22**, `c_dropblue` **22**, `c_dropvvblue` **20**; `n_features` agrees
+  independently in every case. The flag took effect — this is not iter12's silent no-op.
+  *(My staging note said "22/23/20". The 23 was my arithmetic slip: dropping one of 12 bands removes
+  one value channel AND one indicator channel, so 24→22, not 23. No run was void.)*
+- Gate: **ATCF1 15/15 concordant PASS (ρ +0.964, n=7)**, **DIS 5/5 PASS (ρ +1.000, n=4)**.
+  ATC/DIV/MARG FAIL as always. The screen is readable — unlike iter21, where it returned VOID.
+
+**The screen.**
+
+| candidate | ATC-F1 margin | → LB | DIS margin | votes | rule |
+|---|---|---|---|---|---|
+| **`c_dropvv`** | **+0.0902** | +0.0147 | +0.0214 | **2/2** | **SUBMIT** |
+| `c_dropblue` | −0.0133 ~ | −0.0022 | +0.0117 | 1/2 | HOLD |
+| **`c_dropvvblue`** | **+0.0829** | +0.0135 | +0.0311 | **2/2** | **SUBMIT** |
+
+The pre-committed rule was: *"≥2 cleared estimators AND the ATC-F1 margin exceeds the seed sd
+(0.0576)."* **`c_dropvv` satisfies both** (2/2 votes; 0.0902 = 1.57 sd). So does `c_dropvvblue`.
+
+**A stronger statement than the rule required.** The champion's ATC-F1 across 5 seeds is
+mean 0.7759, sd 0.0576, **range [0.7196, 0.8601]**. `c_dropvv` scores **0.8977** — above the champion's
+*best of five* seed draws, not merely above its mean. `c_dropvvblue` at 0.8904 likewise. This is the
+first time a candidate has cleared the champion's entire observed seed range.
+
+**Why `c_dropvv` and not `c_dropvvblue`.** ρ(dropvv, dropvvblue) = **0.9841** — near-twins, so one
+submission tests both. ATC-F1 (the better-fit estimator: n=7, 15/15, vs DIS's n=4) prefers dropvv, and
+blue's *own* row is a HOLD with a **negative** ATC-F1 margin — so the blue deletion is not independently
+supported and `dropvvblue` inherits it. Take the change the evidence actually supports.
+
+**DECISION: upload `submission_c_dropvv.csv` (seed 42). 1 submission.** Seed 42 both sides, one
+variable changed, against the 0.8955 seed-42 anchor — a **paired** A/B under the RESEARCH_07 §5b
+protocol (SUGGESTIVE ≥0.006, CONFIDENT ≥0.012).
+
+**Honest prediction, committed before the result** (last time I predicted 0.892–0.897 and got 0.879123,
+so this is calibrated down): ATC-F1's magnitude runs ~3× overstated, so +0.0147 → a true expectation of
+**≈+0.005**, i.e. **≈0.900**, inside the ±0.019 seed band. Read: **≥0.9075** = confident win and the
+first level gain since the GBDT→Transformer swap; **0.890–0.907** = unresolved, consistent with noise;
+**≤0.8835** = confident loss, and feature-space deletion closes.
+
+**Note on `archblend4`.** Its 4 members are unchanged, so the artifact is identical to the 0.894643
+upload — **do not re-submit it.** The printed "mean pairwise ρ = 0.9345" is contaminated by the two
+`--diag-extra` columns; archblend4's own 4-member mean is **0.9524**.
 
 ---
 

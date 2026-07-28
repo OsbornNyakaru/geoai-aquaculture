@@ -13,7 +13,7 @@
 - **Competition:** GeoAI Aquaculture Pond Identification (Zindi / FAO / ITU)
 - **Repo:** `OsbornNyakaru/geoai-aquaculture` (private) · branch `main`
 - **Deadline:** 2026-08-16 · **Submissions:** max 5/day (manual upload to Zindi; no API)
-- **Last updated:** 2026-07-27 (Phase-A audit) · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643, now unchallenged.** · **Loop state: 🏁 ARCHITECTURE SEARCH CLOSED. iter24 ran and FAILED, significantly: `champion_gbdtblend5` = 0.879123, −0.0155 vs archblend4 on a strongly PAIRED comparison (4/5 shared members, identical 309 rows) → ≥2.5σ, not noise. The result INVERTS its own hypothesis: the GBDT was equally decorrelated as ROCKET (ρ 0.849 vs 0.850) but ~4× stronger (−0.011 vs −0.040 LB), and its blend cost NEARLY TWICE AS MUCH (−0.0155 vs −0.0090). Cross-model-class blending is now closed with n=2 across maximally different families. THE LAW: under a rank-only metric with a PINNED threshold, a decorrelated member's reordering near the cut costs more level than its independence buys back — only rank-twins (ρ>0.93, same class) pool without loss, and those buy variance, never level. METHODOLOGICAL LESSON: the screen said `g_gbdt votes=1/2 → HOLD` and was RIGHT; it was overridden by extending iter18's "read the matrix not the screen" rule beyond its derivation (within-class pooling, where members are equally competent). Do NOT upload `champion_xview_gbdt` (½ weight on the member that just cost −0.0155 at ⅕). · **iter25 (2026-07-27) then reopened ONE narrow lane from round-11 research + a local Phase-A audit that cost 0 submissions: the shift lives in the VALUES (adv-AUC 0.8915 masked+left-aligned) and a 2-D screen (A=shift vs T=signal) names VV and blue as free deletions — with the SAR literature independently rejecting VV. Capacity-REDUCING, the only class that has ever won. Tempered: the shift is DISTRIBUTED (max single-band A 0.59 vs joint 0.89), so this cannot collapse it. NEXT ACTION: `Run all` → iter25 band-deletion screen (0 subs), AND start the Phase-Two writeup in parallel — 35% of the top-5 rubric, still does not exist, deadline 2026-08-16.**
+- **Last updated:** 2026-07-28 (iter25 ran; forum intel from the LB leader) · **Champion public LB: 0.8955 single seed / reliable ≈0.8865** · **Leading finalist: `champion_archblend4` = 0.894643, now unchallenged.** · **Loop state: 🏁 ARCHITECTURE SEARCH CLOSED. iter24 ran and FAILED, significantly: `champion_gbdtblend5` = 0.879123, −0.0155 vs archblend4 on a strongly PAIRED comparison (4/5 shared members, identical 309 rows) → ≥2.5σ, not noise. The result INVERTS its own hypothesis: the GBDT was equally decorrelated as ROCKET (ρ 0.849 vs 0.850) but ~4× stronger (−0.011 vs −0.040 LB), and its blend cost NEARLY TWICE AS MUCH (−0.0155 vs −0.0090). Cross-model-class blending is now closed with n=2 across maximally different families. THE LAW: under a rank-only metric with a PINNED threshold, a decorrelated member's reordering near the cut costs more level than its independence buys back — only rank-twins (ρ>0.93, same class) pool without loss, and those buy variance, never level. METHODOLOGICAL LESSON: the screen said `g_gbdt votes=1/2 → HOLD` and was RIGHT; it was overridden by extending iter18's "read the matrix not the screen" rule beyond its derivation (within-class pooling, where members are equally competent). Do NOT upload `champion_xview_gbdt` (½ weight on the member that just cost −0.0155 at ⅕). · **iter25 (2026-07-27) then reopened ONE narrow lane from round-11 research + a local Phase-A audit that cost 0 submissions: the shift lives in the VALUES (adv-AUC 0.8915 masked+left-aligned) and a 2-D screen (A=shift vs T=signal) names VV and blue as free deletions — with the SAR literature independently rejecting VV. Capacity-REDUCING, the only class that has ever won. Tempered: the shift is DISTRIBUTED (max single-band A 0.59 vs joint 0.89), so this cannot collapse it. iter25 RAN 2026-07-28: gate PASSED (ATCF1 15/15, DIS 5/5) and `c_dropvv` CLEARED THE PRE-COMMITTED RULE — 2/2 votes, ATC-F1 0.8977 vs the champion's 5-seed range [0.7196, 0.8601], i.e. above its BEST draw. `c_dropvvblue` also cleared but is a ρ=0.9841 twin whose extra band (blue) is itself a HOLD with a negative margin. UPLOADING `submission_c_dropvv.csv` (seed 42, paired vs the 0.8955 seed-42 anchor). Committed prediction: ≈0.900; ≥0.9075 = confident win, ≤0.8835 = confident loss and feature-space deletion closes.** · **🔑 NEW 2026-07-28 — THE PUBLIC-LB LEADER (`sdv`) DESCRIBED THEIR APPROACH ON THE FORUM AND IT SAYS WE HAVE BEEN SEARCHING A FLAT AXIS: they are at ~0.94 with PLAIN CATBOOST ("the model isn't the bottleneck"), they tried regime-mimicking validation and it "barely correlated", and their named lever is RATIO/RELATIVE FEATURES over absolute values. Our ≈0.05 gap is therefore entirely in FEATURES, not model class or ensembling — the last 8 iterations searched architecture. We have NEVER tested a cross-band ratio; `VH − VV` (the dB log cross-pol ratio) is queued and unrun. NOTE this does not contradict "amplitude is the signal": we tested WITHIN-SERIES TEMPORAL RANK (destroys level), not a CROSS-BAND ratio at fixed t (preserves level, cancels per-period gain drift). We conflated two different transformations. · NEXT ACTION: upload c_dropvv, then iter26 = ratio-feature battery screened on the free 2-D A/T screen, AND the Phase-Two writeup in parallel — 35% of the top-5 rubric, still does not exist, deadline 2026-08-16.**
 - **🚨 READ FIRST if you are a fresh session — three corrections, one of them fatal to the ledger:**
   1. **SEED VARIANCE IS 0.0191, MEASURED (2026-07-22).** The champion configuration, changing *only*
      the RNG seed, scored **0.8955 (seed 42)** vs **0.8764 (seed 7)**. **Nine of our eleven recorded
@@ -31,10 +31,30 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter25 (band-deletion screen, 0 submissions), and START the
-   Phase-Two writeup in parallel.** Round-11 research (8 agents → `gemini_loop/RESEARCH_11.md`) plus a
-   local Phase-A audit (`tools/shift_audit.py`, ~3 min, zero submissions) closed one lane and opened
-   another:
+3. **Current next action: upload `submissions/submission_c_dropvv.csv` (1 sub), then iter26 =
+   the RATIO-FEATURE battery, and START the Phase-Two writeup in parallel.**
+
+   **🔑 Read this before anything else — the public-LB leader (`sdv`) posted their approach
+   (forum, 14–16 Jul 2026, post-reset) and it reframes the whole project.** They sit at ~0.94 with
+   **plain CatBoost** — *"the model isn't the bottleneck"* — so our ≈0.05 gap is **entirely in the
+   features**, not the model class and not the ensembling that iterations 18–25 spent themselves on.
+   Three actionable specifics: (a) their named lever is **relative/ratio-style features**, which
+   *"survive the shift far better than absolute values"* — **we have never tested a cross-band ratio**,
+   and `VH − VV` (the dB log cross-pol ratio) is queued and unrun; (b) they tried **regime-mimicking
+   validation and it "barely correlated"**, so do not spend days rebuilding CV; (c) **the two scored
+   columns are independent** and they optimize each separately (see `RESEARCH_11.md` §1a).
+   **Do not read (a) as contradicting "amplitude is the signal."** Our refutation tested
+   *within-series temporal rank*, which destroys level. A *cross-band ratio at fixed t* preserves level
+   while cancelling per-period multiplicative gain drift. Two different transformations; we conflated
+   them for ten iterations.
+
+   iter25 (ran 2026-07-28) closed the band-deletion screen with a rare positive: gate PASSED and
+   **`c_dropvv` cleared the pre-committed rule** — 2/2 votes, ATC-F1 **0.8977** against the champion's
+   5-seed range **[0.7196, 0.8601]**, i.e. above its *best* draw. Uploading it (paired, seed 42 both
+   sides). Committed prediction ≈0.900; **≥0.9075** = confident win, **≤0.8835** = confident loss.
+
+   The Phase-A audit (`tools/shift_audit.py`, ~3 min, zero submissions) that produced it closed one
+   lane and opened another:
    - **CLOSED:** the per-band missing-indicator deletion three agents predicted. Indicators alone
      separate masked-train from test at adv-AUC **0.4758** (below chance) and add **+0.0028** over
      values — because `apply_mask` already applies S2 dropout at rates measured off test, so the

@@ -71,6 +71,39 @@ earned with the two legs we do not have.** Do not aim us at them.
 highest.** See §2 (F) and (G). One of them (**window matching**) turned out to be *already fully
 implemented in our repo*. Please do not spend the round re-recommending it.
 
+**6. 🔑 The #1 on the public LB has described their approach on the forum — and it says we have been
+optimizing the wrong axis.** User `sdv` (thread dated 14–16 Jul 2026, post-reset), verbatim:
+
+> *"Random K-fold basically lies to you here — train and test are different time periods, so
+> in-distribution CV looks amazing and means nothing. **I tried validation that mimics the test regime
+> and even that barely correlated.** In the end I treat the LB as the only honest judge."*
+>
+> *"Prefer signals that don't drift between periods — **relative/ratio-style features tend to survive
+> the shift far better than absolute values.**"*
+>
+> *"Think about what physically separates the target from the things it gets confused with, and try to
+> **isolate that one specific signal** rather than throwing everything at a big model."*
+>
+> *"The two scored columns are independent — worth optimizing each on its own terms."*
+>
+> *"**Don't blame the trees — I'm on gradient boosting too (CatBoost-family, nothing exotic), so the
+> model isn't the bottleneck.** If tuning models and swapping features isn't moving the LB, that's a
+> hint the lever is elsewhere."*
+>
+> *"Months aren't independent points — training each month as its own row loses how a pixel behaves
+> across the year."*
+
+**Three consequences, and they are uncomfortable for us.** (i) The leader is at ~0.94–0.945 with
+**plain CatBoost**, while our GBDT scored ≈0.885 and our transformer ≈0.8865 — so the ≈0.05 gap is
+**entirely in the features/representation**, not the model class. Our last 8 iterations of architecture
+and ensemble search were searching an axis the leader says is flat. (ii) Regime-matched validation was
+**tried by the leader and barely correlated** — see Q3, which we have rewritten accordingly. (iii)
+**Ratio-style features** are the leader's named lever and we have **never tested a cross-band ratio.**
+Note this does *not* contradict our amplitude finding (§2 D): we tested replacing values with
+*within-series temporal rank*, which destroys level. A **cross-band** ratio at fixed time preserves
+level information while cancelling per-period gain/calibration drift. **These are different
+transformations and we conflated them.**
+
 **Consequence for you:** the funding bar from Round 09 stands — nothing below **~0.010 LB** is
 measurable in principle — but the *shape* of a fundable idea has changed. We are no longer shopping for
 a better single ranking. We are shopping for **(a)** ways to exploit the two-column split, **(b)** ways
@@ -285,13 +318,15 @@ construction the *least confident* rows — the ones where the shift bites harde
 - What is the **variance** of a boundary-region intervention? If it moves 11 rows in expectation with an
   sd of 11 rows, it is not fundable — say so.
 
-### Q3 — Model selection when even the *matched* CV may lie
-We already match the observation regime in training (§2 G). What we have **not** done is build a
-**model-selection CV** whose folds are scored under the test regime (masked windows, per-month S2
-dropout at measured rates, ≥5 mask draws averaged). Our CV sits at ~0.975 against an LB of ~0.89 and has
-been **anti-correlated** with the LB.
-- Would a regime-matched CV actually recover LB-predictiveness here, or does the *period/region* shift
-  (adv-AUC 0.8915 on the values alone, after masking) mean **no** train-only CV can rank candidates?
+### Q3 — Model selection when even the *matched* CV is known to fail
+We already match the observation regime in training (§2 G), and the **public LB leader reports that a
+regime-mimicking validation "barely correlated"** for them either (§0 #6). So please do **not** answer
+"build a regime-matched CV" — that is the obvious answer and the strongest available evidence says it
+does not work. Our CV sits at ~0.975 against an LB of ~0.89 and has been **anti-correlated**.
+- Given that, is there **any** train-only validation that can rank candidates here, or is the honest
+  answer that *no* train-only CV works when the period/region shift leaves adv-AUC 0.8915 on the values
+  alone *after* regime matching? **If the answer is "no", say so** — it would settle our biggest open
+  methodological question and redirect the remaining 19 days.
 - Are there **label-free** model-selection criteria with real evidence under covariate shift — ATC and
   its variants, importance-weighted CV where ESS permits, agreement-on-the-line / **prediction-based
   "GDE"** methods, or the **DEV/DEV-k** estimators? We built ATC-F1 (ρ+0.964, n=7, CI [0.770, 0.995]).
@@ -326,7 +361,30 @@ Primary sources, not blog summaries. Mechanisms specific enough to implement.
   interested in cases where the winner's edge was **operating-point discipline or validation design**
   rather than architecture — that matches our situation.
 
-### Q6 — The one leg of the physics we still have
+### Q6 — 🔑 Drift-invariant RATIO features (the leader's named lever, and our blind spot)
+The public-LB leader says *"relative/ratio-style features tend to survive the shift far better than
+absolute values"* (§0 #6), and reaches ~0.94 with plain CatBoost on them. **We have never tested a
+cross-band ratio.** Our one "relative" experiment replaced values with *within-series temporal rank*,
+which destroys level and collapsed OOF 0.975→0.86 (§2 D) — a different transformation entirely.
+- **Which ratios are physically drift-invariant for S1/S2 over water?** A cross-band ratio at fixed time
+  cancels multiplicative per-period gain (sensor calibration drift, incidence-angle and atmospheric
+  scaling) while *preserving* the level contrast that is our actual signal. In dB, `VH − VV` **is** the
+  log cross-pol ratio and is the obvious first candidate; we have it queued and have never run it.
+- Give us a **ranked, sourced shortlist** of ratio/relative constructions with a stated invariance
+  argument for each — what physical nuisance does it cancel, and what does it cost in signal? Please
+  exclude the ones we have proven algebraically degenerate here (§3): SDWI, AWEI, EVI, NDWI, MNDWI.
+- **Ratio-of-what-to-what:** cross-band at fixed t · same-band across t (drift-sensitive, likely wrong)
+  · band-to-scene-median · band-to-its-own-window-median. Which survives a *period* shift rather than
+  merely a within-scene one?
+- Ratios are unstable near zero and S2 reflectances over water are small and can be negative after
+  atmospheric correction. **Give the numerically safe form** (log-ratio, normalized difference,
+  clipped denominator) and say which you would use here.
+- **Screening:** every candidate ratio can be scored for free on our 2-D screen (A = adversarial
+  separability, T = target predictiveness). A ratio that is genuinely drift-invariant should show
+  **lower A than either of its constituent bands at comparable T** — that is a falsifiable prediction
+  we can run at zero cost, so state it explicitly for each proposal.
+
+### Q7 — The one leg of the physics we still have
 We have **only** temporal permanence (§0 #4): shape and external overlays are gone. Within a single
 isolated pixel's 12-band × 4–6-month series:
 - What **shape-free, amplitude-preserving** temporal signature separates a managed pond from natural
