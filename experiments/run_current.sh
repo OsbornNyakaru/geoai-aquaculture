@@ -115,3 +115,9 @@ cat <<'NEXT'
  That is the whole compliance claim, auditable from the submission file.
 =====================================================================
 NEXT
+
+# ---- 5. REPRODUCTION VERIFICATION (iter29). Runs on the cloud box, which has the RAM. ----
+# REPORT.md claims one-command reproduction. That claim was never tested end to end until now;
+# a reproduction claim that fails is worse than none. Stage 1 is cheap -- run it and read the
+# fingerprint block it prints.
+bash experiments/reproduce_champion.sh --quick
