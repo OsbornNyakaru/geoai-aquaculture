@@ -31,16 +31,20 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter30 (the LEGAL CATBOOST lane) on Colab, up to 2 uploads.**
-   iter29 result: bigger pool (archblend6, +k4+base) LOST −0.0047 → within-class pooling CLOSED, the
-   level-gap gate survives the legal cut, `archblend4` (0.899643) stays finalist #1. The only pooling
-   gain left needs a competent + different model class → iter30 = legal CatBoost (n-invariant features
-   + VH-CDF permanence + ordered boosting; smoke-verified legal, n_features 78), tested standalone and
-   as the different-bias member in `champion_catblend5` (vs 0.899643). Grounded in
-   `gemini_loop/RESEARCH_14_WEBSEARCH.md` (analogous-winner + feature evidence) while the UPDATE_13
-   CatBoost deep-research (Q1–Q4) is still out. **Still open and deadline-bound regardless of iter30:**
-   (a) DESIGNATE the two legal finalists on Zindi (irreversible); (b) the Phase-Two writeup (35% of a
-   top-5 score, reproduction claim still UNVERIFIED).
+3. **Current next action: LOCK FINALISTS + PHASE-TWO WRITEUP. The score-chasing loop is done.**
+   iter30 (legal CatBoost) FAILED hard: `champion_catblend5` = **0.886043** (−0.0136 paired vs
+   archblend4) and standalone `c_catboost` = **0.697615** (OOF AUC 0.9953 → LB 0.70, the OOF↔LB
+   anti-correlation at its worst). **Cross-class ensemble blending is now CLOSED with n=3** (ROCKET,
+   pin-GBDT, legal-CatBoost all dragged the blend); within-class pooling closed at iter29. The ENTIRE
+   ensemble + model-class search is exhausted. `champion_archblend4` (**0.899643**) is the final,
+   eligible, best-ever artifact. **Strike 3 on my over-predictions** — all on out-of-family candidates
+   with strong offline signals (`c_dropvv`, `c_catboost`); RETIRE OOF-AUC and arch_blend's "POOL IT"
+   verdict as competence signals (only paired LB is trustworthy). **Remaining EV is deadline-bound and
+   guaranteed:** (a) DESIGNATE the two legal finalists on Zindi — `champion_archblend4` (0.899643) +
+   `seq_a_xview` (0.889686) — irreversible, do it early; (b) the Phase-Two reproducibility/novelty
+   writeup (35% of a top-5 score, still does NOT exist, reproduction claim UNVERIFIED). Optional single
+   remaining probe with any real thesis: VH-CDF permanence + `VH−VV` as CHANNELS in the Transformer
+   (the model that transfers) — but it is an unscreenable representation change and "expect small".
 
    **🏆 2026-07-28 — WE ARE LEGAL *AND* AT OUR BEST SCORE EVER.** `champion_archblend4` rebuilt
    through the compliant path = **0.899643**, above every artifact we have ever submitted

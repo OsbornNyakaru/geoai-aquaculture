@@ -358,7 +358,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 27 | 2026-07-28 | **GOING LEGAL** — removed the prevalence pin (a rules violation); train-only Platt + literal 0.5 in both columns | submission_seq_a_xview.csv | **0.548 (reported, not targeted)** | **0.889686** | ✅✅ **−0.0058 paired — BELOW our own 0.006 suggestive threshold. Compliance is statistically FREE.** The pin was worth ~0.006, not the +0.07 it was credited with |
 | 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
 | 29 | 2026-07-28 | **BIGGER LEGAL POOL** — archblend6 = archblend4 + `seq_a_k4` + `seq_a_base` (the 2 weakest members) | submission_champion_archblend6.csv | — | **0.894899** | ❌ **−0.0047 paired vs archblend4 (0.899643)**, shares 4/6 members. Adding the 2 weakest members DRAGGED the blend. "Weak members become assets under a literal cut" **REFUTED** — the level-gap gate SURVIVES the legal regime. **archblend4 stays finalist #1; aggressive pooling CLOSED** |
-| 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | catblend5 + c_catboost | legal | **pending upload** | 🎯 first COMPETENT + DECORRELATED member (ρ~0.80, AUC 0.995) |
+| 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | catblend5 / c_catboost | legal | **0.886043 / 0.697615** | ❌❌ **catblend5 −0.0136 paired (CONFIDENT LOSS); standalone 0.6976 CATASTROPHIC.** OOF AUC 0.995 → LB 0.70: the "competent + decorrelated" signal was an OOF illusion. Cross-class ensemble CLOSED (3rd fail). archblend4 final |
 
 ---
 
@@ -453,6 +453,49 @@ operating point is preserved, so CatBoost's under-selection does NOT collapse th
 **Decision: upload `champion_catblend5` (the main event) + `c_catboost` standalone (anchors whether
 the ranking strength survives the under-selection to LB). Prediction: catblend5 > archblend4's
 0.899643** — first competent, genuinely decorrelated member, operating point preserved.
+
+### iter30 LB RESULT (2026-07-29) — the prediction was WRONG; the ensemble lane is closed for good
+
+| artifact | LB | read |
+|---|---|---|
+| **champion_catblend5** | **0.886043** | **−0.0136 paired vs archblend4** (4/5 shared members) — a CONFIDENT LOSS |
+| **c_catboost** (standalone) | **0.697615** | catastrophic — OOF AUC 0.9953 → LB 0.70 |
+| archblend4 (finalist #1) | 0.899643 | unchanged, undisputed |
+
+**What happened.** CatBoost's "competence" was a pure OOF illusion. Its OOF AUC (0.9953) is the
+HIGHEST of any model we've built, and its LB is the LOWEST (0.6976) — the OOF↔LB anti-correlation in
+its most extreme form yet. Decorrelating the blend with a member whose *test* ranking is bad just
+injects error: catblend5 = archblend4 diluted by a 0.70 member → −0.0136. The under-selection
+(pos-rate 0.403) crippled the standalone F1, and the poor test transfer (implied test AUC ~0.85 vs OOF
+0.995) did the rest.
+
+**The law, now proven three times.** A member that is weak ON THE LB drags the blend in proportion,
+no matter how decorrelated or how strong its OOF looks: ROCKET (−0.040 → blend −0.009), pin-GBDT
+(−0.011 → blend −0.0155), legal-CatBoost (LB 0.70 → blend −0.0136). **Cross-model-class blending is
+CLOSED with n=3 across maximally different families.** Within-class pooling closed at iter29. The
+ENTIRE ensemble lane is now exhausted; `champion_archblend4` (0.899643) is the final answer for it.
+
+**Methodological strike 3 (mine).** I over-predicted a submission for the THIRD time, every time on an
+out-of-family candidate whose OOF/offline signal looked strong: `c_dropvv` (predicted +, got −0.0113),
+and now `c_catboost` (predicted catblend5 > 0.8996, got 0.886). **RETIRE the two offline signals that
+misled here:** (a) OOF AUC as a competence proxy — it is anti-correlated with LB and is worse for
+trees than for the net; (b) `arch_blend`'s rank-correlation "POOL IT/SKIP" verdict — it printed
+"POOL IT: level gain available" at mean ρ 0.8747 and was flatly wrong, because low ρ with a
+BAD-on-test member is a liability, not an asset. **The only trustworthy instrument is a paired LB
+submission.** Offline screening is dead for out-of-family candidates; do not spend narrative on it.
+
+**Where this leaves the CatBoost/feature thesis.** The LB leader is at ~0.94 with CatBoost; ours got
+0.70. A 0.24 gap is not a tuning gap — it is a fundamentally different pipeline (features and/or how
+they escape the masking/operating-point trap), not something we close by parameter sweeps in the time
+left. The tree lane, as WE can build it, does not work. If anything of the feature thesis survives, it
+is as CHANNELS in the Transformer (the model that actually transfers) — the VH-CDF permanence +
+`VH−VV` cross-pol ratio have never been tried there — but that is a representation change we cannot
+screen (strike-3 territory) and RESPONSE_13 already flagged "expect small."
+
+**Strategic consequence.** With the ensemble lane and the tree lane both closed, and a strong ELIGIBLE
+finalist banked (archblend4 = 0.899643), the remaining expected value is in the deadline-bound,
+guaranteed items — the Phase-Two reproducibility/novelty writeup (35% of a top-5 score, still does not
+exist) and the manual finalist designation — not in more LB probing against a 0.019 seed floor.
 
 ## iter25 PHASE-A — two results for zero submissions, computed locally in minutes
 
