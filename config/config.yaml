@@ -213,6 +213,14 @@ seq:
     deltas: false            # month-to-month differences per band (additive-offset invariant)
     indices: false           # per-month NDWI/MNDWI/NDVI/VV-VH/SDWI (ratios cancel offset)
     rank: false              # within-series rank per band over observed months (monotone-invariant)
+    # iter31 — the last feature shot, in the model that actually transfers (the Transformer).
+    cross_pol: false         # add VH-VV (dB) per-month channel: the cross-pol ratio / rice-canopy axis
+                             # (UPDATE_13 3a). Added ALONGSIDE level, never a substitute.
+    permanence: false        # add per-month indicators 1[VH_dB(t)<tau] for tau in cdf_taus. Masked
+                             # mean-pool of the binary channel = VH-CDF permanence fraction (Class-A,
+                             # n-invariant, not affine-spanned). RESPONSE_13's best feature idea; the
+                             # ONLY untested feature in the working model. Amplitude-preserving.
+    cdf_taus: [-22.0, -21.0, -20.0, -19.0]   # SAR land/water split ~ -21.5 dB (used by permanence)
     # iter12 candidate. REPLACES the standardized absolute values with their within-series rank,
     # keeping the channel count at 24 -- a capacity-NEUTRAL swap, unlike `rank` above which ADDS.
     # This is the FIRST GENUINE TEST of the amplitude question: per_cell_detrend was believed to

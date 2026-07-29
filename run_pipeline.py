@@ -116,7 +116,10 @@ def main() -> None:
         _extra = ((schema.n_bands if _ch.get("per_cell_detrend") else 0)
                   + (schema.n_bands if _ch.get("deltas") else 0)
                   + (5 if _ch.get("indices") else 0)
-                  + (schema.n_bands if _ch.get("rank") else 0))
+                  + (schema.n_bands if _ch.get("rank") else 0)
+                  + (1 if _ch.get("cross_pol") else 0)
+                  + (len(_ch.get("cdf_taus") or [-22.0, -21.0, -20.0, -19.0])
+                     if _ch.get("permanence") else 0))
         # iter25: drop_bands removes both the value AND the missing-indicator channel for each
         # dropped band, so the base width is 2*(n_bands - n_dropped). Keeping this in sync
         # matters: the iter12 `c_compact` bug was a silent no-op precisely because this

@@ -238,6 +238,24 @@ def _raw_extra_channels(cube: np.ndarray, schema, ch: dict):
         parts.append(_index_channels(cube, schema))
     if ch.get("rank"):
         parts.append(_rank_months(cube))
+    if ch.get("cross_pol"):
+        # VH - VV (dB): the cross-pol ratio. UPDATE_13 3a -- carries the ~1.3 dB rice-canopy axis
+        # (our hardest confuser). Amplitude-PRESERVING and ADDED, never a substitute for level.
+        VH = _cband(cube, schema, "VH"); VV = _cband(cube, schema, "VV")
+        parts.append((VH - VV)[:, :, None])
+    if ch.get("permanence"):
+        # Per-month permanence indicators c_tau(t) = 1[VH_dB(t) < tau]. The masked mean-pool of a
+        # binary channel IS the fraction-of-observed-months-below-tau -- a fixed-degree (Class-A,
+        # n-invariant) statistic, and an indicator is NOT affine-spanned by the bands, so it escapes
+        # the dead water-index degeneracy. Threshold on RAW dB; NaN preserved where VH is masked.
+        # RESPONSE_13's "best feature idea", generalized to a multi-threshold profile. tau anchored
+        # in SAR literature (land/water split ~ -21.5 dB; flooded-rice VH minima -22..-18 dB).
+        VH = _cband(cube, schema, "VH")
+        taus = ch.get("cdf_taus") or [-22.0, -21.0, -20.0, -19.0]
+        ind = np.stack(
+            [np.where(np.isnan(VH), np.nan, (VH < float(t)).astype(np.float32)) for t in taus],
+            axis=2)
+        parts.append(ind)
     if not parts:
         return None
     return np.concatenate(parts, axis=2).astype(np.float32)
