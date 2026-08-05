@@ -3,70 +3,86 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 32 — SEED-CONFIRM THE PERMANENCE WIN + first tau selection.   *** 1-2 submissions ***
+# ITERATION 33 — THE PERMANENCE ENSEMBLE (stack the two +0.010 lifts).   *** 1 submission ***
 #
-#   THE WIN (iter31). Adding per-month VH permanence indicators 1[VH_dB(t) < tau] as Transformer
-#   input channels scored c_perm = 0.901605 -- our BEST public score ever, above the 4-member
-#   archblend4 (0.899643), as a single legal model. cross_pol (VH-VV) was isolated and shown TOXIC
-#   (-0.0228), so it is OFF here. Direction from now on: PERMANENCE, one change at a time.
+#   CONFIRMED (iter31-32). VH permanence channels 1[VH_dB(t)<tau] lift the Transformer by a
+#   SEED-ROBUST +0.010: champion_perm_seedavg5 = 0.896918 vs champion seed-avg ~0.8865. The 4-tau grid
+#   {-22,-21,-20,-19} is best (6-tau `wide` scored lower). cross_pol stays OFF (toxic, -0.023).
 #
-#   WHY SEED-CONFIRM FIRST. c_perm is a single seed-42 run, and seed 42 is our historically LUCKY
-#   draw (old champion 0.8955@42 vs 0.8764@7 -- a 0.019 swing). +0.0119 sits right at the ~0.013
-#   public resolution. Before we build anything on permanence we must know the SEED-AVERAGED win.
+#   THE MOVE. archblend4 (0.899643) got +0.010 over its members by pooling 4 ARCHITECTURES (calibration
+#   diversity, iter28). Permanence gives +0.010 to each base model. If the two lifts STACK, a blend of
+#   PERMANENCE-transformers should clear ~0.905+. This iteration builds exactly that and compares it,
+#   same-run, against a freshly rebuilt archblend4 control.
 #
-#   THE READ (committed in advance).
-#     perm_seedavg5 - xview_seedavg5 >= +0.006 (matched 5-seed avg -> seed noise removed)
-#         -> REAL, seed-robust win. Permanence is a finalist candidate (simpler + higher than
-#            archblend4). iter33 = winning tau set + permanence-in-the-ensemble.
-#     within +-0.006
-#         -> 0.9016 was largely seed-42 luck; permanence is a tie. Reassess before pushing further.
-#   NOTE: this is a REPRESENTATION change -> ATC-F1 is out-of-family and screens NOTHING. The ground
-#   truth is the seed-averaged paired LB, nothing else.
+#   Members mirror archblend4 exactly, but every one has permanence ON:
+#     seq_a_{reltime,nope,l3,xview}_perm  (xview_perm = the iter31 winner, at 5 seeds).
+#   0 new code -- just `--set seq.channels.permanence=true` on the existing member recipes.
+#
+#   THE READ (committed).
+#     champion_perm_archblend4 - champion_archblend4 >= +0.006  -> the lifts STACK. New best, new
+#         finalist #1; permanence direction has more to give (iter34 = next single feature).
+#     within +-0.006  -> the +0.010 ensemble lift and the +0.010 permanence lift do NOT stack (pooling
+#         already captured most of what permanence adds). Then the finalist pair is archblend4 +
+#         champion_perm_seedavg5 (two ~0.897-0.900 artifacts with different error profiles), and we
+#         return to single-feature permanence engineering (iter34).
+#   NOTE representation change -> ATC-F1 screens nothing; the paired LB is the only truth.
 # =====================================================================
 set -euo pipefail
 
-# The iter31 winner: champion (relative_time + consistency_lambda=1) + VH permanence indicators.
-PERM="--full --model seq --set seq.channels.permanence=true"
-XV="--full --model seq"
+COMMON="--full --model seq"
+# Per-member config recipes (identical to archblend4). Permanence is added by the _perm arms only.
+r_reltime="--set seq.consistency_lambda=0"
+r_nope="--set seq.consistency_lambda=0 --set seq.pos_encoding=none"
+r_l3="--set seq.consistency_lambda=3"
+r_xview=""                       # champion: relative_time + consistency_lambda=1 (defaults)
+PERM="--set seq.channels.permanence=true"
 
-# ---- A. SEED-CONFIRM (the gate). c_perm at 5 seeds vs the champion at the same 5 seeds. ----
-python run_pipeline.py $PERM --name c_perm                       # seed 42 (re-anchors 0.901605)
+# ---- 1. BASE members (control archblend4), mirroring the known 0.899643 build. ----
+python run_pipeline.py $COMMON --name seq_a_reltime $r_reltime
+python run_pipeline.py $COMMON --name seq_a_reltime_s7 $r_reltime --set seed=7
+python run_pipeline.py $COMMON --name seq_a_nope    $r_nope
+python run_pipeline.py $COMMON --name seq_a_l3      $r_l3
+python run_pipeline.py $COMMON --name seq_a_xview   $r_xview
 for SD in 7 13 21 29; do
-  python run_pipeline.py $PERM --name "c_perm_s${SD}" --set seed=$SD
-done
-python run_pipeline.py $XV --name seq_a_xview                    # champion seed 42 (~0.8897)
-python run_pipeline.py $XV --name seq_a_xview_s7  --set seed=7
-for SD in 13 21 29; do
-  python run_pipeline.py $XV --name "seq_a_xview_s${SD}" --set seed=$SD
+  python run_pipeline.py $COMMON --name "seq_a_xview_s${SD}" $r_xview --set seed=$SD
 done
 
-# ---- B. First tau feature-selection probes (one change each, seed 42, suggestive). ----
-echo "=== c_perm_single: permanence with ONE threshold tau=-21 (is one enough?) ==="
-python run_pipeline.py $PERM --name c_perm_single --set seq.channels.cdf_taus="[-21.0]"
-echo "=== c_perm_wide: richer profile tau=-23..-18 (does more resolution help?) ==="
-python run_pipeline.py $PERM --name c_perm_wide \
-  --set seq.channels.cdf_taus="[-23.0,-22.0,-21.0,-20.0,-19.0,-18.0]"
+# ---- 2. PERMANENCE members (same recipes + permanence channels). ----
+python run_pipeline.py $COMMON --name seq_a_reltime_perm    $r_reltime $PERM
+python run_pipeline.py $COMMON --name seq_a_reltime_perm_s7 $r_reltime $PERM --set seed=7
+python run_pipeline.py $COMMON --name seq_a_nope_perm       $r_nope    $PERM
+python run_pipeline.py $COMMON --name seq_a_l3_perm         $r_l3      $PERM
+python run_pipeline.py $COMMON --name seq_a_xview_perm      $r_xview   $PERM      # = the iter31 winner
+for SD in 7 13 21 29; do
+  python run_pipeline.py $COMMON --name "seq_a_xview_perm_s${SD}" $r_xview $PERM --set seed=$SD
+done
 
-# ---- C. Seed-average both the permanence model and the champion (the reliable comparison). ----
-python tools/seed_average.py --variant c_perm      --name champion_perm_seedavg5
-python tools/seed_average.py --variant seq_a_xview  --name champion_seedavg5
+# ---- 3. CONTROL + CANDIDATE blends (legal calibrated pool), + the permanence seed-avg anchor. ----
+echo "=== CONTROL: archblend4 (must reproduce pos-rate 0.5670 / LB 0.899643) ==="
+python tools/arch_blend.py \
+  --members seq_a_reltime seq_a_nope seq_a_l3 seq_a_xview \
+  --name champion_archblend4
+echo "=== CANDIDATE: perm_archblend4 = the same 4 architectures, all with VH permanence ==="
+python tools/arch_blend.py \
+  --members seq_a_reltime_perm seq_a_nope_perm seq_a_l3_perm seq_a_xview_perm \
+  --name champion_perm_archblend4
+python tools/seed_average.py --variant seq_a_xview_perm --name champion_perm_seedavg5
 
 cat <<'NEXT'
 =====================================================================
- PASTE BACK: the `run:` summaries for c_perm (+ s7/s13/s21/s29), seq_a_xview (+ its 4 seeds),
- c_perm_single, c_perm_wide; AND both seed_average blocks (their pooled pos-rate + per-seed rank-corr).
+ PASTE BACK: the CONTROL archblend4 pooled pos-rate (MUST be 0.5670, else VOID), the CANDIDATE
+ perm_archblend4 block (per-member Platt slopes, pooled pos-rate, 4x4 correlation matrix), and the
+ champion_perm_seedavg5 pooled line.
 
- THEN UPLOAD (up to 2):
-   - submission_champion_perm_seedavg5.csv   -> the reliable permanence estimate (MAIN EVENT)
-   - (optional) submission_c_perm_wide.csv   -> richer-profile single-seed read
+ THEN UPLOAD ONE FILE:
+   submissions/submission_champion_perm_archblend4.csv   -> vs archblend4's 0.899643
 
  COMMITTED READ:
-   perm_seedavg5 vs champion_seedavg5 (matched 5-seed avg; seed noise removed):
-     >= +0.006  -> permanence is a REAL, seed-robust win. It becomes a finalist candidate (beats
-                   archblend4, and simpler). iter33 = the winning tau set + rebuild the archblend
-                   members WITH permanence (a permanence ensemble).
-     within +-0.006 -> 0.9016 was mostly seed-42 luck; permanence ties the champion. Reassess.
-   tau probes (single-seed, directional): c_perm_single ~ c_perm -> one threshold suffices;
-                   c_perm_wide > c_perm -> a richer profile helps (carry to iter33).
+   perm_archblend4 >= 0.9056  -> CONFIDENT: the permanence + ensemble lifts STACK. New best & new
+                                 finalist #1. Permanence direction keeps giving -> iter34 next feature.
+   0.9002 - 0.9056  -> suggestive stack; worth one confirming variant.
+   0.8990 - 0.9002  -> the lifts do NOT stack (pooling already captured permanence). Finalists =
+                       archblend4 + champion_perm_seedavg5; back to single-feature permanence (iter34).
+   <= 0.8936  -> permanence hurts the ensemble (unexpected) -> archblend4 stays, reassess.
 =====================================================================
 NEXT

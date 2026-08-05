@@ -31,7 +31,16 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter32 (SEED-CONFIRM the permanence win) on Colab, up to 2 uploads.**
+3. **Current next action: `Run all` → iter33 (the PERMANENCE ENSEMBLE) on Colab, 1 upload.**
+   iter32 CONFIRMED permanence: `champion_perm_seedavg5` = **0.896918** = +0.010 vs champion seed-avg
+   (~0.8865), seed noise removed (~0.005 of the single-seed 0.9016 was seed-42 luck). 4-τ grid beats
+   6-τ (`c_perm_wide` 0.8987 lower) → keep 4. iter33 stacks the two +0.010 lifts: blend 4
+   permanence-transformers (`seq_a_{reltime,nope,l3,xview}_perm`) → `champion_perm_archblend4` vs a
+   same-run archblend4 control (0.899643). ≥ +0.006 → new best & finalist #1; within noise → the lifts
+   don't stack, finalists = archblend4 + perm_seedavg5, back to single-feature permanence (iter34).
+   0 new code. **Then deadline-bound regardless:** DESIGNATE finalists on Zindi + Phase-Two writeup.
+
+   [prior] iter32 (SEED-CONFIRM the permanence win) — DONE, confirmed.
    🏆 **THE FEATURE LANE OPENED (iter31, 2026-07-29).** Adding per-month VH permanence indicators
    `1[VH_dB(t)<τ]` as Transformer channels scored **c_perm = 0.901605 — our BEST public score ever**,
    above `champion_archblend4` (0.899643), as a single legal model. Isolated one-at-a-time, `VH−VV`
