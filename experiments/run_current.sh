@@ -35,7 +35,9 @@ r_reltime="--set seq.consistency_lambda=0"
 r_nope="--set seq.consistency_lambda=0 --set seq.pos_encoding=none"
 r_l3="--set seq.consistency_lambda=3"
 r_xview=""                       # champion: relative_time + consistency_lambda=1 (defaults)
-PERM="--set seq.channels.permanence=true"
+# iter32 feature-selection winner: a SINGLE threshold tau=-21 beat the 4-tau and 6-tau profiles
+# (LB 0.9065 > 0.9016 > 0.8987). The permanence ensemble uses the single-tau config.
+PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
 
 # ---- 1. BASE members (control archblend4), mirroring the known 0.899643 build. ----
 python run_pipeline.py $COMMON --name seq_a_reltime $r_reltime
