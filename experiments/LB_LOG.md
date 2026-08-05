@@ -359,7 +359,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 28 | 2026-07-28 | **LEGAL `champion_archblend4`** — 4 architectures, per-member Platt then probability-average | submission_champion_archblend4.csv | 0.567 (reported) | **0.899643** | 🏆 **BEST PUBLIC SCORE EVER AND IT IS ELIGIBLE.** +0.005 vs its own pinned version; **+0.0100 vs the legal champion, where the pinned pair differed by −0.0009 → the pin was SUPPRESSING the ensemble.** iter18's "pooling is marginal" verdict was an artifact of the operating point |
 | 29 | 2026-07-28 | **BIGGER LEGAL POOL** — archblend6 = archblend4 + `seq_a_k4` + `seq_a_base` (the 2 weakest members) | submission_champion_archblend6.csv | — | **0.894899** | ❌ **−0.0047 paired vs archblend4 (0.899643)**, shares 4/6 members. Adding the 2 weakest members DRAGGED the blend. "Weak members become assets under a literal cut" **REFUTED** — the level-gap gate SURVIVES the legal regime. **archblend4 stays finalist #1; aggressive pooling CLOSED** |
 | 30 | 2026-07-28 | **LEGAL CATBOOST LANE** — n-invariant features + VH-CDF permanence + ordered boosting; standalone + as the different-bias blend member | catblend5 / c_catboost | legal | **0.886043 / 0.697615** | ❌❌ **catblend5 −0.0136 paired (CONFIDENT LOSS); standalone 0.6976 CATASTROPHIC.** OOF AUC 0.995 → LB 0.70: the "competent + decorrelated" signal was an OOF illusion. Cross-class ensemble CLOSED (3rd fail). archblend4 final |
-| 31 | 2026-07-29 | **LAST FEATURE SHOT (in the Transformer)** — VH permanence indicators `1[VH<τ]` + `VH−VV` cross-pol as champion input channels (24→29) | c_permxpol vs seq_a_xview | legal | **staged** | — |
+| 31 | 2026-07-29 | **FEATURE SHOT (in the Transformer)** — VH permanence indicators `1[VH<τ]` (+ `VH−VV` cross-pol, isolated) as champion channels | c_perm / c_permxpol | legal | **0.901605 / 0.878788** | 🏆 **PERMANENCE ALONE = NEW BEST EVER (0.9016, +0.012 vs champion, > archblend4).** cross_pol TOXIC (−0.023 when added). First feature win in the Transformer. One-at-a-time isolation caught it |
 
 ---
 
@@ -497,6 +497,42 @@ screen (strike-3 territory) and RESPONSE_13 already flagged "expect small."
 finalist banked (archblend4 = 0.899643), the remaining expected value is in the deadline-bound,
 guaranteed items — the Phase-Two reproducibility/novelty writeup (35% of a top-5 score, still does not
 exist) and the manual finalist designation — not in more LB probing against a 0.019 seed floor.
+
+---
+
+## iter31 RESULT (2026-07-29) — 🏆 THE FEATURE LANE OPENS: VH permanence WINS in the Transformer
+
+The "last feature shot" was not the last — it was the first WIN. Isolated, one-at-a-time:
+
+| arm | channels | seed | LB | vs matched champion (0.8897) |
+|---|---|---|---|---|
+| **c_perm** | + permanence `1[VH<τ]` only (24→28) | 42 | **0.901605** | **+0.0119** 🏆 |
+| c_perm (resubmit) | identical file | 42 | 0.901605 | exact repro |
+| c_permxpol | + permanence + `VH−VV` (24→29) | 42 | 0.878788 | −0.011 |
+| c_permxpol_s7 | + permanence + `VH−VV` | 7 | 0.873659 | (perm+xpol reliably bad) |
+
+**Two findings:**
+1. **Permanence alone is our best public score ever — 0.901605**, above every artifact including the
+   4-member `champion_archblend4` (0.899643), as a SINGLE legal model. The masked mean-pool of the
+   binary `1[VH_dB<τ]` channels hands the encoder the VH-CDF permanence fraction it could not
+   otherwise form (a per-month threshold is nonlinear; the linear proj + mean-pool can't build it).
+   Amplitude-preserving, n-invariant, not affine-spanned — it cleared every constraint and it worked.
+2. **`VH−VV` cross-pol is TOXIC: −0.0228** (0.9016 → 0.8788 when added on top of permanence). Exactly
+   UPDATE_13 §3a's warning — the cross-pol ratio IS affine-spanned by the projection layer, so it adds
+   nothing but dilutes. **Dropped for good.** The perm+xpol seed spread (0.8788 vs 0.8737) is small,
+   so its loss is reliable, not noise.
+
+**Methodological vindication.** Had we run only the combined `c_permxpol` (0.8788) we would have
+declared features dead — WRONG. The permanence-ONLY isolation arm caught the win. This confirms the
+user's directive: **feature engineering + selection ONE AT A TIME, on ONE direction.** From here the
+direction is PERMANENCE.
+
+**⚠️ Caveat gating everything: c_perm is a single seed-42 run, and seed 42 is historically our LUCKY
+draw** (old champion 0.8955@42 vs 0.8764@7, a 0.019 swing). +0.0119 is right at the ~0.013 public
+resolution. So the win must be **seed-confirmed** before we build on it — iter32.
+
+**Provisional best: `c_perm` = 0.901605 (pending seed-confirmation).** If it holds seed-averaged, it is
+a simpler, higher, fully-reproducible finalist that beats archblend4.
 
 ## iter25 PHASE-A — two results for zero submissions, computed locally in minutes
 
