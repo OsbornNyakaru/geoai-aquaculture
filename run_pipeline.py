@@ -119,7 +119,12 @@ def main() -> None:
                   + (schema.n_bands if _ch.get("rank") else 0)
                   + (1 if _ch.get("cross_pol") else 0)
                   + (len(_ch.get("cdf_taus") or [-22.0, -21.0, -20.0, -19.0])
-                     if _ch.get("permanence") else 0))
+                     if _ch.get("permanence") else 0)
+                  # iter34 single-feature candidates (each adds exactly 1 channel)
+                  + (1 if _ch.get("vv_permanence") else 0)
+                  + (1 if _ch.get("pond_band") else 0)
+                  + (1 if _ch.get("vh_sq") else 0)
+                  + (1 if _ch.get("rice_gate") else 0))
         # iter25: drop_bands removes both the value AND the missing-indicator channel for each
         # dropped band, so the base width is 2*(n_bands - n_dropped). Keeping this in sync
         # matters: the iter12 `c_compact` bug was a silent no-op precisely because this

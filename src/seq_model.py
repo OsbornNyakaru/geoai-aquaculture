@@ -256,6 +256,39 @@ def _raw_extra_channels(cube: np.ndarray, schema, ch: dict):
             [np.where(np.isnan(VH), np.nan, (VH < float(t)).astype(np.float32)) for t in taus],
             axis=2)
         parts.append(ind)
+    # --- iter34 single-feature candidates (UPDATE_15 menu). Each is nonlinear-in-the-mean
+    #     (escapes the affine blind spot), n-invariant (a per-month fraction or squared value whose
+    #     masked mean-pool is an unbiased statistic at any window length), and tested ONE AT A TIME on
+    #     top of the single-tau permanence champion. All gated OFF by default. ---
+    if ch.get("vv_permanence"):
+        # (A) VV permanence 1[VV_dB(t) < tau_vv]: a SECOND CDF coordinate on the co-pol axis, orthogonal
+        #     to VH permanence. VV floor sits ~6 dB above VH; open-water/pond VV ~ -15..-17 dB.
+        VV = _cband(cube, schema, "VV")
+        tau = float(ch.get("vv_tau", -15.0))
+        parts.append(np.where(np.isnan(VV), np.nan, (VV < tau).astype(np.float32))[:, :, None])
+    if ch.get("pond_band"):
+        # (B) Pond-band occupancy 1[lo <= VH < hi]: fraction of months in the MANAGED-POND regime
+        #     (mixed dike+water pixel sits ABOVE open water, BELOW dry). Agent-2's top new feature.
+        VH = _cband(cube, schema, "VH")
+        lo = float(ch.get("pond_band_lo", -22.0)); hi = float(ch.get("pond_band_hi", -18.0))
+        band = ((VH >= lo) & (VH < hi)).astype(np.float32)
+        parts.append(np.where(np.isnan(VH), np.nan, band)[:, :, None])
+    if ch.get("vh_sq"):
+        # (C) VH^2: gives the mean-pool model access to Var_t(VH)=E[VH^2]-E[VH]^2. Rice swings 6-8 dB,
+        #     ponds are stable -> temporal variance is the textbook rice killer. Squared dB, standardized.
+        VH = _cband(cube, schema, "VH")
+        parts.append((VH * VH)[:, :, None])
+    if ch.get("rice_gate"):
+        # (D) SAR x optical rice-exclusion AND-gate 1[VH<tau_s] . 1[NDVI<tau_v]: ponds are low-SAR AND
+        #     never green; paddies green up. The AND is nonlinear (not affine-spanned). NaN where either
+        #     sensor is masked -> mean-pool over months where BOTH are observed.
+        VH = _cband(cube, schema, "VH")
+        NIR = _cband(cube, schema, "nir"); RED = _cband(cube, schema, "red")
+        ndvi = (NIR - RED) / (NIR + RED + 1e-6)
+        ts = float(ch.get("rice_vh_tau", -21.0)); tv = float(ch.get("rice_ndvi_tau", 0.3))
+        gate = ((VH < ts) & (ndvi < tv)).astype(np.float32)
+        bad = np.isnan(VH) | np.isnan(ndvi)
+        parts.append(np.where(bad, np.nan, gate)[:, :, None])
     if not parts:
         return None
     return np.concatenate(parts, axis=2).astype(np.float32)

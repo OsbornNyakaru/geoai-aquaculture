@@ -221,6 +221,18 @@ seq:
                              # n-invariant, not affine-spanned). RESPONSE_13's best feature idea; the
                              # ONLY untested feature in the working model. Amplitude-preserving.
     cdf_taus: [-22.0, -21.0, -20.0, -19.0]   # SAR land/water split ~ -21.5 dB (used by permanence)
+    # iter34 single-feature candidates (UPDATE_15 menu). Each adds ONE nonlinear-in-the-mean,
+    # n-invariant channel, tested one at a time ON TOP of the single-tau permanence champion.
+    # (iter33 proved permanence does NOT stack in an ensemble -> it is a single-model lever.)
+    vv_permanence: false     # (A) 1[VV_dB(t)<vv_tau]: a 2nd CDF coordinate on the co-pol axis
+    vv_tau: -15.0
+    pond_band: false         # (B) 1[pond_band_lo<=VH<pond_band_hi]: managed-pond mixed-pixel regime
+    pond_band_lo: -22.0
+    pond_band_hi: -18.0
+    vh_sq: false             # (C) VH^2 -> gives mean-pool model Var_t(VH); the rice-vs-pond stability cut
+    rice_gate: false         # (D) 1[VH<rice_vh_tau] . 1[NDVI<rice_ndvi_tau]: SARxoptical rice-exclusion
+    rice_vh_tau: -21.0
+    rice_ndvi_tau: 0.3
     # iter12 candidate. REPLACES the standardized absolute values with their within-series rank,
     # keeping the channel count at 24 -- a capacity-NEUTRAL swap, unlike `rank` above which ADDS.
     # This is the FIRST GENUINE TEST of the amplitude question: per_cell_detrend was believed to
