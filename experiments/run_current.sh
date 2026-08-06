@@ -3,66 +3,73 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 35 — CAPACITY-NEUTRAL tau selection + the REAL single-tau seed-avg.   *** up to 3 uploads ***
+# ITERATION 35 — CAPACITY-NEUTRAL levers (round-16 research) + the REAL single-tau seed-avg.  *** up to 3 uploads ***
 #
-#   WHAT iter34 SETTLED. Adding a SECOND channel to the permanence champion HURTS: pondband -0.0061,
-#   vhsq -0.0178, vvperm -0.0153. Clean mechanism -- every arm's OOF rose but every LB fell -> extra
-#   Linear params overfit the adv-AUC-0.89 shift. The 25-channel permanence model is a CAPACITY SWEET
-#   SPOT. So we STOP adding channels and do the only lever that pays no capacity tax:
+#   ROUND-16 RESEARCH (4 agents) RE-AIMED THIS ITERATION. iter34 proved adding a 2nd channel HURTS, and
+#   the theory says WHY: it is a SHIFT-CARRIER / divergence tax (d_HdH + dlambda*), not mere capacity
+#   noise -- every added coord raised OOF (source risk) but paid a train/test-divergence penalty the LB
+#   sees (Agent 3; pos-rate sliding toward the train prior 0.40 was the tell). The cure is CAPACITY-
+#   NEUTRAL. Two untested, theory-backed moves emerged; the hard-tau scan I had staged was KILLED
+#   (Agent 4: tau=-21 is on the physical optimum, a hard-tau move is common-mode and sub-floor).
 #
-#   (1) CAPACITY-NEUTRAL tau feature-selection. We only ever tested tau=-21 as the SOLE permanence
-#       threshold (=0.906492). Scan single tau in {-22, -20.5, -20} -- each stays at 25 channels, no
-#       capacity added. Is -21 the best single cut, or is there a better one? seed 42, directional.
+#   ARM 1 (Agent 4, TOP PICK) -- SOFT permanence. Replace hard 1[VH<-21] with sigma(0.5*(-21-VH)),
+#     a FIXED-slope sigmoid = 0 new params. At n=4-6 the hard fraction is quantized to <=6 levels
+#     (rank ties + train/test level-set mismatch); the soft ramp uses each month's DISTANCE below tau
+#     ("permanence depth") = the optimal rank-1 log-likelihood-ratio coordinate. Capacity-neutral.
 #
-#   (2) THE REAL single-tau SEED-AVERAGE (our permanence FINALIST, still unmeasured -- the 0.8969
-#       upload was the STALE iter32 4-tau file). Rebuild seq_a_xview_perm (single-tau) at 5 seeds and
-#       pool. Given s42=0.9065 + s29=0.9007, expect >= 0.90. Fresh name to kill the stale-file trap.
+#   ARMS 2-3 (Agents 1&2, FLAGSHIP) -- CHANNEL REPLACEMENT. VH & VV are co-observed every month, so
+#     their missing-indicators are the IDENTICAL vector (R=1, info-free). Drop the duplicate (VV) one
+#     and put a NEW nonlinear coordinate in its place -> width stays 25 (the sweet spot). This is the
+#     UNTESTED cell of the 2x2: adding a channel HURT (iter34), deleting a band HURT (iter26),
+#     REPLACEMENT holds width and dodges both. Payloads: VH^2 (Var_t, rice-killer) and the SARxoptical
+#     AND-gate 1[VH<-21].1[NDVI<0.25] (pond = dark AND not-green).
 #
-#   ALSO PENDING (already generated in iter34, no rerun -- upload when slots refresh):
-#       submissions/submission_c_perm_ricegate.csv  -> the last single-channel-add test (low prior).
+#   ARM 4 -- the REAL single-tau SEED-AVERAGE finalist (the 0.8969 upload was the STALE 4-tau file;
+#     s42=0.9065 + s29=0.9007 -> expect >=0.90). champion_perm_seedavg5_st.
 #
-#   THE READ (committed).
-#     tau scan: any single-tau arm - 0.906492 >= +0.006 -> better cut; adopt it, seed-confirm in iter36.
-#               within +-0.006 -> -21 stays the champion tau (feature selection DONE on this lane).
-#     seed-avg: champion_perm_seedavg5_st is the finalist number. >= 0.900 -> strong robust finalist
-#               (pair with champion_archblend4 0.899643, different error profiles). ~0.897 -> still our
-#               best robust legal model; designate it anyway.
-#   NOTE representation is FIXED here (still 25 ch, permanence only) so cross-run pairing is clean;
-#   OOF stays blind (iter34: highest OOF LOST) -- the paired LB is the only truth.
+#   THE READ (committed, each paired vs c_perm_single = 0.906492, seed 42, directional).
+#     any arm - baseline >= +0.006 -> a real capacity-neutral WIN; seed-confirm in iter36, new champion.
+#     within +-0.006 -> tie at the lucky seed; capacity-neutral lane also flat -> pivot to finalize.
+#     <= -0.006 -> that lever hurts; drop it.
+#   OOF stays blind (iter34: highest OOF LOST) -- paired LB only. Single seed 42 (lucky) -> directional.
 # =====================================================================
 set -euo pipefail
 
 COMMON="--full --model seq"
-PERMBASE="--set seq.channels.permanence=true"   # single-tau set per-run via cdf_taus
+PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
+REPL="--set seq.channels.drop_dup_s1_indicator=true"   # frees one channel (25 -> stays 25 when +1 coord)
 
-# ---- 1. CAPACITY-NEUTRAL single-tau scan (each = 25 channels, permanence only). ----
-python run_pipeline.py $COMMON --name c_perm_single $PERMBASE --set seq.channels.cdf_taus=[-21.0]   # = 0.906492 baseline (repro)
-python run_pipeline.py $COMMON --name c_perm_t22    $PERMBASE --set seq.channels.cdf_taus=[-22.0]
-python run_pipeline.py $COMMON --name c_perm_t205   $PERMBASE --set seq.channels.cdf_taus=[-20.5]
-python run_pipeline.py $COMMON --name c_perm_t20    $PERMBASE --set seq.channels.cdf_taus=[-20.0]
+# ---- 0. BASELINE: reproduce c_perm_single (hard single-tau permanence, seed 42 = 0.906492). ----
+python run_pipeline.py $COMMON --name c_perm_single $PERM
 
-# ---- 2. THE REAL single-tau SEED-AVERAGE (the permanence finalist). ----
-python run_pipeline.py $COMMON --name seq_a_xview_perm $PERMBASE --set seq.channels.cdf_taus=[-21.0]           # seed 42 (= c_perm_single)
+# ---- 1. SOFT permanence (Agent 4 top pick; capacity-neutral shape refinement). ----
+python run_pipeline.py $COMMON --name c_perm_soft $PERM --set seq.channels.permanence_soft=true --set seq.channels.soft_slope=0.5
+
+# ---- 2-3. CHANNEL REPLACEMENT: drop duplicate VV indicator, add ONE new coordinate (width stays 25). ----
+python run_pipeline.py $COMMON --name c_repl_vhsq     $PERM $REPL --set seq.channels.vh_sq=true
+python run_pipeline.py $COMMON --name c_repl_ricegate $PERM $REPL --set seq.channels.rice_gate=true
+
+# ---- 4. THE REAL single-tau SEED-AVERAGE (the permanence finalist). ----
+python run_pipeline.py $COMMON --name seq_a_xview_perm $PERM              # seed 42 (= c_perm_single)
 for SD in 7 13 21 29; do
-  python run_pipeline.py $COMMON --name "seq_a_xview_perm_s${SD}" $PERMBASE --set seq.channels.cdf_taus=[-21.0] --set seed=$SD
+  python run_pipeline.py $COMMON --name "seq_a_xview_perm_s${SD}" $PERM --set seed=$SD
 done
 python tools/seed_average.py --variant seq_a_xview_perm --name champion_perm_seedavg5_st
 
 cat <<'NEXT'
 =====================================================================
- PASTE BACK all summary lines. Every run MUST log n_features 25 (permanence only, capacity-neutral).
- c_perm_single MUST reproduce ~0.906492 on upload, else the run is VOID.
+ PASTE BACK all summary lines. Widths MUST be: c_perm_single 25, c_perm_soft 25, c_repl_vhsq 25,
+ c_repl_ricegate 25 (12 val + 11 miss + 1 perm + 1 new coord). c_perm_single MUST reproduce ~0.906492.
 
  UPLOAD PRIORITY (budget 5/day):
    1. submissions/submission_champion_perm_seedavg5_st.csv   <- THE FINALIST (real single-tau seed-avg)
-   2. the BEST single-tau scan arm, IF its OOF/your judgement suggests it may beat -21
-   3. submissions/submission_c_perm_ricegate.csv             <- leftover from iter34, last add-lane test
+   2. submissions/submission_c_perm_soft.csv                 <- Agent-4 top pick (best odds to clear)
+   3. the better of submission_c_repl_vhsq.csv / submission_c_repl_ricegate.csv
 
  COMMITTED READ (each paired vs c_perm_single = 0.906492):
-   tau scan  >= 0.9125 -> a better single cut than -21; adopt + seed-confirm (iter36).
-             0.9005-0.9125 -> tie; -21 stays the champion tau (tau selection DONE).
-             <= 0.9005 -> worse cut; -21 confirmed optimal.
+   >= 0.9125 -> real capacity-neutral WIN; seed-confirm (iter36), new champion candidate.
+   0.9005-0.9125 -> tie at the lucky seed; capacity-neutral lane flat -> finalize.
+   <= 0.9005 -> that lever hurts; drop it.
    seed-avg (champion_perm_seedavg5_st): >= 0.900 -> strong robust FINALIST; pair with archblend4.
-                                          ~0.897  -> still our best robust legal model; designate it.
 =====================================================================
 NEXT

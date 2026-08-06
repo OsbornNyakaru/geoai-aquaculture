@@ -221,6 +221,12 @@ seq:
                              # n-invariant, not affine-spanned). RESPONSE_13's best feature idea; the
                              # ONLY untested feature in the working model. Amplitude-preserving.
     cdf_taus: [-22.0, -21.0, -20.0, -19.0]   # SAR land/water split ~ -21.5 dB (used by permanence)
+    # iter35 (round-16 research) CAPACITY-NEUTRAL levers (adding channels overfits the shift; iter34).
+    permanence_soft: false   # replace the hard permanence indicator with sigma(soft_slope*(tau-VH));
+                             # fixed slope = 0 new params. Removes the n=4-6 quantization; ~optimal LLR.
+    soft_slope: 0.5          # per-dB logistic slope (class separation ~2 dB -> 10-90% rise over ~4 dB)
+    drop_dup_s1_indicator: false  # drop the duplicate VV missing-indicator (== VH's, R=1, info-free) so
+                             # a new coordinate can REPLACE it at constant width (25 ch). See seq_model.
     # iter34 single-feature candidates (UPDATE_15 menu). Each adds ONE nonlinear-in-the-mean,
     # n-invariant channel, tested one at a time ON TOP of the single-tau permanence champion.
     # (iter33 proved permanence does NOT stack in an ensemble -> it is a single-model lever.)

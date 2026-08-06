@@ -145,6 +145,17 @@ def to_inputs(cube: np.ndarray, mean: np.ndarray, std: np.ndarray,
         log.info("seq drop_bands: removed %s -> %d bands (%d value + %d missing channels)",
                  dropped, len(keep), len(keep), miss.shape[2])
 
+    if ch.get("drop_dup_s1_indicator") and not ch.get("compact_missing") \
+            and miss.shape[2] == len(schema.bands):
+        # iter35 (round-16 research, Agents 1&2): VH and VV are co-observed every month, so their two
+        # missing-indicator columns are the IDENTICAL vector 1[month observed] -- an exact collinearity
+        # (redundancy R=1, zero unique information). Dropping ONE is a provably information-free capacity
+        # slot. Purpose: REPLACE dead weight with a new nonlinear coordinate at CONSTANT width (25 ch),
+        # testing the untested cell of the 2x2 (adding a channel HURT iter34, deleting a band HURT iter26;
+        # replacement holds width at the sweet spot and dodges both).
+        vv_i = schema.bands.index("VV")
+        miss = np.delete(miss, vv_i, axis=2)
+
     parts = [vals, miss]
     if channels_cfg and ex_mean is not None:
         ex = _raw_extra_channels(cube, schema, channels_cfg)
@@ -252,9 +263,22 @@ def _raw_extra_channels(cube: np.ndarray, schema, ch: dict):
         # in SAR literature (land/water split ~ -21.5 dB; flooded-rice VH minima -22..-18 dB).
         VH = _cband(cube, schema, "VH")
         taus = ch.get("cdf_taus") or [-22.0, -21.0, -20.0, -19.0]
-        ind = np.stack(
-            [np.where(np.isnan(VH), np.nan, (VH < float(t)).astype(np.float32)) for t in taus],
-            axis=2)
+        if ch.get("permanence_soft"):
+            # iter35 (round-16 research, Agent 4): capacity-NEUTRAL SHAPE refinement of the one working
+            # lever. Replace the hard indicator with a FIXED-slope sigmoid c_t = sigma(s*(tau - VH_t)).
+            # At the test window (n=4-6 months) the hard fraction is quantized to <=6 levels -> massive
+            # rank ties AND a train/test level-set mismatch (13 vs 6 levels) even though the mean is
+            # unbiased. The soft ramp uses each month's DISTANCE below tau ("permanence depth") -> the
+            # optimal rank-1 log-likelihood-ratio coordinate. s is a CONSTANT (not learned) -> 0 new params.
+            s = float(ch.get("soft_slope", 0.5))
+            ind = np.stack(
+                [np.where(np.isnan(VH), np.nan,
+                          (1.0 / (1.0 + np.exp(-s * (float(t) - VH)))).astype(np.float32))
+                 for t in taus], axis=2)
+        else:
+            ind = np.stack(
+                [np.where(np.isnan(VH), np.nan, (VH < float(t)).astype(np.float32)) for t in taus],
+                axis=2)
         parts.append(ind)
     # --- iter34 single-feature candidates (UPDATE_15 menu). Each is nonlinear-in-the-mean
     #     (escapes the affine blind spot), n-invariant (a per-month fraction or squared value whose

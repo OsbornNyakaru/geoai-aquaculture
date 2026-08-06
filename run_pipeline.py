@@ -134,6 +134,9 @@ def main() -> None:
         cv.n_features = (2 if not _ch.get("compact_missing") else 1) * _n_kept + _extra
         if _ch.get("compact_missing"):
             cv.n_features = _n_kept + 2 + _extra
+        # iter35: dropping the duplicate S1 (VV) missing-indicator removes exactly one channel
+        if _ch.get("drop_dup_s1_indicator") and not _ch.get("compact_missing"):
+            cv.n_features -= 1
     elif args.model == "rocket":
         from src.rocket_model import run_rocket_cv
         oof_prob, p_test_raw, fold_scores, test_per_fold = run_rocket_cv(
