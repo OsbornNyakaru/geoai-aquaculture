@@ -160,6 +160,18 @@ def main() -> None:
     out = sub_dir / f"submission_{name}.csv"
     sub.to_csv(out, index=False)
     log.info("Wrote %s  (%d rows, pos-rate %.3f)", out, len(sub), float(sub["TargetF1"].mean()))
+
+    # Also write a preds bundle so the seed-average is a first-class artifact for tools that consume
+    # OOF+test scores (label_shift_gate.py / arch_blend.py). Store the POOLED per-seed-calibrated OOF
+    # and test probabilities (already on a common probability scale); test_ids in native bundle order.
+    try:
+        preds_out = preds_dir / f"preds_{name}.npz"
+        preds_out.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(preds_out, oof_prob=pdiag["p_oof_pooled"], y=y,
+                            p_test_raw=p_pooled, test_ids=np.asarray(ids), model=np.array("seedavg"))
+        log.info("Wrote preds bundle %s", preds_out)
+    except Exception as e:  # bundle is a convenience artifact; never fail the submission over it
+        log.warning("could not write seed-avg preds bundle: %s", e)
     log.info("")
     log.info(
         "REMINDER: a LOWER public score than the best single seed is the EXPECTED and DESIRABLE "

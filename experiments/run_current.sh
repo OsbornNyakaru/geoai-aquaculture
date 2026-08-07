@@ -56,6 +56,11 @@ for SD in 7 13 21 29; do
 done
 python tools/seed_average.py --variant seq_a_xview_perm --name champion_perm_seedavg5_st
 
+# ---- 5. OFFLINE LABEL-SHIFT GATE (round-16, 0 submissions) -- decides the Saerens F1 lever + the
+#         pure-label-vs-conditional-shift question that gates the finalists. Runs on the champion bundle. ----
+echo "=== LABEL-SHIFT GATE (offline, legal, 0 submissions) ==="
+python tools/label_shift_gate.py --bundle submissions/preds/preds_c_perm_single.npz --n-boot 4000 || true
+
 cat <<'NEXT'
 =====================================================================
  PASTE BACK all summary lines. Widths MUST be: c_perm_single 25, c_perm_soft 25, c_repl_vhsq 25,
@@ -71,5 +76,14 @@ cat <<'NEXT'
    0.9005-0.9125 -> tie at the lucky seed; capacity-neutral lane flat -> finalize.
    <= 0.9005 -> that lever hurts; drop it.
    seed-avg (champion_perm_seedavg5_st): >= 0.900 -> strong robust FINALIST; pair with archblend4.
+
+ LABEL-SHIFT GATE (printed above): PASTE the full block back.
+   [PASS] -> the Saerens prior-shift correction is SAFE. To ship it (worth ~+0.010..+0.019 on the F1
+             half, capacity-free, LEGAL), run e.g.:
+       python tools/label_shift_gate.py --bundle submissions/preds/preds_champion_perm_seedavg5_st.npz \
+              --shrink 0.5 --emit-submission champion_perm_seedavg5_st_saerens
+     then upload submission_champion_perm_seedavg5_st_saerens.csv (AUC column unchanged; only F1 moves).
+   [FAIL] -> conditional shift; do NOT apply Saerens. Keep the literal 0.5 cut and weight archblend4 as
+             the safer primary finalist (its no-single-feature-dependence hedges the fragile perm bet).
 =====================================================================
 NEXT
