@@ -481,6 +481,48 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
     opt = torch.optim.AdamW(model.parameters(), lr=s["lr"], weight_decay=s["weight_decay"])
     lossf = nn.BCEWithLogitsLoss()
 
+    # ---- SWA / SWAD: capacity-NEUTRAL weight averaging over the training tail (round-16, Agent 5).
+    #      Training here uses a CONSTANT LR (no scheduler), so the tail iterates genuinely explore the
+    #      loss basin; averaging their WEIGHTS lands at a flatter minimum -> a LEVEL/generalization
+    #      lever that is NOT capped by the (1-rho)/N ceiling that flattened prediction seed-averaging.
+    #      LayerNorm has no running buffers, so there is nothing to recompute after averaging. Averaging
+    #      happens in-place at the very end; enable:false reproduces the champion BIT-FOR-BIT. ----
+    _swa = s.get("swa") or {}
+    swa_on = bool(_swa.get("enable"))
+    swa_start_ep = int(float(_swa.get("start_frac", 0.75)) * int(s["epochs"]))
+    swa_every = max(1, int(_swa.get("every", 1)))
+    swa_lr = _swa.get("lr", None)
+    _sw = {"params": None, "n": 0, "step": 0}
+
+    def _swa_maybe(ep):
+        if not swa_on or ep < swa_start_ep:
+            return
+        _sw["step"] += 1
+        if (_sw["step"] - 1) % swa_every != 0:
+            return
+        with torch.no_grad():
+            cur = [p.detach().clone() for p in model.parameters()]
+            if _sw["params"] is None:
+                _sw["params"] = cur
+            else:
+                m = _sw["n"]
+                for a, c in zip(_sw["params"], cur):
+                    a.add_(c.sub_(a).div_(m + 1))     # running mean of weights
+            _sw["n"] += 1
+
+    def _swa_lr(ep):
+        if swa_on and swa_lr is not None and ep >= swa_start_ep:
+            for pg in opt.param_groups:
+                pg["lr"] = float(swa_lr)
+
+    def _swa_finalize():
+        if swa_on and _sw["n"] and _sw["params"] is not None:
+            with torch.no_grad():
+                for p, a in zip(model.parameters(), _sw["params"]):
+                    p.copy_(a)
+            log.info("SWA: averaged %d tail snapshots (start_ep=%d, every=%d)",
+                     _sw["n"], swa_start_ep, swa_every)
+
     def _to_dev(xn, padn, yn):
         return (torch.from_numpy(xn).to(device),
                 torch.from_numpy(padn).to(device),
@@ -500,7 +542,8 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
         n_owner = n // K
         obs = max(1, bs // K)
         ar = torch.arange(K)
-        for _ in range(s["epochs"]):
+        for ep in range(s["epochs"]):
+            _swa_lr(ep)
             operm = torch.randperm(n_owner, generator=g)
             for i in range(0, n_owner, obs):
                 oidx = operm[i:i + obs]
@@ -513,6 +556,8 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
                 loss = loss + lam * cons
                 loss.backward()
                 opt.step()
+                _swa_maybe(ep)
+        _swa_finalize()
         return model
 
     # INSTANCE-EXPANSION (iter21). The independent-view path (lam=0) already trains each of the K
@@ -523,6 +568,7 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
     # only wired up on the lam=0 path (coupling needs a fixed owner structure); resampler=None
     # reproduces the champion bit-for-bit.
     for ep in range(s["epochs"]):
+        _swa_lr(ep)
         if resampler is not None:
             xe, pade, ye = resampler(ep)
             xt, pt, yt = _to_dev(xe, pade, ye)
@@ -535,6 +581,8 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
             loss = lossf(out, yt[idx])
             loss.backward()
             opt.step()
+            _swa_maybe(ep)
+    _swa_finalize()
     return model
 
 

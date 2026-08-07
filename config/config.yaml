@@ -159,6 +159,15 @@ seq:
   weight_decay: 1.0e-4
   batch_size: 256
   epochs: 60
+  # SWA/SWAD (round-16 Agent 5): capacity-neutral weight-averaging over the training tail. Training
+  # uses a CONSTANT LR, so tail iterates explore the basin -> averaging their weights = flatter minimum
+  # = a LEVEL lever (not capped by the (1-rho)/N prediction-averaging ceiling). LayerNorm -> no BN
+  # recompute. enable:false reproduces the champion bit-for-bit.
+  swa:
+    enable: false
+    start_frac: 0.75    # begin averaging after this fraction of epochs (0.75*60 = last 15 epochs)
+    every: 1            # snapshot every N optimizer steps in the tail (1 = dense SWAD)
+    lr: null            # optional constant tail LR; null = keep the base lr (valid here since LR is constant)
   n_splits: 5
   n_repeats: 1             # NN training is costly; 1 repeat by default
   K: 2                     # champion value. Iter4 tested K=4 -> 0.8665 (−0.0115); K=2 is a sharp optimum, reverted
