@@ -75,6 +75,12 @@ features:
   # permanence indicator, generalized to a multi-threshold profile.
   vh_cdf_profile: false
   cdf_taus: [-22.0, -21.0, -20.0, -19.0]
+  # FEATURE-SHIFT REMOVAL (round-17 tree lane). Drop feature columns whose NAME contains any of these
+  # substrings. tools/adversarial_cv.py flagged the optical index aggregates + VH-VV ratio + swir std as
+  # the top train/test shift-carriers (joint adv-AUC 0.9775); pruning them lets a GBDT key on the
+  # transferable SAR-level + permanence + water-occupancy signal. Empty (default) = no drop = historical
+  # matrix. Only affects the GBDT lane (compute_features); the seq lane never calls this.
+  drop_name_substrings: []
 
 cv:
   n_splits: 5
@@ -113,15 +119,18 @@ models:
   catboost:
     iterations: 600
     learning_rate: 0.03
-    depth: 6
-    l2_leaf_reg: 3.0
+    depth: 4                 # round-17 SHIFT-ROBUST: shallow (was 6) -> fewer high-order interactions
+    l2_leaf_reg: 20.0        # heavy L2 (was 3) -> forbids memorising train-specific structure
+    bootstrap_type: Bernoulli
+    subsample: 0.75          # row subsampling -> decorrelate from residual shift-carriers
+    rsm: 0.7                 # feature (column) subsampling per split
     thread_count: 4
     allow_writing_files: false
     verbose: false
-    # Plain = default. iter30 overrides to 'Ordered' via --set: ordered boosting is the permutation
-    # scheme CatBoost documents as especially effective at small n (~1,800 here), fighting prediction
-    # shift/bias at higher compute cost. See RESEARCH_14 §3.
-    boosting_type: Plain
+    # Ordered boosting: CatBoost's permutation scheme, documented as especially effective at small n
+    # (~1,800), fighting prediction shift/bias. Round-17 makes it the DEFAULT for the tree lane (was
+    # Plain) alongside the shift-robust depth/L2/subsampling above. See gemini_loop/research_md/.
+    boosting_type: Ordered
 
 calibration:
   # ---- RULES COMPLIANCE. Read before changing. ----

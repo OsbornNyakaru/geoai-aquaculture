@@ -296,6 +296,19 @@ def compute_features(cube_row: np.ndarray, schema: Schema, cfg: dict
                       float(n_valid)]
             names += ["wif_count", "wif_frac", "wif_longest_run", "wif_n_valid_s2"]
 
+    # FEATURE-SHIFT REMOVAL (round-17 tree lane): drop columns whose NAME contains any listed
+    # substring. Used to prune adversarial shift-carriers (optical index aggregates, VH-VV ratio,
+    # swir std -- flagged by tools/adversarial_cv.py) so a GBDT keys on transferable SAR level +
+    # permanence + water-occupancy instead of the train/test-separating optical/ratio columns.
+    # Empty list (default) = no drop = original behaviour. Applied HERE so OOF and full-fit builds
+    # stay consistent.
+    drop_subs = cfg["features"].get("drop_name_substrings") or []
+    if drop_subs:
+        keep = [i for i, nm in enumerate(names)
+                if not any(sub in nm for sub in drop_subs)]
+        feats = [feats[i] for i in keep]
+        names = [names[i] for i in keep]
+
     return np.array(feats, dtype=np.float32), names
 
 
