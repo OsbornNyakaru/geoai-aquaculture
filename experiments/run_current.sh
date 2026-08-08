@@ -3,78 +3,61 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 37 — CONFIRM THE WIN + free shift diagnostics.   *** up to 3 uploads ***
+# ITERATION 38 — DISPERSION POOLING on the permanence champion (config-only).   *** up to 2 uploads ***
 #
-#   THE WIN (iter35). c_repl_vhsq = 0.913263 = NEW BEST EVER (+0.0068 vs c_perm_single 0.906492, clears
-#   the committed >=0.9125 gate). It DROPS the duplicate VV missing-indicator (identical to VH's, R=1,
-#   info-free) and adds VH^2 in its place -> CONSTANT width 25. VH^2 was toxic as a 26th ADD (iter34
-#   -0.018) but wins as a REPLACEMENT: width was the enemy, not the coordinate. It is also the temporal-
-#   dispersion / 2nd-moment axis all of round-17's research converged on. BUT it is single-seed-42 (lucky)
-#   -> it MUST be seed-confirmed before it becomes champion/finalist.
+#   WHERE WE ARE. Seed-robust ceiling is ~0.900 and SINGLE-CHANNEL tweaks keep washing out (iter34 adds,
+#   iter35/37 replacements: the c_repl_vhsq 0.913263 was seed-42 luck; its 5-seed avg 0.899512 = plain
+#   permanence 0.899882). MODE-A confirmed masking is MAR but there is REAL covariate shift on the SAR
+#   level (mean_VH/VH^2 gaps not closed by windowing). So the next gains must be STRUCTURAL, not one more
+#   channel. Round-17 (agents + deep-research) converged on temporal DISPERSION (ponds stable, rice swings
+#   6-8 dB) as the strongest untapped axis, made first-class by a POOLING change -- and mean_std/mean_min/
+#   moments are ALREADY IMPLEMENTED (seq.pooling). They were last tested in round-09, on a WORSE base model
+#   under the illegal pin -> re-testing on the current permanence champion under legal calibration is a
+#   genuinely NEW experiment, at ZERO new code.
 #
-#   ARM 0 (FREE, 0 submissions) -- SHIFT DIAGNOSTICS. Decides private-LB trust:
-#     (A) is the 4-6 month test dropout MAR or SEASONAL? (gates ALL distributional features incl.
-#         permanence). (B) adv-AUC vs label-AUC feature screen on windowed train -> pre-ranks the next
-#         feature experiments (submission-free replacement for OOF, which is anti-correlated with LB).
+#   THE MOVE. Permanence single-tau champion x {mean(baseline), mean_std, mean_min, moments}, seed 42
+#   directional (screen), paired vs c_perm_single 0.906492. NOTE the built-in std is BIASED 1/N (window-
+#   length artifact) -- if a dispersion pool shows promise but underwhelms, iter39 = a proper n-invariant
+#   L-scale/GMD pooling (the round-17-preferred unbiased form).
 #
-#   ARM 1 -- SEED-CONFIRM the win: c_repl_vhsq at seeds {42,7,13,21,29} + seed-avg. THE result.
-#   ARM 2 -- does SWA (round-17 lever, built) STACK on the new champion? same 5 seeds + SWA + seed-avg.
-#
-#   THE READ (committed).
-#     champion_replvhsq_seedavg5 vs the perm seed-avg 0.899882:
-#       >= +0.006 -> the VH^2 replacement is a REAL, seed-robust champion -> new finalist #1; carry the
-#                    replacement idea to iter38 (L-scale/IQR/VV-perm replacements, adv-AUC-screened).
-#       within +-0.006 -> 0.9133 was largely seed-42 luck; replacement is a wash, reassess.
-#     champion_replvhsq_swa_seedavg5 vs champion_replvhsq_seedavg5:
-#       >= +0.006 -> SWA stacks on the champion (adopt); else SWA is flat here (drop, per Agent-5 risk).
-#   OOF is blind; the paired LB is the only truth. Diagnostics are the offline compass for iter38+.
+#   THE READ (committed, single-seed 42 = directional; winner gets an iter39 seed-confirm before belief).
+#     any pooling - 0.906492 >= +0.006 -> dispersion/tail helps -> seed-confirm in iter39 (5 seeds + avg).
+#     within +-0.006 -> pooling flat on this base -> the dispersion axis needs the unbiased L-scale form
+#                       (iter39) or the lever is genuinely tapped; pivot to the TREE lane.
+#   OOF is blind; paired LB only. This is a cheap structural screen before the bigger tree-lane build.
 # =====================================================================
 set -euo pipefail
 
 COMMON="--full --model seq"
-# The new champion feature config: single-tau permanence + drop dup VV indicator + VH^2, width 25.
-REPL="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0] --set seq.channels.drop_dup_s1_indicator=true --set seq.channels.vh_sq=true"
-SWA="--set seq.swa.enable=true --set seq.swa.start_frac=0.5"
+PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
 
-# ---- 0. FREE shift diagnostics (0 submissions, legal: train + UNLABELLED test features only). ----
-echo "=== SHIFT DIAGNOSTICS (free, offline) ==="
-python tools/shift_diagnostics.py --mode both || true
+# ---- 0. BASELINE (mean pooling) = c_perm_single = 0.906492. ----
+python run_pipeline.py $COMMON --name c_perm_single $PERM
 
-# ---- 1. SEED-CONFIRM the win (non-SWA). ----
-python run_pipeline.py $COMMON --name seq_a_replvhsq $REPL              # seed 42 (= c_repl_vhsq = 0.913263)
-for SD in 7 13 21 29; do
-  python run_pipeline.py $COMMON --name "seq_a_replvhsq_s${SD}" $REPL --set seed=$SD
-done
-python tools/seed_average.py --variant seq_a_replvhsq --name champion_replvhsq_seedavg5
-
-# ---- 2. Does SWA stack on the champion? (5 seeds + SWA). ----
-python run_pipeline.py $COMMON --name seq_a_replvhsq_swa $REPL $SWA
-for SD in 7 13 21 29; do
-  python run_pipeline.py $COMMON --name "seq_a_replvhsq_swa_s${SD}" $REPL $SWA --set seed=$SD
-done
-python tools/seed_average.py --variant seq_a_replvhsq_swa --name champion_replvhsq_swa_seedavg5
+# ---- 1. Dispersion / tail pooling variants on the permanence champion (config-only, width unchanged). ----
+python run_pipeline.py $COMMON --name c_perm_meanstd  $PERM --set seq.pooling=mean_std
+python run_pipeline.py $COMMON --name c_perm_meanmin  $PERM --set seq.pooling=mean_min
+python run_pipeline.py $COMMON --name c_perm_moments  $PERM --set seq.pooling=moments
 
 cat <<'NEXT'
 =====================================================================
- PASTE BACK: the FULL diagnostics block (both MODE A and MODE B tables) + all run summary lines. Every
- run MUST log n_features 25 (12 val + 11 miss + 1 perm + 1 vhsq); seq_a_replvhsq MUST reproduce ~0.913263.
+ PASTE BACK all summary lines. c_perm_single MUST reproduce ~0.906492. The pooling runs log a larger head
+ input (mean_std=2x, moments=4x the pooled width) but the same n_features 25 input channels.
 
- UPLOAD (budget 5/day):
-   1. submissions/submission_champion_replvhsq_seedavg5.csv       <- SEED-CONFIRM the win (THE result)
-   2. submissions/submission_champion_replvhsq_swa_seedavg5.csv   <- does SWA stack on the champion?
-   3. (optional) submission_seq_a_replvhsq.csv                    <- repro check of the 0.913263 seed
+ UPLOAD the best 1-2 pooling variants (paired vs c_perm_single 0.906492):
+   submissions/submission_c_perm_meanstd.csv
+   submissions/submission_c_perm_meanmin.csv
+   submissions/submission_c_perm_moments.csv
 
- COMMITTED READ:
-   replvhsq_seedavg5 >= 0.9059 (=+0.006 vs perm seed-avg 0.899882) -> REAL seed-robust champion; new
-       finalist #1. iter38 = adv-AUC-screened REPLACEMENTS (L-scale/IQR dispersion, VV-permanence) guided
-       by the MODE B table + (if trees pass MODE-A/windowed-CV) the shift-robust CatBoost lane.
-   within +-0.006 -> 0.9133 was seed-42 luck; keep permanence seed-avg as finalist, reassess.
-   swa_seedavg5 - replvhsq_seedavg5 >= +0.006 -> SWA stacks (adopt on champion); else drop SWA.
+ COMMITTED READ (single-seed 42, DIRECTIONAL):
+   >= 0.9125 -> dispersion/tail pooling helps -> iter39 seed-confirms (5 seeds + seed-avg) + tries the
+                unbiased L-scale/GMD pooling form (built if this screen is positive).
+   0.9005-0.9125 -> flat; the biased-std pool may be masking a real dispersion signal -> iter39 L-scale.
+   <= 0.9005 -> pooling hurts on this base -> dispersion axis tapped for the Transformer; pivot to trees.
 
- DIAGNOSTICS READ (informs iter38, costs nothing now):
-   MODE A: if windowing explains most of the train->test KS gap for permanence & mean -> distributional
-     features (incl. permanence/VH^2) are private-LB-trustworthy. If a big gap remains -> seasonal/
-     conditional shift -> down-weight distributional features.
-   MODE B: the KEEP list = the ranked, submission-worthy feature candidates for iter38.
+ ALSO STILL PENDING FROM iter37 (already generated, 1 upload):
+   submissions/submission_champion_replvhsq_swa_seedavg5.csv  -> vs 0.899512 (does SWA buy level?).
+ AND re-run once for the fixed MODE-B feature screen table:
+   python tools/shift_diagnostics.py --mode screen
 =====================================================================
 NEXT

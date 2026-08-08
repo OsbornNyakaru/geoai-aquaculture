@@ -196,9 +196,9 @@ def main():
         for k in names:
             lab = _auc(f_win[k], y)                                    # informative? (windowed regime)
             adv = _auc(np.concatenate([f_win[k], f_test[k]]), adv_label)  # transfers? (train vs test)
-            keep = (not np.isnan(lab) and not np.isnan(adv) and lab >= 0.75 and adv <= 0.56)
+            keep = bool(not np.isnan(lab) and not np.isnan(adv) and lab >= 0.75 and adv <= 0.56)
             rows.append((k, lab, adv, keep))
-        rows.sort(key=lambda r: (-(r[3]), -(r[1] if not np.isnan(r[1]) else 0)))
+        rows.sort(key=lambda r: (0 if r[3] else 1, -(float(r[1]) if not np.isnan(r[1]) else 0.0)))
         print(f"{'feature':<26}{'label-AUC':>11}{'adv-AUC':>10}  verdict")
         for k, lab, adv, keep in rows:
             v = "KEEP" if keep else ("shift-carrier" if (not np.isnan(adv) and adv > 0.56) else "weak")
