@@ -91,6 +91,21 @@ def main() -> None:
     log.info("BLEND OOF (uncalibrated): f1@0.5=%.4f auc=%.4f combined=%.4f",
              m["f1"], m["auc"], m["combined"])
 
+    # ⚠️ NON-COMPLIANT EMITTER. This tool still writes through the `pinned` path:
+    # calibrate_for_f1() sets a threshold and logit-shifts it onto 0.5, and score_for_auc()
+    # emits uniformly-spaced RANKS rather than probabilities. Both violate the stated rules
+    # ("Setting a probability threshold is strictly forbidden"; "Zindi will need the raw
+    # probabilities"). It is kept only to reproduce historical pinned anchors. The compliant
+    # pooling path is src.calibration.calibrated_pool(), used by tools/arch_blend.py and
+    # tools/seed_average.py -- prefer those. See REPORT.md section 8.
+    if cfg["calibration"].get("compliance_mode", "legal") != "pinned":
+        raise SystemExit(
+            "tools/blend.py emits a RULES-VIOLATING submission (threshold shift + rank column).\n"
+            "Refusing to run under compliance_mode='legal'. Use tools/arch_blend.py or\n"
+            "tools/seed_average.py, which pool via calibrated_pool() and cut at a literal 0.5.\n"
+            "To reproduce a historical pinned anchor anyway, set calibration.compliance_mode=pinned."
+        )
+    log.warning("blend.py: emitting through the NON-COMPLIANT pinned path -- DO NOT SUBMIT.")
     target_f1, t_star, diag = calibrate_for_f1(y, oof_blend, test_blend, cfg)
     target_rauc = score_for_auc(test_blend)
 

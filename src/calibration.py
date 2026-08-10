@@ -241,8 +241,13 @@ def calibrate_for_f1(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray,
         iso = fit_isotonic(y_oof, p_oof)
         p_oof_cal = iso.predict(p_oof)
         p_test_cal = iso.predict(p_test)
-        # After isotonic, the F1-optimal cut may not be 0.5; find it on OOF and
-        # re-map through a second logit shift so 0.5 is legal.
+        # After isotonic, the F1-optimal cut may not be 0.5; find it on OOF and re-map
+        # through a second logit shift so the comparison happens at 0.5.
+        # ⚠️ THIS IS NOT "LEGAL" — an earlier comment here claimed it was, and that claim was
+        # WRONG. Searching for the F1-optimal cut and then moving it onto 0.5 is threshold
+        # tuning with a wrapper: the literal 0.5 is cosmetic. The whole of calibrate_for_f1 is
+        # the NON-COMPLIANT `pinned` path, retained only so experiments/anchors.tsv stays
+        # reproducible. Nothing it returns may be submitted. See REPORT.md section 8.
         t2 = find_tstar(y_oof, p_oof_cal, cfg)
         p_oof_final = logit_shift(p_oof_cal, t2)
         p_test_final = logit_shift(p_test_cal, t2)

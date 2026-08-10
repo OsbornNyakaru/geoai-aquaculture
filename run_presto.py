@@ -4,9 +4,9 @@ Run:
     python run_presto.py --month-mode const --seed 42 --name c_presto_const
 
 Reuses the existing pipeline wholesale: the same `load_bundle`, the same `_mask_views` masking
-sampler (so the encoder sees train and test at matched observation density), the same
-`target_prevalence_shift` operating point, and the same preds-bundle format so the offline
-validator can screen this exactly like any other candidate.
+sampler (so the encoder sees train and test at matched observation density), the same LEGAL
+`calibrate_legal` operating point (train-only Platt + a literal 0.5 cut), and the same
+preds-bundle format so the offline validator can screen this exactly like any other candidate.
 
 The one number that decides this lane is printed early and costs nothing: the ADVERSARIAL AUC on
 the embeddings. If a discriminator can separate train-embeddings from test-embeddings at ~0.5, the
@@ -31,7 +31,7 @@ from sklearn.model_selection import StratifiedKFold  # noqa: E402
 from sklearn.pipeline import make_pipeline  # noqa: E402
 from sklearn.preprocessing import StandardScaler  # noqa: E402
 
-from src.calibration import score_for_auc, target_prevalence_shift  # noqa: E402
+from src.calibration import calibrate_legal  # noqa: E402
 from src.data import load_bundle  # noqa: E402
 from src.presto_features import embed  # noqa: E402
 from src.seq_model import _mask_views  # noqa: E402
@@ -140,15 +140,18 @@ def main() -> None:
              f1_at(y, oof, 0.5), roc_auc(y, oof),
              combined_score(f1_at(y, oof, 0.5), roc_auc(y, oof)), n_fitted)
 
-    # ---- Same operating point as every other submission ----
-    prevalence = float(cfg["calibration"]["prevalence_target"])
-    p_shift, delta = target_prevalence_shift(p_test_raw, prevalence)
-    log.info("Prevalence target ON: pi_hat=%.3f delta=%.3f | test pos-rate %.3f -> %.3f",
-             prevalence, delta, float((p_test_raw >= 0.5).mean()), float((p_shift >= 0.5).mean()))
+    # ---- Operating point: the SAME legal path every shippable submission uses. ----
+    # This file predated the 2026-07-28 compliance fix and until now still emitted through
+    # `target_prevalence_shift` (a threshold shift onto 0.5, forbidden) plus `score_for_auc`
+    # (uniformly-spaced ranks, not probabilities). Any Presto artifact produced by the old
+    # code was therefore INELIGIBLE for designation. Now routed through calibrate_legal():
+    # Platt fit on TRAINING out-of-fold predictions only, then a literal 0.5 cut, with real
+    # calibrated probabilities in both columns. See REPORT.md section 8.
+    target_f1, target_rauc, cal_diag = calibrate_legal(y, oof, p_test_raw)
 
     sub = pd.DataFrame({"ID": bundle.test_ids,
-                        "TargetF1": (p_shift >= 0.5).astype(int),
-                        "TargetRAUC": score_for_auc(p_test_raw)})
+                        "TargetF1": target_f1.astype(int),
+                        "TargetRAUC": target_rauc})
     order = {i: k for k, i in enumerate(bundle.sample_submission["ID"])}
     sub = sub.sort_values("ID", key=lambda s: s.map(order)).reset_index(drop=True)
 
