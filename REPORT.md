@@ -1,6 +1,6 @@
 # Aquaculture Pond Identification — Solution Report
 
-**Zindi / FAO / ITU GeoAI Challenge** · Osborn Nyakaru · revised 2026-08-10 (iteration 41)
+**Zindi / FAO / ITU GeoAI Challenge** · Osborn Nyakaru · revised 2026-08-10 (through iteration 41)
 
 ---
 
@@ -40,9 +40,10 @@ about **52 rows out of 309**.
 
 | quantity | value |
 |---|---|
-| **finalist #1 (designated)** | **0.899882** — `champion_perm_seedavg5`, a 5-seed pooled artifact |
-| **finalist #2 (designated)** | **0.899643** — `champion_archblend4`, a 4-architecture pool |
-| best *single* public score ever recorded | 0.912759 — **not designated; it is seed luck, see §4** |
+| **finalist #1 (designated)** | **0.909868** — `champion_distill_seedavg5`, transductive self-distillation, 5-seed pool |
+| **finalist #2 (designated)** | **0.899643** — `champion_archblend4`, a 4-architecture pool (decorrelated hedge) |
+| previous ceiling, held by 4 separate constructions | ~0.8995 — broken at iteration 41, see §4(iii) and §9 |
+| best *single* public score ever recorded | 0.914179 — **not designated; it is seed luck, see §4** |
 | **measured seed-to-seed sd** | **0.0191** — larger than most effects in our own ledger |
 | public-slice binomial noise (n=309) | ≈ ±0.012 on the composite |
 | LB-gated iterations / submissions | 41 iterations, ~50 of 100 submissions |
@@ -111,6 +112,10 @@ invariance penalty teaching the model that the label does not depend on *which* 
 **Training:** AdamW lr 1e-3, wd 1e-4, batch 256, 60 epochs, 5-fold CV, owner-grouped batching. Test
 prediction is the mean of the 5 fold-models; the submitted artifact pools **5 independent seeds** on
 top of that, i.e. 25 models.
+
+**The designated finalist adds one more term to this loss** — a soft self-distillation term over the
+unlabeled test rows, which is what carried the score past the long-standing ~0.8995 ceiling. It adds
+no parameters and changes nothing above. See §6.6.
 
 **Why the permanence channel.** The masked mean-pool of a binary indicator *is* the fraction of
 observed months below the threshold — an n-invariant statistic, and the empirical CDF of VH at one
@@ -359,17 +364,49 @@ observe.
 > no clean subset to keep.** It also explains, retrospectively, why deleting individual bands
 > (`c_dropvv`) and dropping whole feature families both failed to help.
 
-**Second result — the two sensors are not equally transferable.**
+**Second result — and it retires adversarial AUC as a selection criterion entirely.**
 
-| bank | adversarial AUC | label AUC |
-|---|---|---|
-| **SAR only** (VH/VV, 20 features) | **0.8452** | 0.9446 |
-| **Optical only** (10 S2 bands, 46 features) | **0.9376** | 0.9817 |
+The natural next step was to align the marginals away. It works, completely, and it buys nothing.
+Per-domain standardization drops linear adversarial AUC from **0.9291 to 0.3608 at zero label cost**
+(label AUC 0.9850 → 0.9850). A transform meeting our stated target also exists — whitening both
+domains reaches adv-AUC **0.6168** at label-AUC **0.9710**. So the shift is marginal, and it is
+erasable.
 
-Optical carries *more label signal* and *far more shift*. Because the shift accumulates additively,
-adding many optical features is precisely the mechanism by which one accumulates it. This is a
-concrete, measured design constraint that we would not have predicted from the physics alone, and it
-is consistent with our SAR-first feature bank having outperformed every optical-heavy variant.
+But when we measured what these transforms do to *actual transfer* — source→target benchmarks with
+known target labels — the ranking inverted:
+
+| | |
+|---|---|
+| Spearman(adversarial AUC, realized transfer gain) across 9 transforms | **+0.676** |
+| the same, across modality subsets | **+1.00** |
+| the *best*-adversarial transform (whiten-both), realized transfer | **−0.0503** (5/5 splits negative) |
+| **SAR-only** — best shift signature (0.8452) | **worst transfer: F1 0.7461** vs optical's 0.8786 |
+
+**The correlation is positive, meaning adversarial AUC points the wrong way.** Both adv-AUC and label
+AUC are driven by the same thing — information content — so suppressing a representation's
+domain-detectability suppresses its signal along with it.
+
+The clinching measurement: a deliberately *mild* synthetic shift registers **adv-AUC 0.9955** while
+costing only **0.0046 AUC** of transfer. **Our real train/test adv-AUC is 0.9670 — lower than the
+mildest shift we could construct.** The statistic saturates long before it becomes informative. That
+is the mechanical reason iteration 39's gate returned a confident false GO, and it means every
+"drop the shift-carriers" rule we ever wrote — including iteration 40's removal of 27 optical
+features — was steering by a broken compass.
+
+> **This supersedes a claim in an earlier revision of this very section.** We had written that SAR
+> transfers better than optical because its adversarial signature is cleaner. Measured against real
+> transfer, the opposite holds. We have killed the SAR-reweighting idea it implied.
+
+---
+
+## 6.4 The instrument that replaced it
+
+What survives is a gate that compares a **paired delta** rather than a level: run a treatment arm and
+a control arm through the *same* proxy-domain split with known target labels, and gate on the
+difference. Both arms are equally blind to whatever the proxy fails to capture, so the blindness
+cancels. Applied retrospectively, this gate would have caught iteration 40. It also decomposes any
+apparent F1 gain into **ranking** versus **cut placement** — which matters because 63–98% of the
+apparent F1 gains we screened turned out to be cut placement, i.e. threshold tuning in disguise.
 
 ---
 
@@ -392,6 +429,42 @@ worth 1.9–3.8× a row in the deep tail.** This is the single most useful strat
 remaining gap is not calibration and not global ranking, it is *local ranking quality among genuinely
 ambiguous cells*. That is a modelling problem, not an operating-point problem — which is why §8.2's
 lever is worth so little and why we did not pursue it.
+
+---
+
+## 6.6 🔑 The one thing that broke the ceiling
+
+Everything above says the barrier is *bias under the covariate shift*, that pooling cannot touch it,
+and that no transformation of the input features helps. That leaves exactly one lever: **information
+about the target distribution itself.** The 1,030 test rows are 57% of our labeled set, they are the
+only target-domain data in existence for this problem, and their *features* are supplied — so using
+them is legal by construction (no test labels, no external data, no threshold tuning).
+
+We ran two zero-parameter forms of this at iteration 41, both as 5-seed averages against the
+0.899882 finalist:
+
+| arm | mechanism | 5-seed LB | vs finalist |
+|---|---|---|---|
+| **D — soft self-distillation** | train against a pooled teacher's *soft* probabilities on test rows (T=1, never thresholded) | **0.909868** | **+0.009986** ✅ |
+| T — transductive consistency | the proven `Var_k(logit)` cross-view penalty pointed at test rows; forms no label | 0.893752 | −0.006130 ❌ |
+
+**Arm D is the first artifact in this project to clear ~0.8995.** It beats the pre-committed +0.006
+bar, it is a five-seed average rather than a lucky draw, and **both metric terms improved** — AUC
+0.935 → 0.944024, F1 0.876 → 0.887097. That matters: an operating-point trick would move F1 alone.
+This moved the ranking. Our AUC is now **within 0.00087 of the leaderboard leader's**, and the entire
+remaining gap is the F1 term.
+
+**Arm T failed, and its failure is the more interesting one.** Its individual seeds produced our two
+highest single scores ever recorded (0.914179 and 0.908873), yet the pool *lost* 0.0178 — the only
+negative pooling gain anywhere in our ledger. The decomposition says exactly what happened: pooled
+AUC (0.926687) sits *between* its members' values, so the ranking pooled normally, while pooled F1
+(0.871795) falls *below both* members. The operating point drifted. Mechanism: a variance penalty on
+unlabeled rows is minimized by a constant predictor, so it compresses the logit distribution; per-seed
+Platt slopes then diverge, and averaging the calibrated probabilities lands at the wrong positive
+rate. **Had we designated on the single-seed 0.914179 — our best number ever — we would have shipped
+an artifact whose own five-seed average is below the model it replaced.** It is the fourth time this
+competition has offered us that trade, and the first time the discipline from §4 was load-bearing on
+a score we would genuinely have wanted.
 
 ---
 
@@ -547,7 +620,7 @@ against, and we flag our physics-derived expectations as **unvalidated for this 
 
 Stated so a reviewer can see we know where the remaining value is, not as a claim of results.
 
-1. **Transductive training on the unlabeled test rows** (in flight at iteration 41). The 1,030 test
+1. **Transductive training on the unlabeled test rows** — ✅ **DONE, and it worked — see §6.6.** The 1,030 test
    rows are 57% of our labeled set and the only target-domain data available; test *features* are
    supplied, so using them is legal by construction. Two zero-parameter forms: extending our proven
    cross-view invariance penalty to test rows (forms no label, so it cannot suffer confirmation
