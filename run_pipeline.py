@@ -107,7 +107,8 @@ def main() -> None:
     if args.model == "seq":
         from src.seq_model import run_seq_cv
         oof_prob, p_test_raw, fold_scores, test_per_fold = run_seq_cv(
-            train_cube, y, test_cube, schema, wd, cfg, smoke=smoke)
+            train_cube, y, test_cube, schema, wd, cfg, smoke=smoke,
+            test_ids=bundle.test_ids)
         cv = _CV()
         cv.oof_prob, cv.y, cv.fold_scores = oof_prob, y, fold_scores
         cv.test_per_fold = test_per_fold
@@ -202,6 +203,25 @@ def main() -> None:
     }
     log.info("mode=%s t_star=%.4f | OOF: f1@0.5=%.4f auc=%.4f combined=%.4f",
              _mode, t_star, m["f1"], m["auc"], m["combined"])
+
+    # ---- iter41 TRANSDUCTIVE ABORT GATE (free; costs no submission). Both transductive terms
+    # have a known failure mode: a variance penalty on unlabeled rows is minimized by a CONSTANT
+    # predictor, and self-distillation can amplify its own error. Both show up first in the
+    # realized positive rate of the SUBMITTED column. Pos-rate direction correctly predicted the
+    # sign of every iter34 arm, and pi_hat is bracketed at 0.559-0.578 by two estimators, so
+    # [0.50, 0.62] around the champion's ~0.55 is the defensible band.
+    if args.model == "seq":
+        _tt = ((cfg["seq"].get("transduct") or {}).get("enable")
+               or (cfg["seq"].get("distill") or {}).get("enable"))
+        if _tt:
+            _pr = float(np.asarray(target_f1).mean())
+            if 0.50 <= _pr <= 0.62:
+                log.info("TRANSDUCTIVE GATE PASS: submitted pos-rate %.4f in [0.50, 0.62]", _pr)
+            else:
+                log.warning("⚠️  TRANSDUCTIVE GATE FAILED: submitted pos-rate %.4f outside "
+                            "[0.50, 0.62] — the unlabeled term is winning (constant-predictor "
+                            "collapse or self-training runaway). DO NOT SUBMIT THIS ARM; halve "
+                            "lambda_u / alpha and rerun.", _pr)
     if "prior_sensitivity" in diag:
         log.info("prior-sens=%s", {k: round(v, 3) for k, v in diag["prior_sensitivity"].items()})
 

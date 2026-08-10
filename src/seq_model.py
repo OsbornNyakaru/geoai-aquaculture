@@ -471,7 +471,14 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
     return PondTransformer()
 
 
-def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
+def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | None = None):
+    """Train one fold-model.
+
+    `u` (optional) carries the TRANSDUCTIVE terms over the unlabeled test rows — see
+    `run_seq_cv` for how it is built. Keys: x, pad (K_u views per test row, owner-major),
+    Ku, lam_u (cross-view invariance on test rows), alpha + p_teacher (soft self-distillation),
+    warmup_frac. u=None reproduces the champion bit-for-bit.
+    """
     import torch
     import torch.nn as nn
 
@@ -542,8 +549,42 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
         n_owner = n // K
         obs = max(1, bs // K)
         ar = torch.arange(K)
+
+        # ---- TRANSDUCTIVE terms over the 1030 UNLABELED test rows (iter41). Two independent,
+        #      ZERO-PARAMETER additions to the objective — the only class of change that has ever
+        #      won here (the winners were a structural reframe +0.0128 and an objective change
+        #      +0.0047; every capacity ADD lost). Both terms see test FEATURES only, never labels.
+        #        lam_u : the same Var_k(logit) cross-view penalty we already run on train rows,
+        #                pointed at test rows. Forms no label, so it cannot suffer confirmation
+        #                bias or pseudo-label prior drift.
+        #        alpha : soft self-distillation against a banked teacher probability (SOFT targets,
+        #                T=1, never thresholded — hard pseudo-labels would re-inject the 0.5-cut
+        #                error and destroy the probability information the variance argument rests on).
+        #      Both are RAMPED linearly from 0 over warmup_frac of the epochs: an un-ramped
+        #      unlabeled term on an untrained network pulls it toward a constant function. ----
+        u_on = bool(u) and u.get("x") is not None
+        if u_on:
+            uxt = torch.from_numpy(u["x"]).to(device)
+            upt = torch.from_numpy(u["pad"]).to(device)
+            Ku = int(u.get("Ku", 2))
+            n_uown = uxt.shape[0] // Ku
+            lam_u = float(u.get("lam_u", 0.0))
+            alpha = float(u.get("alpha", 0.0))
+            warm = max(1, int(float(u.get("warmup_frac", 0.5)) * int(s["epochs"])))
+            ar_u = torch.arange(Ku)
+            # sample test owners at their natural 1030/1821 ratio, so lam_u/alpha are the only knobs
+            u_obs = max(1, int(round(obs * n_uown / max(n_owner, 1))))
+            pT = None
+            if u.get("p_teacher") is not None:
+                pT = torch.from_numpy(
+                    np.asarray(u["p_teacher"], dtype=np.float32)).to(device)
+            log.info("seq transductive: %d test owners x K_u=%d views | lambda_u=%.3g alpha=%.3g "
+                     "| ramp over %d/%d epochs | %d test owners per step",
+                     n_uown, Ku, lam_u, alpha, warm, int(s["epochs"]), u_obs)
+
         for ep in range(s["epochs"]):
             _swa_lr(ep)
+            w_u = (min(1.0, (ep + 1) / warm) if u_on else 0.0)
             operm = torch.randperm(n_owner, generator=g)
             for i in range(0, n_owner, obs):
                 oidx = operm[i:i + obs]
@@ -554,11 +595,25 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None):
                 out_g = out.view(len(oidx), K)
                 cons = ((out_g - out_g.mean(dim=1, keepdim=True)) ** 2).mean()
                 loss = loss + lam * cons
+                if u_on:
+                    uo = torch.randint(0, n_uown, (u_obs,), generator=g)
+                    uidx = (uo.unsqueeze(1) * Ku + ar_u).reshape(-1).to(device)
+                    uout = model(uxt[uidx], upt[uidx]).view(len(uo), Ku)
+                    if lam_u > 0.0:
+                        loss = loss + (w_u * lam_u) * (
+                            (uout - uout.mean(dim=1, keepdim=True)) ** 2).mean()
+                    if alpha > 0.0 and pT is not None:
+                        tgt = pT[uo.to(device)].unsqueeze(1).expand(-1, Ku).reshape(-1)
+                        loss = loss + (w_u * alpha) * lossf(uout.reshape(-1), tgt)
                 loss.backward()
                 opt.step()
                 _swa_maybe(ep)
         _swa_finalize()
         return model
+
+    if u:
+        log.warning("seq transductive terms are wired only on the coupled (consistency_lambda>0, "
+                    "K>1) path — the champion path. They are being IGNORED for this run.")
 
     # INSTANCE-EXPANSION (iter21). The independent-view path (lam=0) already trains each of the K
     # masked views as its own BCE example. `resampler`, when supplied, goes one step further: it
@@ -688,11 +743,83 @@ def _mask_views(cube: np.ndarray, rows: np.ndarray, schema: Schema,
     return np.stack(out), np.array(owners)
 
 
+def _test_views(test_cube: np.ndarray, K_u: int, seed: int, min_len: int = 4):
+    """K_u ON-MANIFOLD masking views of every TEST row -> (cube [n*K_u, M, B], owners).
+
+    A test row already shows a contiguous window; measured on Test.csv, the visible S1 length
+    is uniform over {4,5,6} (345/343/342 rows) and 1030/1030 rows are contiguous. The only
+    augmentation that stays inside that measured support is a contiguous SUB-window of length
+    l in [min_len, L]. We deliberately do NOT hole-punch (mask 1-2 interior active months):
+    interior gaps occur in neither the train masker nor the test set, and that off-manifold
+    augmentation is the diagnosed cause of the iter6 TTA loss (-0.0023).
+
+    View 0 is always the full visible window (the "weak" view). Rows with L == min_len have
+    exactly one legal view, so their cross-view term is identically zero -- that is correct,
+    not a bug: there is no legal augmentation for them. At min_len=4 that is 345/1030 rows;
+    the other 685 carry the penalty.
+    """
+    from .utils import rng_for
+
+    n, M, _ = test_cube.shape
+    fully = np.isnan(test_cube).all(axis=2)                 # [n, M] True = month fully masked
+    out, owners = [], []
+    for i in range(n):
+        active = np.where(~fully[i])[0]
+        L = int(active.size)
+        # every legal (start, length) sub-window of the visible block
+        cand = [(int(active[0]) + o, ln)
+                for ln in range(min_len, L + 1) for o in range(L - ln + 1)]
+        if not cand:                                        # L < min_len (does not occur in Test)
+            cand = [(int(active[0]), L)] if L else [(0, 0)]
+        rng = rng_for(seed, int(i), 30000)
+        pick = [(int(active[0]), L)] if L else [(0, 0)]     # view 0 = the full visible window
+        others = [c for c in cand if c != pick[0]]
+        for k in range(1, K_u):
+            pick.append(others[int(rng.integers(0, len(others)))] if others else pick[0])
+        for (s0, ln) in pick:
+            c = test_cube[i].copy()
+            keep = np.zeros(M, dtype=bool)
+            keep[s0:s0 + ln] = True
+            c[~keep] = np.nan
+            out.append(c)
+            owners.append(i)
+    return np.stack(out), np.array(owners)
+
+
+def _load_teacher(path, test_ids, n_test: int) -> np.ndarray:
+    """Banked teacher probabilities for test rows, realigned to the cube's row order.
+
+    The teacher is a preds bundle written by run_pipeline.py or tools/seed_average.py
+    (`p_test_raw` + `test_ids`). We NEVER trust positional order across runs: if the bundle
+    carries ids we reindex by them and fail loudly on any mismatch.
+    """
+    from pathlib import Path
+
+    d = np.load(Path(path), allow_pickle=True)
+    p = np.asarray(d["p_test_raw"], dtype=np.float32).ravel()
+    if p.size != n_test:
+        raise SystemExit(f"teacher {path}: {p.size} rows, test cube has {n_test}")
+    tid = d["test_ids"] if "test_ids" in d.files else None
+    if tid is not None and test_ids is not None:
+        pos = {str(v): k for k, v in enumerate(np.asarray(tid).ravel())}
+        try:
+            order = np.array([pos[str(v)] for v in np.asarray(test_ids).ravel()])
+        except KeyError as e:
+            raise SystemExit(f"teacher {path}: test id {e} missing from the bundle")
+        p = p[order]
+    elif tid is None:
+        log.warning("teacher %s carries no test_ids; assuming native row order", path)
+    p = np.clip(p, 1e-6, 1 - 1e-6)
+    log.info("seq distill teacher: %s | mean p=%.4f | pos-rate@0.5=%.4f",
+             path, float(p.mean()), float((p >= 0.5).mean()))
+    return p
+
+
 # --------------------------------------------------------------------------- #
 # CV
 # --------------------------------------------------------------------------- #
 def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
-               cfg: dict, smoke: bool = False):
+               cfg: dict, smoke: bool = False, test_ids=None):
     """Masking-aware CV for the sequence model.
 
     Returns (oof_prob [N], test_prob [Ntest], fold_scores, test_per_fold [n_models, Ntest]).
@@ -749,6 +876,33 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
              Xte.shape[2], s.get("pooling", "mean"),
              {k: v for k, v in channels_cfg.items() if v} or "none")
 
+    # ---- TRANSDUCTIVE bundle (iter41). Built ONCE: the test cube is fixed across folds, and the
+    #      views are seeded off cfg["seed"] only, so every fold-model sees the same unlabeled set
+    #      (the folds partition LABELS, and there are none here to leak). Standardization uses the
+    #      TRAIN-derived mean/std/ex_* -- re-fitting them on test would be a different, unmeasured
+    #      intervention and would confound the arm. ----
+    _tr_cfg = s.get("transduct") or {}
+    _di_cfg = s.get("distill") or {}
+    lam_u = float(_tr_cfg.get("lambda_u", 0.0)) if _tr_cfg.get("enable") else 0.0
+    alpha = float(_di_cfg.get("alpha", 0.0)) if _di_cfg.get("enable") else 0.0
+    u_bundle = None
+    if (lam_u > 0.0 or alpha > 0.0) and not smoke:
+        K_u = max(1, int(_tr_cfg.get("K_u", 2)))
+        if lam_u > 0.0 and K_u < 2:
+            raise SystemExit("seq.transduct.lambda_u>0 needs seq.transduct.K_u>=2")
+        u_cube, _ = _test_views(test_cube, K_u, int(cfg["seed"]),
+                                min_len=int(_tr_cfg.get("min_len", 4)))
+        Xu, pad_u = to_inputs(u_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
+                              relative_time=rel)
+        u_bundle = {"x": Xu, "pad": pad_u, "Ku": K_u, "lam_u": lam_u, "alpha": alpha,
+                    "warmup_frac": float(_tr_cfg.get("warmup_frac",
+                                                     _di_cfg.get("warmup_frac", 0.5)))}
+        if alpha > 0.0:
+            teacher = _di_cfg.get("teacher")
+            if not teacher:
+                raise SystemExit("seq.distill.enable=true needs seq.distill.teacher=<preds .npz>")
+            u_bundle["p_teacher"] = _load_teacher(teacher, test_ids, test_cube.shape[0])
+
     n = len(y)
     oof_sum = np.zeros(n); oof_cnt = np.zeros(n)
     test_accum = np.zeros(test_cube.shape[0]); n_models = 0
@@ -793,7 +947,8 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                     log.info("seq instance-expansion: per-epoch view resampling ON "
                              "(K=%d fresh views/row each of %d epochs)", K, s["epochs"])
 
-            model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K, resampler=resampler)
+            model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K, resampler=resampler,
+                           u=u_bundle)
 
             va_cube, va_owner = _mask_views(train_cube, va, schema, wd, cfg,
                                             R, cfg["seed"] + rep, oof=True)
@@ -824,4 +979,21 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     s["epochs"] = epochs_backup
     oof_prob = oof_sum / np.maximum(oof_cnt, 1)
     test_prob = test_accum / max(n_models, 1)
+
+    # ---- FREE abort gate for the transductive arms (costs no submission). A variance penalty on
+    #      unlabeled rows is minimized by a CONSTANT predictor, and self-training amplifies its own
+    #      error; both failure modes show up first in the realized positive rate. Pos-rate direction
+    #      correctly predicted the sign of every iter34 arm, so this is our most reliable free signal.
+    if u_bundle is not None:
+        # Diagnostics only. The ABORT GATE itself lives in run_pipeline.py, on the CALIBRATED
+        # column: the [0.50, 0.62] band and the ~0.55 reference are both properties of the
+        # post-Platt submitted probabilities, not of these raw pre-calibration scores.
+        log.info("TRANSDUCTIVE: raw test pos-rate %.4f (train prior %.4f) | oof_auc %.4f",
+                 float((test_prob >= 0.5).mean()), float(np.mean(y)), roc_auc(y, oof_prob))
+        if u_bundle.get("p_teacher") is not None:
+            pt = np.asarray(u_bundle["p_teacher"])
+            log.info("TRANSDUCTIVE GATE: teacher pos-rate %.4f | student-vs-teacher Spearman %.4f",
+                     float((pt >= 0.5).mean()),
+                     float(np.corrcoef(np.argsort(np.argsort(pt)),
+                                       np.argsort(np.argsort(test_prob)))[0, 1]))
     return oof_prob, test_prob, fold_scores, np.asarray(test_per_fold, dtype=np.float32)

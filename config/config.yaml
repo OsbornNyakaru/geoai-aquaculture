@@ -298,6 +298,36 @@ seq:
                            # Two round-07 agents DISAGREED on which is right (drain events
                            # contaminate max; canopy events make it discriminative), so both are
                            # implemented and screened rather than chosen blind. See RESEARCH_07.md 5d.
+  # ---- iter41 TRANSDUCTIVE lane. Round-18 research: two independent agents (the semi-supervised
+  # lane and the variance lane) converged on the SAME conclusion from different directions --
+  #   * 0.8995 is a BIAS floor, not a variance floor. Pure prediction-pooling has ~+0.0014 left,
+  #     FOREVER (Krogh-Vedelsby fit to the measured 5-seed pooling gain G5=+0.0055 -> asymptote
+  #     0.9013). So no amount of seeds/snapshots/bagging breaks the ceiling.
+  #   * The bias IS the covariate shift. The only levers that touch it are (i) use test-distribution
+  #     information, or (ii) change the inductive bias at zero width. These flags are (i).
+  # The 1030 unlabeled test rows are 57% of our labeled set and are drawn from the TARGET
+  # distribution -- no other lever in this project adds target-domain data. Test FEATURES are
+  # supplied unlabeled, so transduction is legal by construction (no external data, no test labels,
+  # no threshold tuning; the 0.5 cut and train-only Platt are untouched).
+  # BOTH flags add ZERO parameters -- the only class of change that has ever won here.
+  # enable:false on both = the champion, bit-for-bit.
+  transduct:
+    enable: false
+    lambda_u: 0.5      # weight on Var_k(logit) over K_u views of each TEST row. CAP: never exceed
+                       # consistency_lambda (1.0) -- the labeled term must dominate.
+    K_u: 2
+    min_len: 4         # sub-window floor. Measured test support is L in {4,5,6}; going below 4
+                       # leaves the manifold and re-creates the iter6 TTA failure (-0.0023).
+    warmup_frac: 0.5   # ramp the unlabeled weight from 0 over the first half of the epochs. An
+                       # un-ramped unlabeled variance term on an untrained net pulls it to a
+                       # CONSTANT function -- the one real failure mode of this arm.
+  distill:
+    enable: false
+    alpha: 0.7         # weight on BCE(student(test view), teacher soft probability)
+    teacher: null      # path to a preds bundle (p_test_raw + test_ids), e.g.
+                       # submissions/preds/preds_teacher_perm5.npz. Must be regenerated in the
+                       # same run: submissions/preds/ is gitignored.
+    warmup_frac: 0.5
   antithetic_views: false  # draw view 2 maximally distant from view 1 (K=2 only), preserving the
                            # marginal window distribution. Makes the cross-view invariance penalty
                            # (+0.0047, our champion) informative on every row instead of vacuous
