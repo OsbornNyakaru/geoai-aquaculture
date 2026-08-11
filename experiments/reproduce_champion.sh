@@ -100,6 +100,8 @@ want = {
     # disabled the pipeline is bit-for-bit the champion (verified against a pristine checkout).
     "seq.transduct.enable":         (bool((s.get("transduct") or {}).get("enable", False)), False),
     "seq.distill.enable":           (bool((s.get("distill") or {}).get("enable", False)), False),
+    # The iteration-43 dual-pol gate must likewise be OFF: neither designated finalist uses it.
+    "seq.channels.dualpol_gate":    (bool(s["channels"].get("dualpol_gate", False)), False),
     # THE COMPLIANCE ASSERTION. If this is not 'legal', the run produces a rules-violating
     # submission and the script must refuse rather than silently emit one.
     "calibration.compliance_mode":  (c.get("compliance_mode", "legal"), "legal"),

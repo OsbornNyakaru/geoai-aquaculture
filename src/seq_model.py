@@ -302,6 +302,33 @@ def _raw_extra_channels(cube: np.ndarray, schema, ch: dict):
         #     ponds are stable -> temporal variance is the textbook rice killer. Squared dB, standardized.
         VH = _cband(cube, schema, "VH")
         parts.append((VH * VH)[:, :, None])
+    if ch.get("dualpol_gate"):
+        # (E, iter43) DUAL-POLARIZATION water indicator 1[VH<tau_s] . 1[(VH-VV)<tau_r].
+        #
+        # WHY THIS IS NOT A REPEAT OF THE DEAD cross_pol ARM. Our entire feature bank is a
+        # function of VH alone. VH-VV was only ever tested in forms provably AFFINE in bands the
+        # model already has (our SDWI is exactly -5.697415 + 0.230259*(VH+VV), verified to 3.6e-15),
+        # so those arms measured WIDTH COST, not missing information. The AND-gate is the indicator
+        # form -- the same nonlinearity behind our only feature win -- and has never been run.
+        #
+        # TRAIN-ONLY SCREEN (iter43, window-matched via _mask_views so the 4-6 month test window is
+        # not confounded with the domain). Univariate AUC of the mean-pooled fraction:
+        #     VH-only  1[VH<-21]        0.8012   <- the champion permanence channel
+        #     ratio    1[(VH-VV)<-8]    0.7556
+        #     AND gate ts=-21, tr=-8    0.8487   <- +0.0475 over the champion channel
+        # Neither clause alone approaches the AND, so the gain is a genuine INTERACTION, not a
+        # threshold reshuffle. The AND also SUPPRESSES the ratio's domain shift (per-channel
+        # adversarial AUC 0.685 ratio-only -> 0.597 gated) because the VH clause anchors it.
+        # tau_r is anchored physically: open water depolarizes weakly (VH-VV strongly negative),
+        # rice/vegetation canopy volume-scatters (VH-VV near -5..-8 dB), which is our hardest confuser.
+        #
+        # NaN wherever EITHER polarization is masked -> the masked mean-pool is the fraction over
+        # months where BOTH are observed, i.e. still a Class-A n-invariant statistic.
+        VH = _cband(cube, schema, "VH"); VV = _cband(cube, schema, "VV")
+        ts = float(ch.get("dualpol_vh_tau", -21.0)); tr = float(ch.get("dualpol_ratio_tau", -8.0))
+        gate = ((VH < ts) & ((VH - VV) < tr)).astype(np.float32)
+        bad = np.isnan(VH) | np.isnan(VV)
+        parts.append(np.where(bad, np.nan, gate)[:, :, None])
     if ch.get("rice_gate"):
         # (D) SAR x optical rice-exclusion AND-gate 1[VH<tau_s] . 1[NDVI<tau_v]: ponds are low-SAR AND
         #     never green; paddies green up. The AND is nonlinear (not affine-spanned). NaN where either

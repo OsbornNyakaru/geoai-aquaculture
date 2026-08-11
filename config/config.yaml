@@ -257,6 +257,16 @@ seq:
     rice_gate: false         # (D) 1[VH<rice_vh_tau] . 1[NDVI<rice_ndvi_tau]: SARxoptical rice-exclusion
     rice_vh_tau: -21.0
     rice_ndvi_tau: 0.3
+    # (E, iter43) DUAL-POL water indicator 1[VH<tau_s] . 1[(VH-VV)<tau_r]. Intended as a WIDTH-NEUTRAL
+    # REPLACEMENT for `permanence` (run with permanence=false -> still 25 channels), because the gate
+    # already CONTAINS the permanence clause. Train-only, window-matched univariate AUC of the pooled
+    # fraction: perm 1[VH<-21] = 0.8012, ratio 1[(VH-VV)<-8] = 0.7556, AND gate = 0.8487. The AND beats
+    # both clauses, so the gain is an interaction. Our whole bank is a function of VH alone; every prior
+    # VH-VV arm was affine-spanned (SDWI = -5.697415 + 0.230259*(VH+VV) exactly) and so measured width
+    # cost, not information. See src/seq_model.py for the full screen and the shift analysis.
+    dualpol_gate: false
+    dualpol_vh_tau: -21.0    # same threshold as the champion permanence channel -> isolates the clause
+    dualpol_ratio_tau: -8.0  # cross-pol ratio cut; water depolarizes weakly, rice canopy volume-scatters
     # iter12 candidate. REPLACES the standardized absolute values with their within-series rank,
     # keeping the channel count at 24 -- a capacity-NEUTRAL swap, unlike `rank` above which ADDS.
     # This is the FIRST GENUINE TEST of the amplitude question: per_cell_detrend was believed to
