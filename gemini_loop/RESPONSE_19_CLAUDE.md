@@ -31,17 +31,40 @@ arXiv:2007.08792) remedy with Pool-Then-Calibrate. The docstring at lines 145-15
 per-member calibration *against rank-averaging*, which is a sound argument — but it never
 considered the third option (pool the logits, calibrate once), which dominates both.
 
-**WHERE THE REPORT'S RANKING IS WRONG.** It ranks this #1 as a level lever on the champion. Our
-ledger says otherwise: pooling has delivered its expected **+0.0055 to +0.0061 on every perm and
-distill pool** (iter33d +0.0055, iter41 +0.0061). A combiner defect that costs nothing on eight
-pools out of nine is not the champion's bottleneck. It bit **exactly once** — ARM T (tcons) — and
-that is the one pool whose members' Platt slopes diverged, because the unlabeled variance penalty
-compresses each seed's logit distribution by a different amount.
+**MY FIRST TRIAGE OF THIS PROPOSAL WAS WRONG. CORRECTED 2026-08-11, SAME DAY.**
 
-So the honest expected value of Proposal 1 **in isolation** is ~0 on the current champion
-(members are near-homogeneous; logit-averaging is then near rank-equivalent to
-probability-averaging). Its real function is as the **instrument that makes Proposal 3
-measurable**. Proposals 1 and 3 are ONE experiment, not two ranked separately.
+The first draft of this section argued the report had mis-ranked Proposal 1: that pooling has
+paid +0.0055..+0.0061 on every perm/distill pool, so a defect biting eight pools out of nine was
+not the champion's bottleneck; that it bit only ARM T; and that it bit there because ARM T's
+member Platt slopes diverged. **Two errors, both material.**
+
+1. **Slope divergence cannot be the mechanism.** Per-member Platt scaling is *scale-invariant* —
+   fitting a logistic on each member's own logits removes that member's slope by construction. So
+   combiner A cannot see slope heterogeneity at all. Verified synthetically (`tools/repool.py`
+   header): 5 members at slopes {1,1,1,1,1} vs {0.35,0.6,1.0,1.7,2.6} give combiner A
+   **bit-identical** pooled OOF F1 0.62529 and pos-rate 0.2033.
+2. **The ledger evidence I cited was a category error.** The +0.0055..+0.0061 gains measured
+   **pool vs single member**, never **combiner A vs combiner B**. Pooling can be worth +0.006 and
+   still leave more on the table through the wrong combiner. *Nothing in the ledger has ever
+   compared the two orders.* I used an irrelevant measurement to downgrade a live proposal.
+
+**The correct mechanism is generic, not ARM-T-specific.** An arithmetic mean of
+independently-noisy probabilities is shrunk toward the members' centre of mass, so the pooled
+distribution is strictly narrower than any member's and a FIXED 0.5 cut catches fewer rows. This
+requires only independent member noise — which is exactly what multi-seed pooling is. In the same
+synthetic, B beat A by **+0.039 F1 (homogeneous)** and **+0.031 F1 (divergent)**, with pos-rate
+0.2033 -> 0.2450 and 0.2500 respectively.
+
+**So the report's ranking stands and mine did not: Proposal 1 is a candidate level lever on the
+CHAMPION pool, not merely an instrument for Proposal 3.** Magnitudes above are synthetic and carry
+no weight for our data; the direction and the genericity do. Settle it on real bundles with
+`tools/repool.py` before spending a submission.
+
+This also refines the ARM T diagnosis. The tcons members were individually *underdispersed* (a
+cross-view variance penalty compresses each seed's logits toward a constant — its known
+attractor), and arithmetic averaging of already-underdispersed members compresses hardest. That is
+why ARM T was hit worst while ordinary pools merely under-delivered. Same defect, different
+severity — not a special case.
 
 Compliance: clean, and arguably more standard-correct than what we ship. Must be a config flag
 defaulting **OFF** so the already-scored finalists and every `anchors.tsv` entry reproduce
@@ -120,8 +143,14 @@ combiner** to count. The report states this correctly.
 ## Net effect on the plan
 
 - iter43's three uploads proceed unchanged. Its result still sets finalist #1.
-- **iter44 = Proposals 1 + 3 as a single experiment**, with the free re-pooling diagnostic as
-  step 0 and the combiner behind an OFF-by-default flag. Not Proposal 1 alone (~0 expected on a
-  champion that already pools correctly), and not Proposal 2 (dead).
+- **iter44 = Proposal 1 (primary) + Proposal 3 (rider)**, with the `tools/repool.py` diagnostic as
+  step 0 and the combiner behind an OFF-by-default flag. Proposal 1 is now the primary because the
+  defect is generic and therefore applies to the champion pool itself; Proposal 3 rides along
+  because the same fixed combiner is what makes the ARM T re-test interpretable. Not Proposal 2
+  (dead).
+- **Bundle persistence.** `colab_run.ipynb:55-59` copies the three CSVs IN from Drive and copies
+  nothing back, so `submissions/preds/*.npz` dies with the session — iteration 41's ARM T bundles
+  are already lost, which is why step 0 must regenerate its members. Add a Drive copy-out of
+  `submissions/preds/` so no future diagnostic is blocked on re-running finished compute.
 - Proposal 2 and the F/2 score-shift are **closed permanently**; do not re-litigate.
 - **Fix `UPDATE_19.md:57`** before it is fed to any further research round.
