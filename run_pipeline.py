@@ -125,7 +125,15 @@ def main() -> None:
                   + (1 if _ch.get("vv_permanence") else 0)
                   + (1 if _ch.get("pond_band") else 0)
                   + (1 if _ch.get("vh_sq") else 0)
-                  + (1 if _ch.get("rice_gate") else 0))
+                  + (1 if _ch.get("rice_gate") else 0)
+                  # iter43. MISSING THIS LINE WAS A REAL (reporting-only) BUG, caught in the iter43
+                  # log: dpr_* ran at a true width of 25 but printed `n_features: 24`, and dpa_* ran
+                  # at 26 but printed 25. The MODEL was correct throughout -- "seq input width" is
+                  # read straight off the tensor -- but this independently-computed audit counter is
+                  # what lands in the run summary and the reproduction package, so a reviewer would
+                  # have seen a 25-channel model claiming 24. Same failure mode the comment below
+                  # describes for iter12's c_compact, with the error on the other side.
+                  + (1 if _ch.get("dualpol_gate") else 0))
         # iter25: drop_bands removes both the value AND the missing-indicator channel for each
         # dropped band, so the base width is 2*(n_bands - n_dropped). Keeping this in sync
         # matters: the iter12 `c_compact` bug was a silent no-op precisely because this
