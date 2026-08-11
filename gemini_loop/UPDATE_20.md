@@ -216,6 +216,18 @@ This reframes everything, so we want it settled:
 the entire calibration lane — including our own §2.1 fix — is a sideshow, and we would rather know that
 before spending our last experimental slot.
 
+> **⚡ UPDATED AFTER WRITING: iteration 43's scores arrived and they push hard toward the local-ranking
+> answer.** One arm (the dual-pol gate added to permanence) posted **AUC 0.946460 — our highest ever, and
+> for the first time ABOVE the leaderboard leader's 0.944897** — while its F1 came in at 0.881720, *below*
+> our champion's 0.889488. **We have now overtaken the leader on global ranking and are still ~0.022
+> behind on the composite.** Full numbers and the exact confusion-matrix inversion are in §5; the short
+> version is that at essentially equal AUC the leader converts **8 more true positives** at the cut than
+> we do. Since AUC ≥ theirs rules out "we rank worse globally," the live explanations are (i) local ROC
+> shape in the near-cut band, or (ii) their operating point is better placed — and (ii) is not available
+> to us legally, because our own train-only prior estimate sits *below* our realized positive rate, so
+> any correction we are entitled to make pushes the cut the **wrong** way. **Please answer 4.1(a)–(c)
+> with this in mind: the question is no longer hypothetical.**
+
 ### 4.2 Q2 — Does the linear-pool defect survive at ρ = 0.98?
 
 Round 19 asserted the pooling defect and we confirmed the code, but **neither of us checked the
@@ -323,7 +335,44 @@ notebook copies data *in* from Drive but nothing back out, so iteration 41's ARM
 are lost; the comparison requires re-running those 5 seeds (compute, **zero submissions**). Treat the
 combiner question as **open and unmeasured**, not as a confirmed win.
 
-*If iteration 43's scores have arrived by the time you read this, they will be appended here.*
+### 5.1 Iteration 43 RESULT — scores in, pre-registered read applied
+
+| arm | artifact | composite | AUC | F1 | vs 0.910837 |
+|---|---|---|---|---|---|
+| E | `champion_distill_alphamix10` | 0.906104 | 0.942680 | 0.881720 | −0.004733 |
+| F | `champion_dualpol_rep_seedavg5` (gate replaces perm, 25 ch) | 0.904005 | 0.941953 | 0.878706 | −0.006832 |
+| G | `champion_dualpol_add_seedavg5` (gate added to perm, 26 ch) | 0.907616 | **0.946460** | 0.881720 | −0.003221 |
+
+**The pre-registered read, applied verbatim.** ARM E was declared a *variance* decision, banked unless it
+landed below ~0.903 — it did not, so it is finalist #1. Neither gate arm clears the +0.006 bar, so **the
+VH−VV lane is closed for good**: raw (−0.0228, iteration 31), affine/SDWI (algebraically spanned, zero
+capacity), and now the indicator form. Three independent parameterizations of the same physical quantity,
+all null. G beat F on both terms (+0.0036 composite, +0.0045 AUC, +1 TP), so the gate is *additional*
+information rather than a refinement of permanence — consistent with their Spearman of only 0.75 — but
+the extra channel of width does not pay for itself.
+
+**The exact confusion-matrix inversion (diagnosis only; never fed to any operating point).** Zindi's F1
+column is a small-denominator rational: 328/372, 326/371, 328/372. The AUC quantum 4.396e-5 = 1/(P·N)
+with P+N = 309 pins the public slice at **P = 188 positives, N = 121 negatives**. That closes the system:
+
+| artifact | TP | pred-pos | FP | FN | precision | recall | AUC |
+|---|---|---|---|---|---|---|---|
+| `a15` (best composite, 0.910837) | 165 | 183 | 18 | 23 | 0.9016 | 0.8777 | 0.942861 |
+| `alphamix10` (ARM E) | 164 | 184 | 20 | 24 | 0.8913 | 0.8723 | 0.942680 |
+| `dualpol_add` (ARM G) | 164 | 184 | 20 | 24 | 0.8913 | 0.8723 | **0.946460** |
+| `dualpol_rep` (ARM F) | 163 | 183 | 20 | 25 | 0.8907 | 0.8670 | 0.941953 |
+| **leaderboard leader** | **≈173** | **≈188** | ≈15 | ≈15 | ≈0.920 | ≈0.920 | 0.944897 |
+
+**Every submission we have made in two iterations lies inside TP ∈ {163,164,165}, pred-pos ∈ {183,184}.**
+Six artifacts, two true positives and one predicted positive of spread. The composite differences we have
+been reading as signal are one or two rows out of 309.
+
+**And the leader is 8 true positives ahead of us at a ranking we have now beaten.** This is the single
+most important fact in this document. It says the remaining gap is not global discrimination and not, so
+far as we can legally reach it, cut placement — our train-only prior estimate (MLLS 0.578 / BBSE 0.559)
+is *below* our realized 0.592, so every prior correction we are entitled to make moves the cut the wrong
+direction. See §4.1: we need to know whether this is local ROC shape near the cut, and if so what
+actually optimizes it.
 
 ---
 

@@ -31,14 +31,28 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: `Run all` → iter43 on Colab (25 runs, 3 uploads).** ARM E = the alpha-marginalized
+3. **Current next action: iter44 = FINALIST CONSOLIDATION + the code-review package (35% of the final
+   score). The experimental phase is over.** iter43 RESULT, pre-registered read applied verbatim:
+   ARM E `champion_distill_alphamix10` **0.906104** (AUC 0.942680, F1 0.881720) → clears the ≥0.903 bar,
+   **BANKED AS FINALIST #1**; ARM F `champion_dualpol_rep_seedavg5` **0.904005** (AUC 0.941953, F1 0.878706);
+   ARM G `champion_dualpol_add_seedavg5` **0.907616** (AUC **0.946460**, F1 0.881720). Neither gate arm
+   clears +0.006 vs 0.910837, so **the VH−VV lane is CLOSED for good** — raw (−0.0228), affine/SDWI
+   (spanned), indicator (this round): three independent forms of the same quantity, all failed.
+   **BUT ARM G POSTED THE HIGHEST AUC WE HAVE EVER RECORDED, 0.946460, ABOVE THE LEADER'S 0.944897.**
+   AUC is our stable term (the whole α ladder moved it 0.0017; 5- vs 10-seed α=0.7 were bit-identical),
+   so +0.0024 over our previous max is outside its observed spread — the gate genuinely improves RANKING
+   and loses one row at the cut. **Consequence: global ranking is no longer the bottleneck and no legal
+   move converts it.** Inverting the Zindi columns exactly (F1 rationals 328/372, 326/371, 328/372; AUC
+   quantum 4.396e-5 ⇒ public slice = 188 pos / 121 neg) puts every iteration-42/43 artifact inside
+   TP∈{163,164,165}, PP∈{183,184}, and the leader at ≈TP 173 / PP 188 at the same AUC — **the whole
+   remaining ~0.022 gap is 8 true positives at the cut, at a ranking we have now matched.** Lowering the
+   cut to reach it is the forbidden move; the train-only prior (MLLS 0.578 / BBSE 0.559) sits *below* our
+   realized 0.592, so there is no legal upward correction either. This is diagnosis only and has NOT been
+   fed to any operating point. **Finalists now {champion_distill_alphamix10 0.906104, champion_archblend4
+   0.899643}**, with `champion_distill_a15_seedavg5` (0.910837) and `champion_dualpol_add_seedavg5`
+   (0.907616, best AUC) as the two alternates to settle in iter44. **Deadline 2026-08-16.**
+   [superseded] iter43 STAGED: ARM E = the alpha-marginalized
    10-distinct-seed finalist; ARMS F/G = the dual-pol gate as replacement (25 ch) and as an add (26 ch).
-   Read is pre-registered in `experiments/run_current.sh`: ARM E is a VARIANCE decision and is NOT gated on
-   beating 0.910837 (it becomes finalist #1 unless it lands below ~0.903); F/G need ≥+0.006 vs 0.910837, and
-   if BOTH wash the VH−VV lane closes for good with three independent forms of the same quantity (raw,
-   affine/SDWI, indicator) having failed — a publishable negative, not a null. **Deadline 2026-08-16: iter43
-   is the last iteration with room for a feature experiment. iter44 = finalist consolidation + the code-review
-   package, which is 35% of the final score.**
    [superseded] **ROUND-18 deep research (8 subagents) → the path to 0.95.** iter40 closed the
    tree lane (sr 0.7186 / nodrop 0.6903 — conditional shift fatal; the adversarial GO was a false
    positive, blind to conditional shift). Both in-house lanes are now capped: Transformer ~0.8995
