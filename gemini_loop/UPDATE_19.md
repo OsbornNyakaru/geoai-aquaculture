@@ -54,7 +54,16 @@ co-present when a month is observed) + 10 Sentinel-2 optical bands (individually
   level.** An offline label-shift goodness-of-fit test **FAILED** (KS D=0.186, p≈0), i.e. there is a real
   **conditional** shift component, not pure label shift — so Saerens/BBSE prior correction is unsafe and
   is switched off.
-- **Believed true test prevalence ≈0.65**; our artifacts realize ≈0.588.
+- **Measured test prevalence ≈0.56–0.58**; our artifacts realize ≈0.588 — i.e. we are already AT or
+  slightly ABOVE the estimated test prior, and there is **no positive-rate gap to close.** The two
+  estimators agree: MLLS 0.578, BBSE 0.559 (`tools/label_shift_gate.py`, iter35b). ⚠️ **CORRECTION
+  (2026-08-11):** an earlier revision of this line read "believed true test prevalence ≈0.65", a stale
+  figure carried over from the retired prevalence-pin era and contradicted by our own measurement. Any
+  proposal whose value rests on driving the realized pos-rate up toward 0.65 is arguing from a premise
+  we have already falsified — and, with the calibrator fit under the correct observation regime and
+  landing at the measured prior, a further upward shift would be an operating-point move chosen for its
+  effect on the 0.5 cut, i.e. threshold tuning in a calibration costume. See
+  `gemini_loop/RESPONSE_19_CLAUDE.md` §Proposal 2.
 
 **Metric:** `0.6·F1 + 0.4·AUC`. Two columns: `TargetF1` (binary, at a **hard 0.5 cut**) and `TargetRAUC`
 (probability). **Threshold tuning is explicitly forbidden by the rules.**
