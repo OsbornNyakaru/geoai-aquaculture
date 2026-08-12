@@ -351,28 +351,46 @@ all null. G beat F on both terms (+0.0036 composite, +0.0045 AUC, +1 TP), so the
 information rather than a refinement of permanence — consistent with their Spearman of only 0.75 — but
 the extra channel of width does not pay for itself.
 
-**The exact confusion-matrix inversion (diagnosis only; never fed to any operating point).** Zindi's F1
-column is a small-denominator rational: 328/372, 326/371, 328/372. The AUC quantum 4.396e-5 = 1/(P·N)
-with P+N = 309 pins the public slice at **P = 188 positives, N = 121 negatives**. That closes the system:
+**The partial confusion-matrix inversion (diagnosis only; never fed to any operating point).** Zindi's F1
+column is a small-denominator rational, 2·TP/(PP+P), and it inverts *exactly*: 328/372, 326/371, 328/372,
+each matching the reported value to 10 decimals. That pins **TP** and the **sum PP+P** — and nothing else.
 
-| artifact | TP | pred-pos | FP | FN | precision | recall | AUC |
-|---|---|---|---|---|---|---|---|
-| `a15` (best composite, 0.910837) | 165 | 183 | 18 | 23 | 0.9016 | 0.8777 | 0.942861 |
-| `alphamix10` (ARM E) | 164 | 184 | 20 | 24 | 0.8913 | 0.8723 | 0.942680 |
-| `dualpol_add` (ARM G) | 164 | 184 | 20 | 24 | 0.8913 | 0.8723 | **0.946460** |
-| `dualpol_rep` (ARM F) | 163 | 183 | 20 | 25 | 0.8907 | 0.8670 | 0.941953 |
-| **leaderboard leader** | **≈173** | **≈188** | ≈15 | ≈15 | ≈0.920 | ≈0.920 | 0.944897 |
+> ### ⚠️ CORRECTION, 2026-08-12 — this section originally over-claimed
+>
+> An earlier version of this section asserted that the AUC quantum 4.396e-5 = 1/(P·N) with P+N = 309
+> "pins the public slice at P = 188, N = 121", and printed a full confusion matrix on that basis. **The
+> assertion is false and the full matrix is withdrawn.** An integrality sweep over every split of 309
+> (and of 308 and 310, and with the tie half-quantum 1/(2PN)) evaluated against the three 9-decimal AUC
+> values gives a best max-residual of **0.070**, where 9-decimal reporting admits only ~1e-5. Every split
+> is rejected at four orders of magnitude; the quantum assumption does not hold for this column at all.
+>
+> **The honest figure is P = 190 ± 7, an ESTIMATE**, obtained from our own logged full-test pos-rate
+> 0.5874 (E[public PP] = 309 × 0.5874 = 181.5, hypergeometric sd 7.2, and P = 371.5 − PP), bounded below
+> and above by TP ≤ min(PP, P) at P ∈ [164, 208]. Consequently **PP, FP, FN, FPR, precision and recall
+> were never established** and must not be reasoned from. **What survives is P-independent:** the TP
+> counts, and therefore the gap to the leader.
 
-**Every submission we have made in two iterations lies inside TP ∈ {163,164,165}, pred-pos ∈ {183,184}.**
-Six artifacts, two true positives and one predicted positive of spread. The composite differences we have
-been reading as signal are one or two rows out of 309.
+| artifact | TP | PP + P | AUC |
+|---|---|---|---|
+| `a15` (best composite, 0.910837) | 165 | 372 | 0.942861 |
+| `alphamix10` (ARM E) | 164 | 372 | 0.942680 |
+| `dualpol_add` (ARM G) | 164 | 372 | **0.946460** |
+| `dualpol_rep` (ARM F) | 163 | 371 | 0.941953 |
+| **leaderboard leader** | **≈173** | ≈376 | 0.944897 |
 
-**And the leader is 8 true positives ahead of us at a ranking we have now beaten.** This is the single
-most important fact in this document. It says the remaining gap is not global discrimination and not, so
-far as we can legally reach it, cut placement — our train-only prior estimate (MLLS 0.578 / BBSE 0.559)
-is *below* our realized 0.592, so every prior correction we are entitled to make moves the cut the wrong
-direction. See §4.1: we need to know whether this is local ROC shape near the cut, and if so what
-actually optimizes it.
+**Every submission we have made in two iterations lies inside TP ∈ {163,164,165}.** Six artifacts, two
+true positives of spread. The composite differences we have been reading as signal are one or two rows
+out of 309.
+
+**And the leader is ~9 true positives ahead of us at a ranking we have now beaten.** This is the single
+most important fact in this document. It says the remaining gap is not global discrimination; it is what
+happens at the cut. **A second retraction belongs here:** this section previously argued that cut
+placement is also unreachable, because "our train-only prior estimate (MLLS 0.578 / BBSE 0.559) is below
+our realized 0.592, so every prior correction we are entitled to make moves the cut the wrong direction."
+Those two estimators were **retired at iteration 41 as invalid** — the KS gate rejected the p(x|y)
+invariance they both assume at p ≈ 0. Retiring an estimator for the purpose of *correction* while still
+citing it as evidence that *no correction is warranted* is an unsound asymmetry, and the argument is
+withdrawn. **Whether our operating pos-rate is too low is an OPEN question.** See §4.1.
 
 ---
 

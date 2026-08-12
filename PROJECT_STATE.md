@@ -42,13 +42,20 @@
    AUC is our stable term (the whole α ladder moved it 0.0017; 5- vs 10-seed α=0.7 were bit-identical),
    so +0.0024 over our previous max is outside its observed spread — the gate genuinely improves RANKING
    and loses one row at the cut. **Consequence: global ranking is no longer the bottleneck and no legal
-   move converts it.** Inverting the Zindi columns exactly (F1 rationals 328/372, 326/371, 328/372; AUC
-   quantum 4.396e-5 ⇒ public slice = 188 pos / 121 neg) puts every iteration-42/43 artifact inside
-   TP∈{163,164,165}, PP∈{183,184}, and the leader at ≈TP 173 / PP 188 at the same AUC — **the whole
-   remaining ~0.022 gap is 8 true positives at the cut, at a ranking we have now matched.** Lowering the
-   cut to reach it is the forbidden move; the train-only prior (MLLS 0.578 / BBSE 0.559) sits *below* our
-   realized 0.592, so there is no legal upward correction either. This is diagnosis only and has NOT been
-   fed to any operating point. **Finalists now {champion_distill_alphamix10 0.906104, champion_archblend4
+   move converts it.** Inverting the Zindi F1 column exactly (it is the small-denominator rational
+   2·TP/(PP+P); 328/372, 326/371, 328/372 all match to 10 decimals) puts every iteration-42/43 artifact
+   inside **TP∈{163,164,165} with PP+P∈{371,372}**, and the leader at **TP≈173** — **the whole remaining
+   ~0.022 gap is 8–9 true positives at the cut, at a ranking we have now matched.** Lowering the cut to
+   reach it is the forbidden move. **CORRECTION (2026-08-12): the public split is NOT derivable.** An
+   earlier note here claimed the AUC quantum 1/(P·N) pinned the slice at 188 pos / 121 neg. That is
+   **false** — an integrality sweep over every split of 309 (and of 308/310, and with the tie half-quantum
+   1/(2PN)) gives a best max-residual of **0.070**, against the ~1e-5 that 9-decimal reporting allows. No
+   split works; the quantum assumption is rejected. The honest figure is **P = 190 ± 7**, *estimated* from
+   our own logged full-test pos-rate 0.5874 (⇒ E[public PP] = 181.5, hypergeometric sd 7.2, so
+   P = 371.5 − PP), bounded by P ∈ [164, 208]. **What survives is P-independent**: the TP counts and the
+   8–9-TP gap come straight from the F1 rationals. **What does NOT survive**: PP, FP, FN, FPR, precision
+   and recall were never established. All of this is diagnosis only and has NOT been fed to any operating
+   point. **Finalists now {champion_distill_alphamix10 0.906104, champion_archblend4
    0.899643}**, with `champion_distill_a15_seedavg5` (0.910837) and `champion_dualpol_add_seedavg5`
    (0.907616, best AUC) as the two alternates to settle in iter44. **Deadline 2026-08-16.**
    [superseded] iter43 STAGED: ARM E = the alpha-marginalized
