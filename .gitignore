@@ -26,3 +26,8 @@ geoai-aquaculture-code.zip
 # OS
 .DS_Store
 Thumbs.db
+
+# Vendored third-party source + pretrained weights (fetched deterministically by
+# tools/fetch_presto.py at a pinned SHA with a checksum gate). Not committed: 3.3 MB binary,
+# and the fetch is reproducible from the pin.
+vendor/

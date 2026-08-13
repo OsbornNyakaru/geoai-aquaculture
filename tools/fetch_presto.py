@@ -24,6 +24,7 @@ USAGE
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -32,7 +33,14 @@ from pathlib import Path
 
 REPO = "https://github.com/nasaharvest/presto"
 # Pin the revision so a reviewer gets byte-identical source. Update deliberately, never silently.
-REV = "main"
+#
+# ⚠️ FIXED 2026-08-13 (iter47). This said REV = "main" while the comment above claimed it was a
+# pin. It was not: `main` moves, so two reviewers running this a week apart could vendor different
+# source and different weights, and the "byte-identical" promise was false. Now pinned to a commit
+# SHA, with the checkpoint's SHA-256 verified after copy so a silent upstream change cannot slip
+# through even if the tag were somehow reused.
+REV = "11e207a668a34336ced1d8e492a1bd5849b96c4a"
+CKPT_SHA256 = "559c9d76f525bdf2dd3774da8b1e7f1510769b73baacac12e9e4d8d5c67fbe65"
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor" / "presto"
@@ -119,9 +127,20 @@ def main() -> None:
 
     VENDOR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as td:
+        # `git clone --branch` accepts tags and branch names but NOT commit SHAs, so a pinned
+        # revision needs fetch-then-checkout. Falls back to --branch for a symbolic ref.
         print(f"cloning {REPO} @ {args.rev} ...")
-        subprocess.run(["git", "clone", "--depth", "1", "--branch", args.rev, REPO, td],
-                       check=True, capture_output=True)
+        if len(args.rev) == 40 and all(c in "0123456789abcdef" for c in args.rev.lower()):
+            subprocess.run(["git", "init", "-q", td], check=True, capture_output=True)
+            subprocess.run(["git", "-C", td, "remote", "add", "origin", REPO],
+                           check=True, capture_output=True)
+            subprocess.run(["git", "-C", td, "fetch", "-q", "--depth", "1", "origin", args.rev],
+                           check=True, capture_output=True)
+            subprocess.run(["git", "-C", td, "checkout", "-q", "FETCH_HEAD"],
+                           check=True, capture_output=True)
+        else:
+            subprocess.run(["git", "clone", "--depth", "1", "--branch", args.rev, REPO, td],
+                           check=True, capture_output=True)
         src = Path(td)
         # NOTE: model.py MUST keep its upstream filename. presto.py does
         # `from .model import ...`, so the vendored copy has to be importable as
@@ -141,8 +160,14 @@ def main() -> None:
         if not ckpt.exists():
             raise SystemExit(f"checkpoint not found at {ckpt}")
         shutil.copy2(ckpt, VENDOR / "default_model.pt")
+        got = hashlib.sha256((VENDOR / "default_model.pt").read_bytes()).hexdigest()
+        if CKPT_SHA256 and got != CKPT_SHA256:
+            raise SystemExit(
+                f"checkpoint SHA-256 mismatch.\n  expected {CKPT_SHA256}\n  got      {got}\n"
+                "The pretrained weights are not the ones this project was built and scored "
+                "against. Refusing to continue.")
         print(f"  wrote {(VENDOR / 'default_model.pt').relative_to(ROOT)} "
-              f"({ckpt.stat().st_size / 1e6:.1f} MB)")
+              f"({ckpt.stat().st_size / 1e6:.1f} MB, sha256 verified)")
 
         lic = src / "LICENSE"
         if lic.exists():
