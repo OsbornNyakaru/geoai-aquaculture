@@ -443,6 +443,73 @@ Research brief `gemini_loop/UPDATE_21.md` written and carries all of the above.
 
 ---
 
+## Round 21b — the preds bundles came home; three offline findings, 0 submissions (2026-08-14)
+
+**Cell 5b worked.** 23 bundles recovered (`preds.zip`, 1.18 MB) and extracted to
+`submissions/preds/` — which stays gitignored, verified. **The analysis lane is open for the first
+time in the project.** Every bundle carries the per-view OOF record.
+
+**FINDING 1 — a CAUTION on iter45's premise, and it is the important one.** The dual-pol gate's AUC
+edge is **+0.00378 on the leaderboard but only +0.00038 on OOF** — ten times smaller offline, and
+well inside the per-seed OOF AUC spread:
+
+| family | OOF AUC | sd | n |
+|---|---|---|---|
+| amix | 0.98887 | 0.00149 | 10 |
+| dpa | 0.98925 | 0.00099 | 5 |
+
+Worse for our confidence: **the two LB readings of the gate's AUC (iter43 0.946460, iter44 0.946387)
+come from the SAME five seeds**, and the iter44 regime-match left the ranking essentially untouched
+(pooled ρ = 0.99996). **They are one observation, not two.** So the entire case for the gate's
+ranking edge rests on a single independent 5-seed draw that OOF cannot corroborate.
+
+This does **not** change iter45's pre-registered rule — that rule already carries the branch
+*"AUC ~0.943 ⇒ the edge was a 5-seed artifact; record that the iter43 and iter44 readings were
+correlated, not independent."* It changes the **prior**: that branch is now meaningfully more likely
+than it looked when the rule was written. iter45 is the first genuinely independent test of the gate's
+ranking, which is exactly why it is worth the run — but we should not expect the favourable branch.
+
+**FINDING 2 — going 5 → 10 seeds barely moves the pooled ranking.** Over all 252 five-of-ten subsets
+of the amix pool, Spearman(5-seed subpool, 10-seed pool) = **0.9986 mean, 0.9975 min**. This
+generalizes iter42's observation that α=0.7 at 5 and at 10 seeds gave *bit-identical* AUC. So if the
+gate's ranking edge is real, seed expansion should preserve it; if iter45 comes back at the amix AUC
+level, seed count will not be the explanation.
+
+**FINDING 3 — amix and dpa are near-twins, so the finalist choice between them is a small bet.**
+Spearman(amix10, dpa5) = **0.9937**, disagreeing on **11 of 1030** hard labels (~3 on the public
+slice). Whichever wins, `champion_archblend4` remains the genuine diversity hedge — it predates the
+entire distillation lane, while these two share a teacher.
+
+**THE GRAPH-TEACHER KILL CONDITION DID NOT FIRE.** From `UPDATE_21.md` §4.3: *"if the graph teacher's
+ranking correlates with our current teacher's above some threshold, it carries no independent
+information and the lane is dead."*
+
+| k | ρ(graph, teacher_perm5) | ρ(graph, amix10) | hard-label disagreement |
+|---|---|---|---|
+| 5 | 0.7861 | 0.7813 | 92/1030 |
+| 10 | 0.8247 | 0.8139 | 100/1030 |
+| 25 | 0.8652 | 0.8498 | 97/1030 |
+| 50 | 0.8782 | 0.8625 | 98/1030 |
+
+For scale, **within our own family ρ(teacher_perm5, amix10) = 0.9686.** The graph teacher is
+genuinely decorrelated and carries substantial independent information — it disagrees with us on
+about a tenth of all rows.
+
+**But note precisely where that decorrelation sits: ρ ≈ 0.79–0.88 is the SAME band as ROCKET (0.850)
+and the GBDT (0.849), both of which LOST as pool members (−0.009 and −0.0155).** This project's law —
+*under a hard-threshold metric a decorrelated member's reordering near the cut costs more level than
+its independence buys back* — is why it could only ever enter as a **teacher**, never as a pool
+member. Combined with the measured near-binary teacher (0.5–2.9% of mass near the cut, so soft
+distillation approaches hard pseudo-labelling on a shifted test set), the lane is **alive but
+unattractive**.
+
+**Verdict: the graph-teacher lane is CLOSED FOR TIME, NOT FOR EVIDENCE.** Its kill condition did not
+fire and it remains a legitimate open direction. With two days left and the code-review package
+outstanding, we are not spending a round on a new lane whose two documented risks both point down.
+Recorded as future work in `REPORT.md` §9 rather than as a dead end.
+
+---
+
 ## iter44 RESULT — the boundary lane closes on a measurement (2026-08-14)
 
 **Scores.** `champion_alphamix10_regimematch` **0.907109506** (AUC 0.942571, F1 0.883469) and

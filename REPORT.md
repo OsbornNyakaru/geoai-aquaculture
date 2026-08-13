@@ -697,6 +697,24 @@ against, and we flag our physics-derived expectations as **unvalidated for this 
 
 Stated so a reviewer can see we know where the remaining value is, not as a claim of results.
 
+0. **A graph-propagation teacher — the one lane we closed for time rather than for evidence.**
+   Distillation from a pooled teacher was our single largest win (§6.6, +0.0100), but it is capped
+   at one round because the teacher is the model's own prediction and re-teaching compounds error
+   (Kumar, Ma & Liang). A teacher built from k-NN label propagation on a mask-matched similarity
+   graph (§5.4) is **structurally independent of the network's own predictions**, so that cap does
+   not obviously apply. We wrote a kill condition — *if its ranking correlates too highly with the
+   current teacher's, it carries no new information* — and **the kill condition did not fire**:
+   ρ = 0.79–0.88 against our teacher, versus ρ = 0.9686 *within* our own family, disagreeing on
+   ~10% of all rows. It needs no new model code, since `seq.distill.teacher` already accepts a
+   probability bundle.
+   **Two honest reasons we did not spend the round.** Its decorrelation (ρ ≈ 0.79–0.88) sits in
+   precisely the band where ROCKET (0.850) and the GBDT (0.849) both *lost* as pool members
+   (−0.009, −0.0155), so it could only ever enter as a teacher, never as a member. And it is
+   near-binary — only 0.5–2.9% of its mass lies within 0.05 of the cut — so soft distillation from
+   it approaches hard pseudo-labelling on a shifted test set, the classic self-training failure mode.
+   Both risks point down, and we had two days and an unwritten report. **This is an open lane, not a
+   dead one**, and it is the first thing we would run with another week.
+
 1. **Transductive training on the unlabeled test rows** — ✅ **DONE, and it worked — see §6.6.** The 1,030 test
    rows are 57% of our labeled set and the only target-domain data available; test *features* are
    supplied, so using them is legal by construction. Two zero-parameter forms: extending our proven
