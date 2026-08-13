@@ -379,6 +379,69 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 
 ---
 
+## Round 21 — the GRAPH GATE: an independent prevalence estimate, 0 submissions (2026-08-13)
+
+**The question it settles.** iter43's entry left this open in writing: *"whether our operating
+pos-rate is too LOW is OPEN, not closed."* It had to, because the two estimators that could answer it
+(MLLS 0.578, BBSE 0.559) were **retired at iter41** when the KS gate rejected `p(x|y)`-invariance at
+p≈0 — and an estimator retired *for* correction cannot be re-used as evidence that *no* correction is
+warranted. We have had no valid independent estimate since.
+
+**First, what is NOT available.** The natural graph for pond detection is spatial — ponds cluster, so
+a cell beside a pond is likely a pond. Verified directly against the CSVs this round: `Train.csv` is
+146 columns (`ID`, `label`, 12 bands × 12 months) with **no lat/lon/tile/region column of any kind**,
+and IDs are random Crockford base32 (no `I`/`O`/`0`/`1`), non-sequential, zero train/test overlap.
+Reconstructing location needs external data, which the rules forbid. **Spatial graph methods are
+closed permanently** — and so are GNNs over months or bands, since self-attention already learns a
+complete weighted graph over months and a GNN would be a *restriction* of it plus added width.
+
+**What IS available: a similarity graph over rows.** `tools/graph_gate.py` (committed, deterministic,
+zero submissions). Train rows masked to test-like 4–6 month windows through the same
+`_mask_views(..., oof=True)` replica the pipeline calibrates on; features are per-band means over
+*observed* months, n-invariant so the graph measures signal and not window length.
+
+| block | mask-matched | unmasked control |
+|---|---|---|
+| test rows' k=10 neighbours that are LABELLED | **24.5%** (random mixing 63.8%) → ~2.5 labelled neighbours/row | 22.5% |
+| train–train edge label homophily | **0.9252** (chance 0.5191, lift +0.4061) | 0.9518 |
+| parameter-free propagation, k=10 | AUC 0.9724 / F1@0.5 0.9276 / **combined 0.9456** | 0.9684 |
+| **implied test positive rate**, k=5/10/25/50 | **0.5990 / 0.5913 / 0.5961 / 0.5913** (spread 0.0078) | **0.5291** |
+
+**FINDING 1 — the cut is where an independent estimator says it should be.** Flat in k, and **0.591
+against our realized 0.587 (+0.007)**. Label propagation assumes *no label shift at all* — only
+adjacency plus train labels — so the failure that retired MLLS and BBSE does not apply to it. This is
+evidence **against** the "our cut is too conservative, that's why we're short ~9 TP" hypothesis, and
+it independently supports iter44's pre-registered NULL.
+
+**FINDING 2 — regime mismatch alone manufactures a prevalence gap, in either direction.** Comparing
+12-month train rows against 4–6-month test rows gives **0.5291**; matching the masking first gives
+**0.5913**, a **+0.062** move. The naive comparison would have said our positive rate was far too
+*high*. This is iter44's thesis — that the calibration set must be shaped like deployment — reached
+independently from a non-parametric direction, with no Platt fit anywhere in it.
+
+**⚠️ THE CAVEAT THAT GOVERNS BOTH.** The replica reproduces the *window masking* but **not the
+temporal shift**, which is the larger half of the problem (adv-AUC ≈0.99). Every figure is therefore
+**optimistic — an upper bound.** Hence the deliberate asymmetry in how we read it: *"the graph agrees
+our cut is roughly right"* is ROBUST, because a shift can only make the graph worse and it already
+agrees; *"the graph says move the cut"* would be FRAGILE. We acted only on the robust direction — i.e.
+we did not act. **Diagnosis only; nothing here reaches the 0.5 cut.**
+
+**SPECIFIED, NOT BUILT — the graph-teacher lane (conditional iter45).** k-NN label propagation onto
+the test rows as a **distillation teacher**. No new model code: `seq.distill.teacher` already takes an
+npz of test-row probabilities. Motivation is specific — iter41 proved the ceiling was *bias* and only
+test-distribution information moved it (+0.0100), but the lane is capped at one round because the
+teacher is the model's own pool and re-teaching compounds error (Kumar/Ma/Liang); a graph teacher is
+**independent of the model's own predictions**. Two risks stated before any run: **(1) measured** — the
+teacher is near-binary (only 0.5–2.9% of its mass in [0.45,0.55]), so soft distillation from it is
+close to hard pseudo-labelling on a shifted test set; **(2) historical** — as a *pool member* a weaker
+model has lost twice here (ROCKET −0.009, GBDT −0.0155), so it may enter only as a teacher. Kill
+condition: if its ranking correlates too highly with the current teacher's it carries no independent
+information — **not yet computable, because that needs the preds bundles iter44 finally ships home.**
+
+Research brief `gemini_loop/UPDATE_21.md` written and carries all of the above.
+
+---
+
 ## iter44 — the calibration set is not shaped like deployment (staged 2026-08-13)
 
 **The planned iter44 (sigmoidF1) was cancelled before it ran.** Three independent lines killed it:

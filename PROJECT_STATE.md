@@ -462,6 +462,18 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   another experiment.**
 - **Next action:** run iter44 on Colab, confirm Cell 5b copied `submissions/preds/*.npz` to Drive
   (that copy is the actual point of the round), upload the two `*_regimematch.csv` files.
+- **Round-21 graph gate (2026-08-13, 0 submissions).** `tools/graph_gate.py`. The prevalence question
+  iter43 left explicitly open is now answered by a **third estimator that assumes no label shift** —
+  k-NN label propagation on a mask-matched similarity graph. Implied test pos-rate **0.591** (flat in
+  k: 0.599/0.591/0.596/0.591) against our realized **0.587**. Evidence **against** "our cut is too
+  conservative." Second finding: the unmasked control gives **0.529**, so **regime mismatch alone
+  moves a prevalence estimate by +0.062** — iter44's thesis reached from a non-parametric direction.
+  ⚠️ The replica lacks the *temporal* shift, so both figures are optimistic upper bounds; "the graph
+  agrees the cut is right" is the robust reading, "move the cut" the fragile one. **Diagnosis only.**
+  Spatial graph methods are **closed permanently** (no lat/lon in the CSVs; IDs are random base32);
+  GNNs over months/bands too (self-attention is already a complete graph over months). A graph
+  **distillation teacher** is specified but not built — conditional iter45, see `LB_LOG.md`.
+- **Research brief out:** `gemini_loop/UPDATE_21.md` (supersedes UPDATE_20).
 
 ### 🔴 THE BOARD RESET 2026-07-28 — every row below is INELIGIBLE
 

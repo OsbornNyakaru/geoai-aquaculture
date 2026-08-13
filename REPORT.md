@@ -233,7 +233,7 @@ the 721-row private slice rather than our best public score.
 
 ---
 
-## 5. 🔑 Two offline instruments, both certified, both then falsified
+## 5. 🔑 Four offline instruments — two certified then falsified, one that held
 
 Given a 0.019 noise floor and 100 total submissions, screening candidates *without* spending a
 submission was worth more than any single feature. We built two such instruments. **Both passed
@@ -334,6 +334,52 @@ that support ends.**
 The practical rule we now follow: **an offline gate may gate a PAIRED DELTA, never a LEVEL.** Both
 failures above were level predictions. A paired difference between a treatment and a control arm,
 both equally blind, cancels the blindness in the difference.
+
+---
+
+### 5.4 Instrument four — a graph estimator that finally answered the prevalence question
+
+The two instruments above were certified and then falsified. This one is the exception, and it
+answered a question that had been formally open in our ledger.
+
+**The question.** Is our realized positive rate (0.587) too low? We are missing ~9 true positives at
+the boundary (§6.5), and the obvious explanation is that our cut is too conservative. We could not
+test it: the two estimators that would have — MLLS (0.578) and BBSE (0.559) — were **retired** when
+`tools/label_shift_gate.py` rejected `p(x|y)`-invariance at p ≈ 0. An estimator retired *for*
+correction cannot then be cited as evidence that *no* correction is warranted, so we struck both and
+the question stayed open.
+
+**The instrument** (`tools/graph_gate.py`, zero submissions, deterministic). Build a k-NN similarity
+graph over rows — train rows masked to test-like 4–6 month windows through the same `_mask_views`
+replica the pipeline calibrates on, features being per-band means over *observed* months
+(n-invariant, so the graph measures signal rather than window length). Propagate train labels along
+edges. This assumes **no label shift at all** — only adjacency plus labels — so the failure that
+retired MLLS and BBSE does not apply to it.
+
+| | mask-matched | unmasked control |
+|---|---|---|
+| test rows' k=10 neighbours that are labelled | 24.5% (random mixing 63.8%) | 22.5% |
+| train–train edge label homophily | 0.9252 (chance 0.5191) | 0.9518 |
+| parameter-free propagation, k=10 | combined 0.9456 | 0.9684 |
+| **implied test positive rate** | **0.591** *(0.599/0.591/0.596/0.591 at k=5/10/25/50)* | **0.529** |
+
+**Two findings.** First, the estimate is **flat in k** (spread 0.0078) and lands at **0.591 against
+our realized 0.587** — an estimator with a completely different bias structure independently puts our
+operating point where it already is. That is evidence *against* the "our cut is too conservative"
+hypothesis, and it is why we did not chase the ~9 rows by lowering the cut.
+
+Second, and more general: **regime-matching moves the estimate by +0.062.** Comparing 12-month train
+rows to 4–6-month test rows gives 0.529; matching the masking first gives 0.591. The naive comparison
+would have told us our positive rate was far too *high*. **Regime mismatch alone can manufacture an
+apparent prevalence gap in either direction** — which is the same lesson, arrived at from a
+non-parametric direction, that §7's regime-matched calibration row reaches from the Platt side.
+
+**The caveat, which governs how far we take it.** The replica reproduces the *window masking* but not
+the *temporal* shift, the larger half of the problem. Every figure above is therefore optimistic, an
+upper bound. The asymmetry that follows is deliberate: "the graph agrees the cut is roughly right" is
+robust — a shift can only make the graph worse, and it already agrees — whereas "the graph says move
+the cut" would be fragile. We acted only on the robust direction, which is to say we did not act.
+**Diagnosis only; nothing this instrument prints reaches the 0.5 cut.**
 
 ---
 
@@ -699,6 +745,9 @@ tools/
   shift_diagnostics.py          free adv-AUC / label-AUC feature screen
   shift_audit.py                adversarial probes + the 2-D band screen
   label_shift_gate.py           the mixture goodness-of-fit test that vetoed Saerens
+  graph_gate.py                 the k-NN graph instrument (§5.4): connectivity, homophily,
+                                parameter-free propagation, and the independent test-prevalence
+                                estimate that answered a question MLLS/BBSE could no longer answer
   arch_blend.py, seed_average.py   pooled artifacts
   regime_match.py               regime-matched calibration (§7): refits Platt on an OOF vector
                                 whose averaging structure matches deployment. Its `--views all`
