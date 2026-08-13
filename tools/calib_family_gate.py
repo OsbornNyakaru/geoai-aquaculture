@@ -227,6 +227,43 @@ def run(variant: str, views: str, seeds, preds_dir: Path) -> None:
         log.info("    %-9s f1@0.5 %.5f | AUC %.5f | pos-rate %.4f", tag, f1_at(y, po, 0.5),
                  roc_auc(y, po), float((po >= 0.5).mean()))
 
+    # ---- Q4: the POOLING OPERATOR, which is a separate lever from the calibrator family ----
+    #
+    # Ranjan & Gneiting (JRSS-B 2010, 72(1):71-91, DOI 10.1111/j.1467-9868.2009.00726.x) prove that
+    # any non-trivial weighted average of two or more distinct CALIBRATED probability forecasts is
+    # necessarily UNCALIBRATED and under-confident. Our shipped path does exactly the thing that
+    # theorem forbids: per-member Platt, THEN average. Rahaman & Thiery (NeurIPS 2021,
+    # arXiv:2007.08792) give the remedy -- average FIRST, then fit ONE map on the pooled OOF:
+    # "in the low data regime, this simple strategy can halve the Expected Calibration Error".
+    #
+    # This survives the death of the calibrator-family lever because it is NOT a reparameterization
+    # of any member's map. It changes WHAT IS AVERAGED: rank(mean(platt_i(s_i))) is not
+    # rank(platt(mean(s_i))). So it moves the ranking, is not annihilated, and is not AUC-neutral
+    # by construction -- all three have to be measured rather than argued.
+    log.info("")
+    log.info("Q4  POOLING OPERATOR: pool-then-calibrate vs the shipped calibrate-then-pool")
+    o_raw_p, t_raw_p = np.vstack(oof_l).mean(axis=0), np.vstack(test_l).mean(axis=0)
+    B_o, B_t, slope_p = platt_calibrate(y, o_raw_p, t_raw_p)
+    A_o = np.vstack([platt_calibrate(y, o, o)[1] for o in oof_l]).mean(axis=0)
+    log.info("    %-34s %9s %10s %8s %5s %5s %6s %10s", "artifact", "OOF AUC", "OOF f1@.5",
+             "testPos", "up", "dn", "~pub", "rank-corr")
+    for tag, oo, tt in (("A shipped: platt-each, then avg", A_o, P),
+                        ("B pool-then-calibrate", B_o, B_t)):
+        up = int(((tt >= 0.5) & (P < 0.5)).sum())
+        dn = int(((tt < 0.5) & (P >= 0.5)).sum())
+        rho = float(np.corrcoef(np.argsort(np.argsort(tt)), np.argsort(np.argsort(P)))[0, 1])
+        log.info("    %-34s %9.5f %10.5f %8.4f %5d %5d %+6.1f %10.6f", tag, roc_auc(y, oo),
+                 f1_at(y, oo, 0.5), float((tt >= 0.5).mean()), up, dn,
+                 (up - dn) * 309.0 / n_test, rho)
+    log.info("    Platt slope on the pooled raw score: %.4f", slope_p)
+    log.info("    DIRECTION IS UP -- the opposite of beta, and the sign God_mode sec 2 says we need.")
+    log.info("    But size the effect before believing in it: a net of a few rows on 1030 is ~1-2")
+    log.info("    rows on the 309-row public slice, and near-cut rows are a TP/FP mix, so the")
+    log.info("    composite move is ~+0.0003 to +0.002 -- an ORDER OF MAGNITUDE below our +0.006")
+    log.info("    paired bar and two below the 0.019 seed sd. God_mode sec 3 predicted exactly this")
+    log.info("    ('bounded by your members' near-duplication at rho~0.98 ... 0-3 TP on public;")
+    log.info("    treat it as a free rider, not a standalone slot') and the measurement agrees.")
+
     log.info("")
     log.info("VERDICT TEMPLATE. The memo's Slot-1 kill condition was: OOF AUC delta >= -0.0005 AND "
              "OOF 0.5-flip count > 0. Both can pass while the lever is still worthless or harmful, "

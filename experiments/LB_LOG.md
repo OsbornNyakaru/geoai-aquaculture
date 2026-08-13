@@ -791,6 +791,48 @@ same answer. **Finalists unchanged.**
 **Status: LANE CLOSED, zero submissions spent.** `compliance_mode: legal` keeps a Platt map and a
 literal 0.5. The gate is committed and reproducible so a code reviewer can re-run the refutation.
 
+### iter46 part 2 — the POOLING operator: right direction, right theory, too small to use
+
+The memo's §3 was a *separate* lever from the calibrator family and it survives the family's death,
+because it is not a reparameterization of any member's map — it changes **what is averaged**.
+Ranjan & Gneiting (JRSS-B 2010, 72(1):71–91) prove that *any* non-trivial weighted average of two or
+more distinct **calibrated** probability forecasts is necessarily **uncalibrated** and under-confident.
+Our shipped path does precisely the forbidden thing: per-member Platt, *then* average. Rahaman &
+Thiery (NeurIPS 2021, arXiv:2007.08792) give the remedy — average first, fit **one** map on the pooled
+OOF. So this is a lane where our shipped estimator is provably mis-specified, which is exactly prong
+(c) of our own legality test.
+
+Measured (gate Q4, both pools, R=1):
+
+| | OOF AUC | OOF f1@0.5 | test pos-rate | up | down | ~net public | pooled rank-corr |
+|---|---|---|---|---|---|---|---|
+| A shipped (`amix`) | 0.99213 | 0.97726 | 0.5845 | — | — | — | 1.000000 |
+| B pool-then-calibrate | 0.99210 | 0.97591 | 0.5893 | **5** | **0** | +1.5 | 0.999981 |
+| A shipped (`dpa`) | 0.99181 | 0.97041 | 0.5796 | — | — | — | 1.000000 |
+| B pool-then-calibrate | 0.99183 | 0.97182 | 0.5874 | **8** | **0** | +2.4 | 0.999950 |
+
+**It passes every check beta failed.** Direction is **UP — 13 rows up, 0 down across both pools**,
+which is the sign §2 argues we need and the exact opposite of beta's 19-down/0-up. AUC is neutral to
+five decimals (−0.00003 and +0.00002), and the pooled rank correlation (0.999981 / 0.999950) is
+*higher* than the regime-match arm we already shipped at iter45 (0.99997870), so the column we are
+winning is safer here than in an arm we have already sent. It is fully legal: train-only, literal 0.5,
+no test quantity anywhere.
+
+**And it is still not worth a submission.** A net of 5–8 rows on 1030 is ~1.5–2.4 rows on the 309-row
+public slice; near-cut rows are a TP/FP mix, so the composite move is **~+0.0003 to +0.002** — an
+order of magnitude under our +0.006 paired bar and two orders under the 0.019 seed sd. The OOF
+composite splits (`amix` −0.0008, `dpa` +0.0009), which at our OOF/LB anti-correlation means nothing
+either way. **God_mode §3 predicted this outcome precisely** — "bounded by your members'
+near-duplication… plausibly 0–3 TP on public… treat pool-then-calibrate as a free rider bundled with
+the calibrator swap, not as a standalone slot" — and the measurement agrees with it. The free rider's
+host is dead, so there is nothing to bundle it with.
+
+**The decisive argument against shipping it** is not the size, though: it is that swapping a
+**measured** artifact (public 0.907368983, known to nine decimals) for an **unmeasured** one on
+theoretical grounds, at a predicted effect two orders below the noise floor, is the precise mistake
+this ledger exists to prevent. **Finalists unchanged. No submission spent.** Recorded as a real
+measurement of the pooling lane, not a failed experiment.
+
 ---
 
 ## iter44 — the calibration set is not shaped like deployment (staged 2026-08-13)
