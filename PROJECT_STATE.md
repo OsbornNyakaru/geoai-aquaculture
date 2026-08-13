@@ -85,6 +85,36 @@
    decisions) independently reproduces the iter45 choice from Dwork et al. and Roelofs et al. rather
    than from our iter42 crossing analysis. **Finalists unchanged.**
 
+   🔬 **iter47 STAGED (2026-08-13): the Presto lane is REOPENED and will actually be submitted.**
+   This reverses the "no further experiments" line above, deliberately and on the user's explicit
+   instruction, for a reason that is not a renegotiation: **iter17 killed Presto using three
+   instruments this project has since retired** — adversarial AUC (round 18: "DEAD … BACKWARDS" as
+   a selection criterion), ATC-F1 (iter25/26: invalid out-of-family, ρ +0.964 → +0.738, and frozen
+   Presto embeddings are the most out-of-family candidate we ever screened), and OOF (blind by
+   standing rule). Presto has **never been submitted once**. A lane closed on withdrawn evidence is
+   not closed.
+
+   Round-22 research verified the shape fits *by reading the code*
+   (`gemini_loop/findings/round22_pretrained_models.md`): `construct_single_presto_input` is real;
+   our 12 bands map 1:1 onto Presto's S1+S2 slots (missing only B9, which Presto drops); the
+   `mask_tokens` uniform-mask assert lives only in `single_file_presto.py`, and `fetch_presto.py`
+   already vendors `presto/presto.py`, which uses `attn_mask`; `month=0` is supported; lat/lon is a
+   mandatory arg but the paper itself runs S2-Agri100 from one shared location.
+
+   **The untried arm is fine-tuning.** iter17 only ever ran the frozen encoder with a ~129-parameter
+   head, so it never tested our "added capacity fitted to shifted rows hurts" law — frozen capacity
+   is amortized over Presto's pretraining corpus. `run_presto.py --finetune` now moves all 404,160
+   encoder parameters onto our 1,817 shifted rows, which *is* the condition the law was measured
+   under. ⚠️ **Pre-registered prediction: the fine-tuned arm loses.** Recorded before the run.
+
+   Verified locally before staging: pinned fetch + SHA-256 gate passes, encoder loads at 404,160
+   params, and the **frozen arm runs end to end — OOF combined 0.9673, realized test pos-rate
+   0.570**, independently close to our champion's 0.5845 and the graph estimate 0.587–0.591.
+
+   Two real bugs fixed in the inherited lane: `fetch_presto.py` said `REV = "main"` under a comment
+   claiming it was a pin (now a commit SHA + checksum gate), and `run_presto.py` gated the lane on
+   adversarial AUC (now descriptive-only, which is the iter17 mistake being corrected).
+
    ⛔ **The subagent research lane is closed by account capacity, not by judgement.** Seven agents
    were launched three times and a reduced batch of three once; all four attempts died on API session
    limits, and the limit is now **weekly, resetting Aug 16 5am (Africa/Nairobi) — i.e. at the
