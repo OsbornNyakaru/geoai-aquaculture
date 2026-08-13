@@ -668,6 +668,21 @@ introduce small run-to-run differences. GBDT runs are bit-identical; `seq` runs 
 that kernel nondeterminism. Given §4, a reviewer should expect run-to-run variation on the order of
 the seed effect, and **should reproduce the pooled artifacts rather than any single seed.**
 
+**Measured, 2026-08-14 — the caveat above is conservative.** iter45 happened to re-run ten configs
+that iter44 had already executed (five `teacher_perm_s{42,7,13,21,29}` and five distilled students at
+α=0.7), in a *different* Colab session on a *different* GPU allocation, a day apart. **All ten
+reproduced to every logged decimal:**
+
+| config | iter44 `final_oof` | iter45 `final_oof` |
+|---|---|---|
+| `teacher_perm_s42 / s7 / s13 / s21 / s29` | 0.97347 / 0.97437 / 0.97143 / 0.97161 / 0.97414 | identical |
+| distilled α=0.7, seeds 42 / 7 / 13 / 21 / 29 | 0.97594 / 0.97773 / 0.97403 / 0.97350 / 0.97317 | identical |
+
+Both statements are true and a reviewer should have both: the *guarantee* is genuinely absent
+(we do not set the deterministic flags, so we cannot promise bit-exactness), while the *observed*
+behaviour over ten runs and two sessions was exact agreement to five decimals. The pooled-artifact
+recommendation stands regardless, because it is about seed variance (§4), not kernel nondeterminism.
+
 ### 8.4 A ceiling we cannot reach, and why we stopped trying
 
 The pond-mapping literature stands on three legs, and two are unavailable to us:

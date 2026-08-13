@@ -571,15 +571,96 @@ retroactively strengthens the case for cancelling sigmoidF1.
 → sd of their mean 0.015, a **2.24× shrink present in the test vector and absent from OOF**. Closing
 it needs `n_repeats>1`, which also moves `p_test_raw` and the ranking — a confounded lever, left alone.
 
-**Three independent instruments now agree the operating point is right.** The graph gate says 0.591
-vs our realized 0.587; δ̂ says the F1-optimal cut is ≥0.48 against a cut at 0.50; and moving the cut
-directly (this arm) bought +0.001 to +0.003. The hypothesis that we are short ~9 true positives
-*because our cut is too conservative* is now dead three ways.
+**Three instruments agree the operating point is right — but they are NOT independent, and we
+overclaimed when we said they were.** The graph gate says 0.591 vs our realized 0.587; δ̂ says the
+F1-optimal cut is ≥0.48 against a cut at 0.50; and moving the cut directly (this arm) bought +0.001
+to +0.003.
+
+⚠️ **RETRACTION of the independence claim (round-21 external review, 2026-08-13).** All three share
+error structure:
+- **The graph gate is a classify-and-count quantifier on the same feature space the model fits.**
+  A k-NN count and the model's average posterior are both functionals of the same class-conditional
+  densities `p(x|y)`; when the bias originates in the shared representation under target shift, both
+  inherit *correlated* error. Card & Smith (NAACL-HLT 2018) show the average posterior is a valid
+  prevalence estimator only under target calibration and is biased otherwise; Tasche (JMLR 18(95),
+  2017) shows plain classify-and-count is not Fisher-consistent under prior shift. Both of ours are
+  CC-family counters. (Note: the specific "shared representation ⇒ correlated bias" step is a
+  reasoned inference from those two, not a theorem we can cite verbatim. State it that way.)
+- **δ̂ = F*_masked/2 is computed from the model's own OOF F1.** Model-internal by construction.
+- **Moving the cut directly is the model itself.** Not an instrument at all — it is the thing being
+  measured.
+
+**What survives.** The *conclusion* holds, because in every case the agreement is the ONE-SIDED
+robust reading, which correlated bias does not manufacture: each check independently fails to find
+the large upward cut-move the "short ~9 TP" hypothesis requires, and a shared optimistic bias would
+push toward finding one, not away. So "do not move the cut" stands. What does **not** stand is the
+strength: this is **three correlated checks that concur**, not three independent confirmations. A
+code reviewer familiar with quantification will flag same-feature agreement, so we flag it first.
+
+**The test that would break the circularity, un-run (recorded for the write-up, not a lane):** rebuild
+the k-NN graph on a feature subspace disjoint from the model's most-used channels (rank by first-layer
+projection weights, hold out the top set) and re-estimate. If it still lands near 0.59, that is genuine
+partial independence. Also available: an AC-corrected k-NN using LOO TPR/FPR (Barranquero et al.,
+Pattern Recognition 46(2):472–482, 2013) instead of raw counting, and a synthetic-shift injection with
+known ground-truth prevalence. All train-only and legal. Not run — out of time, not out of merit.
 
 **One number worth noting.** `champion_dualpol_add_regimematch` = **0.910446704** is our
 **second-best composite ever** (best 0.910837) and carries our **best-ever AUC, 0.946387 — still
 above the leader's 0.944897.** Under pre-registration it does not become a finalist (replacement
 required ≥ +0.006). Whether it should on other grounds is a separate question, taken up in iter45.
+
+---
+
+## iter45 RESULT — every gate passed; the SCORE is contested (2026-08-14)
+
+**The run is clean.** `champion_dualpolmix10` = the alphamix10 recipe plus the dual-pol gate, same 10
+seeds, same α marginalization {0.7, 1.5}, same teacher. All pre-registered gates passed:
+
+| gate | result |
+|---|---|
+| width guard (gate attached?) | **26 channels/month on all 10 `dpam` runs** (teacher logs 25) — not void |
+| CONTROL: `regime_match --views all` == `seed_average` | **PASS, bit for bit**, max drift `0.0e+00` on all 10 bundles |
+| isolation: per-member rank identity | **exact, 10/10** |
+| pooled rank corr vs control | 0.99997870 (sub-1.0 as predicted; pooling averages *calibrated* members) |
+| transductive gate | PASS on all 10 seeds, pos-rates 0.5699–0.5990 |
+| seed rank corr within pool | mean 0.9826, min 0.9729 |
+| δ̂ | 0.4836 (R=all) / 0.4812 (R=1) — again inside [0.479, 0.485], reconfirming the iter44 kill |
+| rows crossing 0.5 vs control | 7 of 1030 (~2.1 public) |
+
+Shipped `submission_champion_dualpolmix10_regimematch.csv`, 1030 rows, pos-rate 0.583.
+
+**FREE REPRODUCIBILITY RESULT.** iter45 re-ran five teacher configs and five `dpa`/`dpam` configs
+that iter44 had already run. **All ten reproduced to every logged decimal**, in a different Colab
+session on a different GPU allocation, days apart (teachers 0.97347/0.97437/0.97143/0.97161/0.97414;
+students 0.97594/0.97773/0.97403/0.97350/0.97317). `REPORT.md` §8.3 warns reviewers to expect
+run-to-run variation because we do not set `torch.use_deterministic_algorithms`. That caveat is
+**conservative**: the guarantee is genuinely absent, but the observed behaviour across ten runs and
+two sessions is exact. Both halves belong in the code-review package.
+
+### ⚠️ THE SCORE RETURNED IS BIT-IDENTICAL TO iter44's OTHER ARTIFACT — DO NOT READ IT YET
+
+Reported back for `champion_dualpolmix10_regimematch`: **AUC 0.942570514, F1 0.883468834.**
+That is, to all nine decimals **on both columns**, the iter44 score of
+`champion_alphamix10_regimematch` (composite 0.907109506). F1 inverts exactly: `326/369` in both —
+same TP (163), same PP+P (369). AUC lands on the identical grid point as well.
+
+**Measured locally, why this is almost certainly a duplicate reading and not a result:**
+- The two families are **3.01% discordant** (15,941 of 529,935 pairs on the 1030 test rows), mean
+  rank displacement **22 rows**, 315 rows moving >25 ranks, Spearman 0.99374 on `p_test_raw`.
+- Empirically the families score **86 AUC quanta apart**: dpa5 0.946387 vs amix10 0.942571.
+- Decisively: **`champion_dualpolmix10` contains no non-dual-pol members.** It is not a blend of the
+  two families — it is the dual-pol family with five extra seeds (all ten logged 26 channels). It
+  should land *near dpa5*. Snapping onto the 25-channel family's exact grid point on AUC **and**
+  exact TP **and** exact PP is not a plausible coincidence.
+
+**Status: the iter45 read is SUSPENDED pending confirmation of which submission row that score
+belongs to.** Do not record it as the "AUC ~0.943 → edge did not survive" branch; that branch
+requires a reading actually produced by this artifact.
+
+**Note on the decision's robustness.** Both resolutions keep `champion_distill_alphamix10` as
+finalist #1 *unless* the true dualpolmix10 AUC is ≥ ~0.945, so the incumbent is safe by default and
+the only thing at stake is the upside case. Finalist #2 remains `champion_archblend4` (0.899643) —
+the decorrelated hedge, predating the whole distillation lane.
 
 ---
 

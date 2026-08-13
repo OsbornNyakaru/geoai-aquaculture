@@ -475,16 +475,24 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   round-20's "40% cut placement / 60% local ranking" split *and* our own binormal ceiling arithmetic
   are **void**. (b) **Density corrected downward:** 9–28 of 1030 rows in [0.45,0.55], mean ~15 =
   **1.5%**, not the ~3% previously quoted.
-- **Three independent instruments now agree the operating point is right:** graph gate 0.591 vs
-  realized 0.587; δ̂ ≥ 0.48 against a 0.50 cut; and moving the cut directly bought +0.001–0.003. The
-  "we are short ~9 TP because the cut is too conservative" hypothesis is dead three ways.
+- **Three instruments agree the operating point is right — NOT independent ones (claim retracted
+  2026-08-13):** graph gate 0.591 vs realized 0.587; δ̂ ≥ 0.48 against a 0.50 cut; moving the cut
+  directly bought +0.001–0.003. Round-21 external review is correct that these share error
+  structure: the graph gate is a classify-and-count quantifier on **the same feature space the model
+  fits** (correlated bias under target shift — Tasche JMLR 2017, Card & Smith NAACL 2018), δ̂ is
+  computed from the model's **own OOF F1**, and "move the cut" is the model itself. The
+  **conclusion survives** — every check is the one-sided *robust* reading, and shared optimistic bias
+  would push toward finding a cut-move, not away — but the **strength does not**. Say "three
+  correlated checks concur," never "three independent instruments." See `LB_LOG.md` iter44 RESULT.
 - **Next action:** iter45 = **finalist lock + code-review package, NOT another experiment.** One open
   decision: `champion_dualpol_add_regimematch` (0.910446704, best-ever AUC 0.946387, still above the
   leader) is our second-best composite ever but rests on 5 seeds, while finalist #1 rests on 10. See
   `LB_LOG.md` iter44 RESULT.
 - **Round-21 graph gate (2026-08-13, 0 submissions).** `tools/graph_gate.py`. The prevalence question
-  iter43 left explicitly open is now answered by a **third estimator that assumes no label shift** —
-  k-NN label propagation on a mask-matched similarity graph. Implied test pos-rate **0.591** (flat in
+  iter43 left explicitly open is addressed by a **third estimator that assumes no label shift** —
+  k-NN label propagation on a mask-matched similarity graph. ⚠️ It is *not* independent of the model:
+  same feature space, same CC-quantifier family (see the retraction above). Implied test pos-rate
+  **0.591** (flat in
   k: 0.599/0.591/0.596/0.591) against our realized **0.587**. Evidence **against** "our cut is too
   conservative." Second finding: the unmasked control gives **0.529**, so **regime mismatch alone
   moves a prevalence estimate by +0.062** — iter44's thesis reached from a non-parametric direction.
