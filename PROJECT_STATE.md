@@ -460,8 +460,28 @@ into `experiments/LB_LOG.md`, the reward signal) → agent stages the next exper
   experimental round: instrument the calibration set, correct the one calibration defect that is a
   fact of the code, and expect a null. **iter45 = code-review package + final finalist lock, not
   another experiment.**
-- **Next action:** run iter44 on Colab, confirm Cell 5b copied `submissions/preds/*.npz` to Drive
-  (that copy is the actual point of the round), upload the two `*_regimematch.csv` files.
+- **iter44 RESULT (2026-08-14) — NULL on both, exactly as pre-registered; lane closed on a
+  measurement.** `champion_alphamix10_regimematch` **0.907109506** (+0.001006) and
+  `champion_dualpol_add_regimematch` **0.910446704** (+0.002831), both inside ±0.006. **The
+  pre-registered kill fired on its ROBUST branch: δ̂ = F*_masked/2 ∈ [0.4791, 0.4852] across all 30
+  seed×regime combinations**, decisively above 0.47, and δ̂ is a lower bound so "the cut is fine"
+  cannot be an artifact. The mechanism was validated anyway — predicted crossings ~1.2/~2.4 public
+  rows vs observed PP −3/−2, and the predicted small-but-nonzero pooled AUC drift came in at
+  **−2.5 / −1.7 concordant pairs**. F1 inverts exactly: amix TP 164→163 with PP −3 (1 TP, 2 FP
+  removed); **dpa TP 164→164 with PP −2 — both removed rows were FALSE POSITIVES.** Zindi
+  **truncates** the 9th decimal (methodological note for future inversions).
+- **⚠️ TWO OF OUR OWN CLAIMS CORRECTED BY OUR OWN CHECKS.** (a) **The binormal model is REJECTED by
+  our data:** first labelled `b` ≈ 0.70, but implied AUC **1.0000 vs empirical 0.9885** — so
+  round-20's "40% cut placement / 60% local ranking" split *and* our own binormal ceiling arithmetic
+  are **void**. (b) **Density corrected downward:** 9–28 of 1030 rows in [0.45,0.55], mean ~15 =
+  **1.5%**, not the ~3% previously quoted.
+- **Three independent instruments now agree the operating point is right:** graph gate 0.591 vs
+  realized 0.587; δ̂ ≥ 0.48 against a 0.50 cut; and moving the cut directly bought +0.001–0.003. The
+  "we are short ~9 TP because the cut is too conservative" hypothesis is dead three ways.
+- **Next action:** iter45 = **finalist lock + code-review package, NOT another experiment.** One open
+  decision: `champion_dualpol_add_regimematch` (0.910446704, best-ever AUC 0.946387, still above the
+  leader) is our second-best composite ever but rests on 5 seeds, while finalist #1 rests on 10. See
+  `LB_LOG.md` iter44 RESULT.
 - **Round-21 graph gate (2026-08-13, 0 submissions).** `tools/graph_gate.py`. The prevalence question
   iter43 left explicitly open is now answered by a **third estimator that assumes no label shift** —
   k-NN label propagation on a mask-matched similarity graph. Implied test pos-rate **0.591** (flat in
