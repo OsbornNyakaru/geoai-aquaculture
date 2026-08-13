@@ -833,6 +833,67 @@ theoretical grounds, at a predicted effect two orders below the noise floor, is 
 this ledger exists to prevent. **Finalists unchanged. No submission spent.** Recorded as a real
 measurement of the pooling lane, not a failed experiment.
 
+### iter46 part 3 — importance weighting is not high-variance here, it is NOT ESTIMABLE
+
+Round-22 research (`gemini_loop/findings/round22_transfer_instruments.md`) made a reframing worth more
+than the anecdote it replaces: **iteration 39's adversarially-selected "most test-like 30% of train"
+holdout was not a mishap — it is nonparametric importance-weighted cross-validation with hard 0/1
+weights.** Its 0.7186 is therefore evidence against the entire importance-weighting family, not
+against one badly-built holdout. The agent could not retrieve a verbatim effective-sample-size result
+(two PDFs would not render) and correctly told us to compute our own rather than cite one. We did.
+
+Fit a cross-fitted discriminator `p(test | x)` on all 144 shared features, take `w = p/(1−p)` on the
+train rows, and report Kish's `ESS = (Σw)² / Σw²`:
+
+| discriminator | adversarial AUC | Kish ESS | as % of 1821 | SE scale `1/√ESS` |
+|---|---|---|---|---|
+| HistGB, depth 4 | **1.0000** | **73.2** | 4.02% | 0.117 |
+| logistic, standardized | **1.0000** | **687.8** | 37.77% | 0.038 |
+
+Two readings, and the second is the important one.
+
+**First: even the optimistic number is useless.** Our paired significance bar is 0.006. A weighted
+estimator's standard error scales as `1/√ESS` — 0.038 at best, 0.117 at worst. That is 6× to 19×
+coarser than the effect we need to resolve. Importance weighting cannot rank our candidates.
+
+**Second, and this is stronger than "high variance": the weights are not identifiable at all.** The
+cross-fitted adversarial AUC is **1.0000 — perfect separation**, not the ~0.99 this ledger has been
+quoting (the 0.99 figure came from a reduced feature screen; on all 144 features cross-fitted, the
+domains are *exactly* separable). Under disjoint support the density ratio `p_test(x)/p_train(x)` is
+zero over the entire train support, so there is nothing for the weights to converge to. The evidence
+is the disagreement itself: **the same data yields ESS 73 and ESS 688 depending only on which
+discriminator you fit** — a 9.4× spread. That number is measuring the discriminator's regularization,
+not the data. Any ESS anyone quotes here, including ours, is an artifact of a modelling choice.
+HistGB concentrates 11.5% of all weight on a **single row**.
+
+So the lane closes for a reason better than the one we had. We previously said the iter39 holdout was
+"blind to conditional shift", which is true but incomplete; the sharper statement is that **with
+train and test exactly separable, no reweighting scheme can transport a train-labelled estimate onto
+the test distribution, because there is no overlap to transport across.** That is a property of the
+data the organizers built, not of our method.
+
+**A compliance leak the same research found, and it is a real one.** Our own significance bar
+**δ = 0.019 is leaderboard-derived** — it was measured by submitting seed replicates and reading back
+the spread. Using it as a *gate* therefore lets LB feedback reach a decision knob, which is exactly
+what prong (b) forbids. The fix costs nothing: **the 309-row binomial arithmetic gives ≈0.015
+directly**, with no LB input at all. Nothing already shipped changes (0.015 < 0.019, so every call we
+made under the looser bar still holds under the tighter one), but the *provenance* is now clean and
+the writeup should quote the binomial figure. Recorded rather than quietly patched.
+
+**One methodological correction to carry into any future agreement-based instrument.** Baek et al.'s
+agreement-on-the-line requires that models differ by **random head initialization only**
+(arXiv:2404.01542: *"only random head initialization is able to reliably induce
+agreement-on-the-line"*). Our "seed" changes initialization, data ordering, **and** the fold split
+simultaneously, so our existing 10-seed pool does not satisfy the precondition and could not be used
+as an AGL ensemble without being rebuilt with the fold split held fixed. Flagged, not fixed — it
+needs runs we do not have time for.
+
+⚠️ **Not runnable locally: the full 45-artifact back-test.** The agent delivered a complete protocol
+(PRA-δ: pairwise ranking accuracy over discriminable pairs, artifact-level permutation,
+Westfall–Young step-down max-T across pre-registered instruments, five-condition pass bar). We hold
+only ~23 bundles on this machine; the rest lived on Colab. The protocol is banked in the findings file
+for the writeup, **not executed**, and we should not claim otherwise.
+
 ---
 
 ## iter44 — the calibration set is not shaped like deployment (staged 2026-08-13)
