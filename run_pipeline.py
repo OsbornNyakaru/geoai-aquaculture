@@ -106,12 +106,13 @@ def main() -> None:
 
     if args.model == "seq":
         from src.seq_model import run_seq_cv
-        oof_prob, p_test_raw, fold_scores, test_per_fold = run_seq_cv(
+        oof_prob, p_test_raw, fold_scores, test_per_fold, oof_views = run_seq_cv(
             train_cube, y, test_cube, schema, wd, cfg, smoke=smoke,
             test_ids=bundle.test_ids)
         cv = _CV()
         cv.oof_prob, cv.y, cv.fold_scores = oof_prob, y, fold_scores
         cv.test_per_fold = test_per_fold
+        cv.oof_views = oof_views
         # per-month input dim = values + missing (2B) + enabled transfer channels
         _ch = cfg["seq"].get("channels") or {}
         _extra = ((schema.n_bands if _ch.get("per_cell_detrend") else 0)
@@ -264,6 +265,13 @@ def main() -> None:
     _tpf = getattr(cv, "test_per_fold", None)
     if _tpf is not None and len(_tpf):
         _extra_arrays["test_per_fold"] = np.asarray(_tpf, dtype=np.float32)
+    # Per-view OOF (seq lane only, iter44). `oof_prob` averages R masked window views per row while
+    # a test row shows ONE window, so Platt is fit on a variance-shrunk vector and applied to a
+    # non-shrunk one. Saving the individual views lets tools/regime_match.py rebuild the calibration
+    # set at R=1 -- matching deployment -- offline, with no extra training. See src/seq_model.py.
+    _ov = getattr(cv, "oof_views", None)
+    if _ov:
+        _extra_arrays.update({k: v for k, v in _ov.items() if len(v)})
     save_npz_atomic(
         preds_dir / f"preds_{name}.npz",
         oof_prob=cv.oof_prob, y=cv.y, p_test_raw=p_test_raw,

@@ -379,6 +379,77 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 
 ---
 
+## iter44 — the calibration set is not shaped like deployment (staged 2026-08-13)
+
+**The planned iter44 (sigmoidF1) was cancelled before it ran.** Three independent lines killed it:
+
+1. **Platt annihilation — a theorem, not a worry.** If a loss change induces any affine logit
+   reparameterization `z' = αz + β`, then `σ(a(αz+β)+b) = σ((aα)z + (aβ+b))`. Refitting Platt's two
+   parameters recovers the identical function. sigmoidF1's entire boundary effect, logit-adjusted
+   loss and balanced softmax all lie **exactly** in Platt's span, and `calibrate_legal` refits Platt
+   on the very next line. The arm would have returned a null for a plumbing reason unrelated to the
+   loss — and we would have banked that null as evidence about F-surrogates.
+2. **No published evidence** any F-surrogate beats BCE at a *pre-specified* fixed 0.5 with every
+   hyperparameter fixed a priori. sigmoidF1's own fixed-0.5 result is defeated on its own terms:
+   its `η` is a logit offset, so the grid search over `η` **is** a threshold search.
+3. **Measured score density** (local, on our own artifacts): only **29–38 of 1030** rows lie in
+   [0.45, 0.55]. Reaching the F1 optimum needs a threshold-equivalent move of **0.21–0.33**;
+   sigmoidF1 blended at w=0.5 supplies ~0.006, crossing **0.3–0.6** public-slice rows against a
+   +0.006 bar that needs ~1.9 TP. Not a close call — roughly 35× short.
+
+**A retraction.** The replacement first proposed here — "refit Platt on a masked train replica" —
+is a **no-op**. `src/seq_model.py` already builds OOF through `_mask_views(..., oof=True)`, so
+held-out rows are *already* masked to contiguous 4–6 month windows drawn from the measured test
+window distribution. The masked replica has existed all along; so has the KILL-2 statistic.
+
+**What reading the code did find.** OOF and test scores have different **averaging structure**, and
+Platt is fit across the mismatch:
+
+| | window views | fold-models |
+|---|---|---|
+| OOF row (`seq_model.py`) | mean of **R=2** masked draws | **1** |
+| test row | **1** real window | mean of **n_splits** |
+
+Each side is variance-shrunk on the axis the other is not. Under the old prevalence pin this was
+harmless — the cut was re-derived downstream and only the *order* survived. Under a literal 0.5 cut
+**the Platt slope is the operating point**. The repo already flagged half of this
+(`run_pipeline.py`, `seq_model.py`) but only as an explanation for OOF anti-correlation, never as a
+calibration defect.
+
+**`R` is the only perfectly isolated operating-point lever in the pipeline** — it is read solely on
+the held-out path, so it cannot reach `p_test_raw`, a member's ranking, or that member's AUC.
+
+**And we had been discarding the evidence on every run.** `run_pipeline.py` has always written
+`submissions/preds/preds_<name>.npz`, but `colab_run.ipynb` Cell 5 downloaded only CSVs and
+`submissions/preds/` is gitignored — so **every bundle died with the Colab VM** (local count: 0).
+That one missing copy is why `b`, `F*/2` and `P` have been *argued* from leaderboard arithmetic
+rather than *measured* on labelled data.
+
+**What iter44 does:** (1) Cell 5b ships the bundles to Drive, and `seq_model.py` additionally
+records the per-view OOF — verified inert, `--smoke final_oof` bit-identical at 0.86777, submission
+sha unchanged. (2) `tools/regime_match.py` rebuilds the calibration set at **R=1** — one window per
+row, matching a test row — and refits Platt, offline, at **zero extra training cost**.
+
+**Verification built in:** `--views all` must reproduce `seed_average.py` **bit-for-bit** (it does;
+this required matching the native-float32 reduction exactly, since the obvious float64 `np.add.at`
+rewrite agrees only to ~1e-9 — invisible in OOF metrics but it survives Platt into the TargetRAUC
+decimals). A corrupted per-view record is caught and hard-fails. Per-member rank identity is
+asserted.
+
+**One claim of ours corrected by its own test.** We asserted the arm was exactly AUC-neutral. It is
+not, for a *pooled* artifact: `calibrated_pool` averages per-member-calibrated **probabilities**, so
+changing each member's slope reshapes what is averaged and the pooled ranking can shift even though
+no member reorders. Measured pooled ρ = 0.99999684. Near-neutral, not neutral.
+
+**Pre-commitment (made before any number exists):** R=1 ships whatever positive rate it produces;
+`regime_match` therefore runs *inside* `run_current.sh`, so the choice lives in version control
+rather than being made after the fact. **Expected outcome is a NULL** — with ~3% of test mass within
+0.05 of the cut, a slope change this size cannot move enough rows. A null here closes the
+boundary-calibration lane on a *measurement* rather than an argument, which is what iterations 42
+and 43 could not do for their lanes.
+
+---
+
 ## iter29 — a bigger pool does NOT win: the level-gap gate survives the legal cut
 
 `archblend6` (archblend4 + the two weakest same-class members, `seq_a_k4` and `seq_a_base`) scored

@@ -3,32 +3,71 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 43 — THE LAST FEATURE SHOT + THE VARIANCE-OPTIMAL FINALIST.  *** 3 uploads ***
+# ITERATION 44 — INSTRUMENT THE CALIBRATION SET, THEN CORRECT ONE MEASURABLE DEFECT.  *** 2 uploads ***
 #
-#   iter42 RESULT: THE alpha KNOB IS CLOSED. The ladder around the banked alpha=0.7 (0.909868):
-#       alpha=0.3, 5 seeds   0.907370   (AUC 0.942280  F1 0.884097)   -0.002498
-#       alpha=1.5, 5 seeds   0.910837   (AUC 0.942861  F1 0.889488)   +0.000969
-#       alpha=0.7, 10 seeds  0.906642   (AUC 0.944024  F1 0.881720)   -0.003226
-#   Nothing clears the +0.006 bar over a 5x range of alpha. Total spread 0.0035. Zindi's F1 column
-#   is a small-denominator rational, so we can read the ladder EXACTLY: 55/62, 330/371 and 82/93 are
-#   TP=165, TP=165, TP=164 at predicted-positive counts differing by one. THE ENTIRE LADDER IS ONE
-#   TRUE POSITIVE AND ONE PREDICTED POSITIVE OUT OF 309 PUBLIC ROWS. Stop tuning alpha. Permanently.
+#   iter43 RESULT: the VH−VV lane is CLOSED (three independent forms of the same quantity failed).
+#   ARM E banked as finalist #1 at 0.906104. ARM G posted AUC 0.946460 — our highest ever and above
+#   the leader's 0.944897 — while still losing at the cut. The read stands: our RANKING has caught
+#   the leader; the whole remaining gap is ~9 true positives they convert at the boundary and we do
+#   not. So the only live question is whether anything sharpens the LOCAL boundary.
 #
-#   THE DECISIVE DETAIL: alpha=0.7 at 5 seeds and at 10 seeds have BIT-IDENTICAL AUC (0.944024425).
-#   Identical concordant-pair count => adding 5 seeds did not degrade the RANKING at all. The whole
-#   -0.0032 is one row crossing the 0.5 cut -- an operating-point coin flip that re-flips independently
-#   on the 721 private rows. So the 5-seed public edge carries ZERO ranking information, and the
-#   10-seed artifact is strictly the better bet on private. See ARM E.
+#   THE PLANNED iter44 (sigmoidF1) IS CANCELLED. Three independent lines killed it:
+#     1. PLATT ANNIHILATION (a theorem, not a worry). If a loss change induces any affine logit
+#        reparameterization z' = a*z + b, then sigma(A(az+b)+B) = sigma((Aa)z + (Ab+B)) — refitting
+#        Platt's two parameters recovers the identical function. sigmoidF1's entire boundary effect,
+#        logit-adjusted loss and balanced softmax all lie exactly in Platt's span, and our pipeline
+#        refits Platt on the very next line. The arm would have returned a null for a plumbing
+#        reason having nothing to do with the loss.
+#     2. NO PUBLISHED EVIDENCE any F-surrogate beats BCE at a pre-specified fixed 0.5 with every
+#        hyperparameter fixed a priori. sigmoidF1's own fixed-0.5 result is defeated because its
+#        eta is a logit offset, so the grid search over eta IS a threshold search.
+#     3. MEASURED SCORE DENSITY (local, on our own artifacts). Only 29–38 of 1030 rows lie in
+#        [0.45,0.55]. Reaching the F1 optimum needs a threshold-equivalent move of 0.21–0.33;
+#        sigmoidF1 blended at w=0.5 supplies ~0.006, which crosses 0.3–0.6 public-slice rows against
+#        a +0.006 bar that needs ~1.9 TP.
 #
-#   PREDICTION SCORECARD (logged before the scores arrived, and it FAILED): from the iter42 run log
-#   the inter-seed rank correlation rose monotonically with alpha (0.9666 / 0.9770 / 0.9863), so I
-#   predicted alpha=1.5 would lose pooling gain and underperform. It came top instead -- by one row.
-#   The homogenization mechanism is not refuted, it is simply unmeasurable at this resolution. Logged
-#   as a miss; no rescue attempted.
+#   ALSO RETRACTED: the "refit Platt on a masked train replica" proposal. Reading the code, that
+#   already happens — src/seq_model.py builds OOF through _mask_views(..., oof=True), so held-out
+#   rows are ALREADY masked to contiguous 4–6 month windows drawn from the measured test window
+#   distribution. The proposal was a no-op.
 #
-#   WHAT THIS ITERATION DOES. Two things, no third:
-#     E. Lock in the variance-optimal finalist (alpha-marginalized, 10 DISTINCT seeds). Near-free.
-#     F/G. Spend the one remaining feature idea: the DUAL-POLARIZATION gate. Replacement and added.
+#   WHAT THIS ITERATION DOES INSTEAD. Two things, no third:
+#
+#   (1) STOP THROWING AWAY THE EVIDENCE.  run_pipeline.py has always written
+#       submissions/preds/preds_<name>.npz (oof_prob, y, p_test_raw, test_per_fold). But Cell 5 only
+#       downloaded CSVs and submissions/preds/ is gitignored, so EVERY bundle has died with the
+#       Colab VM. That one missing copy is why the binormal b, the F1-optimal cut F*/2 and the test
+#       positive count P have all been ARGUED from leaderboard arithmetic instead of MEASURED on
+#       labelled data. Cell 5b now ships them to Drive. src/seq_model.py additionally records the
+#       PER-VIEW OOF predictions (verified inert: --smoke final_oof is bit-identical, 0.86777).
+#
+#   (2) CORRECT THE ONE CALIBRATION DEFECT THAT IS A FACT OF THE CODE, NOT A HYPOTHESIS.
+#       OOF and test scores have different AVERAGING STRUCTURE, and Platt is fit across the mismatch:
+#
+#                            window views          fold-models
+#           OOF row          mean of R=2           1
+#           test row         1 (the real window)   mean of n_splits
+#
+#       Each side is variance-shrunk on the axis the other is not. Under the OLD prevalence pin this
+#       was harmless — the cut was re-derived downstream and only the ORDER survived. Under a LITERAL
+#       0.5 cut the Platt slope IS the operating point. tools/regime_match.py rebuilds the
+#       calibration set at R=1 — one window per row, exactly like a test row — from the per-view
+#       record, offline, at ZERO extra training cost.
+#
+#   ⚠️ PRE-COMMITMENT, MADE BEFORE ANY NUMBER EXISTS. R=1 ships whatever positive rate it produces.
+#      Choosing between R=1 and R=2 after seeing their positive rates would be threshold tuning by
+#      the back door. That is why regime_match runs INSIDE this script: the choice is made here, in
+#      version control, not after the fact. The R=all column it prints is UNDERSTANDING ONLY.
+#
+#   LEGALITY (three prongs, all argued from the data-generating process):
+#     (a) the decision rule stays a literal 0.5 — `R` does not appear in src/calibration.py;
+#     (b) the knob is fixed by a TRAIN-ONLY criterion stated a priori — "the calibration set's
+#         averaging structure must match deployment's" — never against a realized pos-rate or the LB;
+#     (c) it corrects a demonstrably mis-specified model (the table above is code, not conjecture).
+#
+#   NOT FIXED, deliberately: the MODEL axis (1 fold-model vs n_splits). Closing it needs
+#   n_repeats>1, which also changes p_test_raw and the RANKING — a confounded lever. regime_match
+#   MEASURES it from test_per_fold and leaves it alone.
 #
 #   ⚠️ ONE ROUND OF DISTILLATION ONLY, as before. The teacher is the NON-distilled 5-seed permanence
 #   pool in every arm. Do NOT re-teach from a distilled student (Kumar/Ma/Liang: error compounds).
@@ -37,10 +76,11 @@ set -euo pipefail
 
 BASE="--full --model seq"
 PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
+DP="--set seq.channels.dualpol_gate=true"
 SEEDS5="42 7 13 21 29"
 
 # ---- STEP 1: rebuild the 5-seed TEACHER in-run (submissions/preds/ is gitignored). ----
-#      Identical to iter41/42 so every arm below stays comparable to the banked 0.909868.
+#      Byte-identical to iter41/42/43 so every arm below stays comparable to the banked numbers.
 for s in $SEEDS5; do
   python run_pipeline.py $BASE $PERM --set seed=$s --name teacher_perm_s$s
 done
@@ -49,13 +89,10 @@ TEACHER="submissions/preds/preds_teacher_perm5.npz"
 
 DISTILL="--set seq.distill.enable=true --set seq.distill.teacher=$TEACHER"
 
-# ---- ARM E: the ALPHA-MARGINALIZED finalist. 10 members, 10 DISTINCT seeds. ----
-#      iter42 proved alpha is a nuisance parameter (spread = one row). When a knob is flat you do not
-#      pick a setting, you AVERAGE OVER IT -- that removes the alpha choice from the private-slice
-#      gamble at zero cost. Crucially this uses TEN DISTINCT SEEDS, so it dominates BOTH iter42
-#      candidates: alpha=0.7 x 10 seeds marginalized only seed; alpha=1.5 x 5 seeds only had 5 seeds.
-#      Seed variance (sd 0.019) is the dominant error term, so distinct seeds are what matter most.
-#      All 10 pool under one `amix` prefix so seed_average globs them together.
+# ---- STEP 2: rebuild FINALIST #1 (ARM E, alpha-marginalized, 10 DISTINCT seeds). ----
+#      Identical flags and seeds to iter43, so this MUST reproduce 0.906104. That makes the rebuild
+#      a free reproducibility proof for the Phase-2 code review — and it is what attaches the
+#      per-view instrumentation to the artifact we actually care about.
 for s in $SEEDS5; do
   python run_pipeline.py $BASE $PERM --set seed=$s $DISTILL --set seq.distill.alpha=0.7 --name amix_s$s
 done
@@ -64,99 +101,92 @@ for s in 3 17 23 31 37; do
 done
 python tools/seed_average.py --variant amix --name champion_distill_alphamix10
 
-# ---- ARM F: DUAL-POL GATE as a WIDTH-NEUTRAL REPLACEMENT (25 channels, same as champion). ----
-#      1[VH<-21] . 1[(VH-VV)<-8] replaces 1[VH<-21]. The gate CONTAINS the permanence clause, so this
-#      is a pure refinement at identical width -- no capacity change, the only family that ever wins here.
-#
-#      WHY NOW, AFTER cross_pol SCORED -0.0228. That arm added RAW VH-VV, which is affine-spanned by
-#      bands the model already has (our SDWI is exactly -5.697415 + 0.230259*(VH+VV), verified to
-#      3.6e-15). It measured WIDTH COST, not information. The INDICATOR form -- the same nonlinearity
-#      behind our only feature win -- had never been run until now.
-#
-#      TRAIN-ONLY SCREEN run this round (window-matched through _mask_views, so the 4-6 month test
-#      window is NOT confounded with the domain). Univariate AUC of the mean-pooled fraction:
-#          VH-only  1[VH<-21]       0.8012      <- the current champion channel
-#          ratio    1[(VH-VV)<-8]   0.7556
-#          AND gate                 0.8487      <- +0.0475, and NEITHER clause alone comes close
-#      The AND is therefore a genuine interaction, not a threshold reshuffle. Best VH-only threshold
-#      anywhere in [-26,-12] is 0.7917, so this is not reachable by retuning tau.
-#
-#      THE HONEST RISK, stated before the run: the gate's marginal shifts HARDER than permanence
-#      (window-matched train->test mean -0.122 vs +0.061; per-channel adversarial AUC 0.597 vs 0.550).
-#      Under A8 (shift is additive across many weak marginals) that is a cost. Under A3 (adv-AUC is
-#      RETIRED as a selection criterion -- it correlated POSITIVELY with realized transfer, +0.68 across
-#      transforms and +1.00 across modalities) it is not evidence against. The two read opposite, which
-#      is exactly why this needs the leaderboard and not another offline argument. Note also that the
-#      AND SUPPRESSES the ratio's shift (adv-AUC 0.685 ratio-only -> 0.597 gated): the VH clause anchors it.
-DP="--set seq.channels.dualpol_gate=true"
-for s in $SEEDS5; do
-  python run_pipeline.py $BASE $DP --set seq.channels.permanence=false --set seed=$s \
-    $DISTILL --set seq.distill.alpha=0.7 --name dpr_s$s
-done
-python tools/seed_average.py --variant dpr --name champion_dualpol_rep_seedavg5
-
-# ---- ARM G: DUAL-POL GATE **ADDED** on top of permanence (26 channels). ----
-#      If the gate is genuinely informative, keeping both coordinates may beat either alone -- the two
-#      channels agree only at Spearman 0.75, so they are not redundant. This costs one channel of width,
-#      and width cost is precisely what killed every previous VH-VV arm, so F vs G separates
-#      "the information is new" from "the width is affordable". Distillation stabilizes training, which
-#      is why a 26-channel arm is worth one upload now when it would not have been before iter41.
+# ---- STEP 3: rebuild ARM G (dual-pol ADDED, 26 ch) — our highest-AUC artifact ever (0.946460). ----
+#      Not a new experiment: the gate is closed on composite. It is rebuilt because it is the
+#      artifact with the best RANKING we have ever produced, and the regime-matched cut is a
+#      boundary intervention — if the correction is real, the base with the best ranking is where
+#      it should pay most. This gives the same single intervention two independent readings.
 for s in $SEEDS5; do
   python run_pipeline.py $BASE $PERM $DP --set seed=$s \
     $DISTILL --set seq.distill.alpha=0.7 --name dpa_s$s
 done
 python tools/seed_average.py --variant dpa --name champion_dualpol_add_seedavg5
 
+# ---- STEP 4: THE CONTROL. regime_match --views all must reproduce seed_average BIT-FOR-BIT. ----
+#      If it does not, the per-view reconstruction is wrong and the R=1 artifacts below are
+#      meaningless. Hard-fail here rather than shipping a submission built on a broken rebuild.
+for V in amix dpa; do
+  case $V in
+    amix) REF="submissions/submission_champion_distill_alphamix10.csv" ;;
+    dpa)  REF="submissions/submission_champion_dualpol_add_seedavg5.csv" ;;
+  esac
+  python tools/regime_match.py --variant $V --name _control_$V --views all
+  if cmp -s "$REF" "submissions/submission__control_$V.csv"; then
+    echo "CONTROL PASS ($V): regime_match --views all == seed_average, bit for bit."
+  else
+    echo "CONTROL FAIL ($V): the per-view rebuild does not reproduce seed_average. ABORTING."
+    exit 1
+  fi
+done
+
+# ---- STEP 5: THE ARM. Regime-matched calibration (R=1) on both bases. ----
+python tools/regime_match.py --variant amix --name champion_alphamix10_regimematch
+python tools/regime_match.py --variant dpa  --name champion_dualpol_add_regimematch
+
 cat <<'NEXT'
 =====================================================================
- PASTE BACK the run summary lines AND, for every arm, BOTH gate lines:
-     "TRANSDUCTIVE GATE PASS/FAILED: submitted pos-rate ..."
-     "TRANSDUCTIVE GATE: teacher pos-rate ... | student-vs-teacher Spearman ..."
- Also paste the "seq input width: NN channels/month" line for arms F and G -- F MUST log 25 and
- G MUST log 26. If F logs 26 the replacement silently became an addition and the arm is void.
+ PASTE BACK, for BOTH regime_match runs:
+   - the whole "=== SUMMARY (means across seeds) ===" block (slope / pos-rate / delta_hat / b)
+   - the "ROWS CROSSING 0.5 vs the R=all control" line
+   - the "MODEL-AXIS (uncorrected)" line
+   - the "Isolation OK" line, and the pooled rank correlation
+   - both "CONTROL PASS/FAIL" lines from STEP 4
  Also paste the per-metric AUC and F1 columns from Zindi for each upload. Reading our own score
- breakdown is free and it is what closed the alpha knob this round.
- IGNORE OOF entirely; it is anti-correlated with the LB.
+ breakdown is free and it is what closed the alpha knob in iter42 and the VH-VV lane in iter43.
+ IGNORE OOF level entirely; it is anti-correlated with the LB. (delta_hat and b are read from the
+ OOF *shape*, which is a different claim — see the caveat below.)
 
- If an arm logs "TRANSDUCTIVE GATE FAILED" (pos-rate outside [0.50, 0.62]), DO NOT UPLOAD IT --
- that is the constant-predictor / runaway failure mode that sank ARM T in iter41.
+ ⚠️ AND: confirm Cell 5b printed "copied to MyDrive/geoai-preds/" and listed the .npz files.
+ That copy is the actual point of this iteration. If it failed, say so FIRST — the analysis lane
+ stays blocked and everything below is secondary.
 
  UPLOAD (budget 5/day):
-   1. submissions/submission_champion_distill_alphamix10.csv       <- the finalist candidate
-   2. submissions/submission_champion_dualpol_rep_seedavg5.csv     <- gate REPLACES permanence (25 ch)
-   3. submissions/submission_champion_dualpol_add_seedavg5.csv     <- gate ADDED to permanence (26 ch)
- Do NOT upload teacher_perm5 (it re-measures the known 0.899882) or any single seed.
+   1. submissions/submission_champion_alphamix10_regimematch.csv     <- PRIMARY (finalist #1 base)
+   2. submissions/submission_champion_dualpol_add_regimematch.csv    <- replication (best-AUC base)
+ Do NOT upload the rebuilds (champion_distill_alphamix10, champion_dualpol_add_seedavg5) or the
+ _control_* files: they re-measure the known 0.906104 / 0.907616 and would waste two slots.
 
  COMMITTED READ (pre-registered; do not renegotiate after seeing the numbers):
 
- ARM E (alphamix10). This is a VARIANCE decision, not a level decision, so it is NOT gated on
-   beating 0.910837. Expect it to land anywhere in 0.905-0.912; that whole range is one or two rows.
-   It becomes FINALIST #1 unless it comes in below ~0.903, which would mean something is actually
-   wrong rather than noisy. Rationale is settled by the iter42 AUC identity above: the public gap
-   between 5- and 10-seed pools was pure cut-crossing, zero ranking content, while the variance
-   reduction is real and applies to all 721 private rows.
+ The comparators are the artifacts' OWN rebuilt scores: 0.906104 (amix) and 0.907616 (dpa).
+ This is a PAIRED delta between two artifacts differing in one scalar per member, so the ~0.006
+ paired SE applies, not the ~0.012 unpaired one.
 
- ARMS F/G (dual-pol gate). Judged against the best comparable 5-seed distilled artifact, 0.910837.
-   >= +0.006 on either  -> the gate is REAL. It is the first new information admitted to the feature
-                           bank since permanence, and iter44 tunes tau_r (which we have never swept
-                           on the leaderboard) and rebuilds the finalist on top of it.
-   both within +-0.006   -> the VH-VV lane is CLOSED for good. Three independent forms of the same
-                           quantity (raw, affine/SDWI, indicator) will have failed to move it, and the
-                           conclusion is that VH-VV carries no transferable information here beyond
-                           what VH already gives. That is a publishable negative, not a null.
-   F >> G                -> width cost binds even at 26 channels with distillation; note it and stop.
-   G >> F                -> the gate is ADDITIONAL information, not a refinement; permanence and the
-                           gate are separate coordinates (consistent with their Spearman of only 0.75).
-   either << -0.006      -> the harder marginal shift dominates, A8 beats A3 on this channel, and the
-                           adv-AUC retirement gets a caveat: it does not extend to channels whose own
-                           marginal moves this much.
+   >= +0.006 on the PRIMARY   -> the averaging asymmetry was really misplacing the cut. The
+                                 regime-matched artifact becomes finalist #1. Treat dpa as
+                                 confirmation, not as a second independent result.
+   within +-0.006 on BOTH     -> NULL, and this is the EXPECTED outcome. Say so plainly. With only
+                                 ~3% of test mass within 0.05 of the cut, a slope change of this
+                                 size cannot move enough rows. That closes the boundary-calibration
+                                 lane on a MEASUREMENT rather than an argument, which is exactly
+                                 what iterations 42 and 43 could not do for their lanes.
+   <= -0.006                  -> the R=2 shrinkage was load-bearing IN OUR FAVOUR. That is a real
+                                 finding about our own pipeline, not a failure; record it and keep
+                                 R=2. Do NOT then go hunting for the "best" R.
+   PRIMARY and dpa DISAGREE   -> the correction is base-dependent, i.e. noise at our resolution.
+                                 Read it as a null and stop.
 
- FINALISTS going in: {champion_distill_a15_seedavg5 0.910837, champion_archblend4 0.899643}.
-   a15 is a placeholder for ARM E and should be replaced by alphamix10 per the read above.
+ CAVEAT ON delta_hat, stated before the number arrives. delta_hat = F*_masked/2 is Lipton's
+ F1-optimal cut. Our OOF prior is 0.4023 while the deployment pos-rate is ~0.587, and F1 rises with
+ prevalence, so the measured delta_hat is a LOWER BOUND on the deployment-optimal cut. Therefore:
+ "delta_hat > 0.47, the cut is fine, kill the lane" is a ROBUST verdict; "delta_hat < 0.45, the cut
+ is misplaced" is the FRAGILE one and must not be acted on by itself.
+
+ FINALISTS going in: {champion_distill_alphamix10 0.906104, champion_archblend4 0.899643}.
    archblend4 stays as the DECORRELATED hedge: every distill artifact is built on the same teacher,
-   so they are not second opinions of each other.
+   so they are not second opinions of each other. Replace #1 only on the >= +0.006 branch above.
 
- DEADLINE 2026-08-16. This is the last iteration with room for a feature experiment; iter44 should
- be finalist consolidation and the code-review package (35% of the final score).
+ DEADLINE 2026-08-16. iter45 is the code-review package and the final finalist lock — NOT another
+ experiment. If this returns a null, that is the signal to stop experimenting entirely.
 =====================================================================
 NEXT

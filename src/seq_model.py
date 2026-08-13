@@ -15,7 +15,7 @@ the GBDT path.
 from __future__ import annotations
 
 import math
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -942,6 +942,23 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
     # highest OOF 0.984, 2nd-worst LB). Saving these costs nothing and lets us test it directly.
     test_per_fold: List[np.ndarray] = []
 
+    # ---- PER-VIEW OOF (iter44). `oof_prob` below averages R masked window views per held-out
+    #      row, but a TEST row shows exactly ONE window. So the vector Platt is FIT on is
+    #      variance-shrunk on the window axis relative to the vector it is APPLIED to, and under a
+    #      literal 0.5 cut the Platt slope IS the operating point. Keeping the individual view
+    #      predictions lets tools/regime_match.py rebuild the calibration set at any R offline --
+    #      in particular R=1, which matches deployment exactly -- with no extra training.
+    #
+    #      `R` is read ONLY here, on the held-out path. It cannot reach p_test_raw, the ranking or
+    #      the AUC column; it moves the 0.5 crossing and nothing else. That isolation is what makes
+    #      the offline reconstruction legitimate, and it is asserted in the verification below.
+    #
+    #      Purely additive: no RNG is drawn here, so `oof_prob` is bit-identical to before.
+    oof_view_p: List[np.ndarray] = []
+    oof_view_owner: List[np.ndarray] = []
+    oof_view_k: List[np.ndarray] = []       # view index within (row, repeat)
+    oof_view_rep: List[np.ndarray] = []
+
     for rep in range(n_repeats):
         skf = StratifiedKFold(n_splits=n_splits, shuffle=True,
                               random_state=cfg["seed"] + rep)
@@ -988,6 +1005,24 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                 prob_rows[pos] = pv[va_owner == i].mean()
             oof_sum[va] += prob_rows; oof_cnt[va] += 1
 
+            # Per-view record (see the block above run_seq_cv's fold loop). The view index is
+            # recovered by counting occurrences of each owner rather than assuming _mask_views'
+            # emission order, so this stays correct if that loop is ever reordered.
+            _seen: Dict[int, int] = {}
+            _kidx = np.empty(len(va_owner), dtype=np.int16)
+            for _j, _o in enumerate(va_owner):
+                _kidx[_j] = _seen.get(int(_o), 0)
+                _seen[int(_o)] = int(_kidx[_j]) + 1
+            # Stored in pv's NATIVE dtype (float32, from torch) with no conversion. regime_match.py
+            # rebuilds `oof_prob` from this and its control run must reproduce seed_average.py
+            # BIT-FOR-BIT, so the rebuild has to replicate `pv[va_owner == i].mean()` exactly --
+            # including the float32 accumulator. Upcasting here would silently change that
+            # reduction's rounding and break the control for no gain.
+            oof_view_p.append(np.asarray(pv))
+            oof_view_owner.append(np.asarray(va_owner, dtype=np.int32))
+            oof_view_k.append(_kidx)
+            oof_view_rep.append(np.full(len(va_owner), rep, dtype=np.int16))
+
             if tta_on:
                 p_fold = _tta_predict(model, test_cube, mean, std, schema,
                                       channels_cfg, ex_mean, ex_std, rel, cfg,
@@ -1023,4 +1058,13 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                      float((pt >= 0.5).mean()),
                      float(np.corrcoef(np.argsort(np.argsort(pt)),
                                        np.argsort(np.argsort(test_prob)))[0, 1]))
-    return oof_prob, test_prob, fold_scores, np.asarray(test_per_fold, dtype=np.float32)
+    # 5th element: the per-view OOF record. Consumed by run_pipeline.py -> preds_*.npz ->
+    # tools/regime_match.py. Empty dict if the fold loop never ran (cannot happen in practice).
+    oof_views = {
+        "oof_view_p": np.concatenate(oof_view_p) if oof_view_p else np.zeros(0, np.float32),
+        "oof_view_owner": np.concatenate(oof_view_owner) if oof_view_owner else np.zeros(0, np.int32),
+        "oof_view_k": np.concatenate(oof_view_k) if oof_view_k else np.zeros(0, np.int16),
+        "oof_view_rep": np.concatenate(oof_view_rep) if oof_view_rep else np.zeros(0, np.int16),
+    }
+    return (oof_prob, test_prob, fold_scores,
+            np.asarray(test_per_fold, dtype=np.float32), oof_views)

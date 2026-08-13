@@ -29,7 +29,7 @@
 #   that violated that; it survives ONLY as `compliance_mode: pinned` so historical anchors stay
 #   reproducible, and its output must never be submitted. See REPORT.md section 8.
 #
-# STAGE 1 reproduces FINALIST #1 (5 runs + a pool).  STAGE 2 reproduces FINALIST #2 (8 runs + a
+# STAGE 1 reproduces FINALIST #1 (15 runs + 2 pools).  STAGE 2 reproduces FINALIST #2 (4 runs + a
 #   pool). Pass --quick to stop after stage 1.
 # =====================================================================
 set -euo pipefail
@@ -44,24 +44,32 @@ cat <<'BANNER'
 =====================================================================
  Reproducing the SUBMITTED finalists: from-scratch temporal Transformer
 
-   FINALIST #1  champion_perm_seedavg5   public LB 0.899882   (stage 1)
-                = 5 seeds x 5 folds of the 25-channel permanence model, legally pooled
-   FINALIST #2  champion_archblend4      public LB 0.899643   (stage 2)
+   FINALIST #1  champion_distill_alphamix10   public LB 0.906104   (stage 1)
+                = a 5-seed permanence TEACHER, then 10 distilled students on 10 DISTINCT seeds
+                  with the distillation weight alpha marginalized over {0.7, 1.5}, legally pooled
+   FINALIST #2  champion_archblend4           public LB 0.899643   (stage 2)
                 = 4 architecture variants, legally pooled
 
  WHY BOTH FINALISTS ARE POOLED ARTIFACTS, AND WHY NEITHER IS OUR BEST PUBLIC SCORE
-   Our measured seed-to-seed leaderboard sd is 0.0191. Three separate single-seed "records"
-   (0.906492, 0.913263, 0.912759) ALL collapsed to ~0.8995 when averaged over 5 seeds. We
-   therefore designate pooled, low-variance artifacts for the 721-row private slice rather than
-   the best number we ever saw on the 309-row public slice. See REPORT.md section 4.
+   Our measured seed-to-seed leaderboard sd is 0.0191. Four separate single-seed "records"
+   (0.906492, 0.913263, 0.912759, 0.914179) ALL collapsed to ~0.8995-0.906 when averaged over 5
+   seeds. We therefore designate pooled, low-variance artifacts for the 721-row private slice
+   rather than the best number we ever saw on the 309-row public slice. See REPORT.md section 4.
+
+   Finalist #1 is NOT our best public score (0.910837, champion_distill_a15_seedavg5). That was a
+   5-seed pool at a single alpha; this is a 10-DISTINCT-SEED pool that also marginalizes alpha. The
+   two differ on the public slice by 4 concordant pairs of AUC and ONE row at the cut -- i.e. zero
+   ranking information -- while the variance reduction applies to all 721 private rows. Choosing
+   the lower public number here is deliberate and pre-registered. See REPORT.md section 4.
 
  STAGE 1 fingerprints to verify in the log below:
    seq relative_time ON: observed window left-aligned to t_rel=0
    seq cross-view invariance ON: lambda=1
    seq input width: 25 channels/month        <- 24 + the permanence indicator
    t_star        0.5000        <- LITERAL. Not fitted. This is the compliance claim.
-   Pairwise rank correlation between seeds: mean ~0.95
-   POOLED: 5 seeds | test pos-rate ~0.58
+   TRANSDUCTIVE GATE ... submitted pos-rate  <- must land inside [0.50, 0.62] for every student
+   POOLED: 5 seeds  (the teacher)  then  POOLED: 10 seeds  (the finalist)
+   final pooled test pos-rate ~0.59
 
  STAGE 2 fingerprints:
    seq input width: 24 channels/month        <- archblend4 predates the permanence channel
@@ -96,8 +104,11 @@ want = {
     "seq.pooling":                  (s.get("pooling", "mean"), "mean"),
     "seq.dropout":                  (float(s["dropout"]), 0.2),
     "seq.channels.drop_bands":      (list(s.get("channels", {}).get("drop_bands") or []), []),
-    # The transductive terms (iteration 41) must be OFF for the designated finalists; with both
-    # disabled the pipeline is bit-for-bit the champion (verified against a pristine checkout).
+    # The transductive terms (iteration 41) must be OFF **in the committed config**, so that the
+    # file on disk reproduces the original 24-channel champion and the historical anchors stay
+    # valid. Finalist #1 DOES use soft self-distillation, but it is switched on explicitly by
+    # `--set seq.distill.enable=true` in stage 1 below -- never by a default. That is the point of
+    # asserting False here: every flag behind a finalist is visible on a command line in this file.
     "seq.transduct.enable":         (bool((s.get("transduct") or {}).get("enable", False)), False),
     "seq.distill.enable":           (bool((s.get("distill") or {}).get("enable", False)), False),
     # The iteration-43 dual-pol gate must likewise be OFF: neither designated finalist uses it.
@@ -132,13 +143,42 @@ if not ok:
 PY
 }
 
-# ---- STAGE 1: FINALIST #1 -- champion_perm_seedavg5 (5 seeds, legally pooled). ----
-echo "=== STAGE 1/2: champion_perm_seedavg5 (finalist #1) -- 5 runs + pool ==="
+# ---- STAGE 1: FINALIST #1 -- champion_distill_alphamix10. ----
+# Two sub-stages, because the finalist is a distilled student and the teacher is not shipped:
+#   1a. the 5-seed permanence TEACHER  (this is champion_perm_seedavg5, public LB 0.899882)
+#   1b. 10 students on 10 DISTINCT seeds, alpha marginalized over {0.7, 1.5}, pooled
+#
+# ⚠️ ONE ROUND OF DISTILLATION ONLY. The teacher is the NON-distilled pool from 1a in every student.
+# Re-teaching from a distilled student compounds error (Kumar/Ma/Liang) and is NOT what we shipped.
+#
+# The teacher is rebuilt here rather than shipped because submissions/preds/ is gitignored -- it
+# holds arrays derived from the competition CSVs, which we do not redistribute. Rebuilding it is
+# deterministic given the seeds below.
+echo "=== STAGE 1a/2: the 5-seed permanence TEACHER -- 5 runs + pool ==="
 for SD in 42 7 13 21 29; do
   python run_pipeline.py --full --model seq $PERM --set seed=$SD --name "perm_single_s${SD}"
 done
 python tools/seed_average.py --variant perm_single --name champion_perm_seedavg5
-audit "submissions/submission_champion_perm_seedavg5.csv" "finalist #1"
+audit "submissions/submission_champion_perm_seedavg5.csv" "the teacher (LB 0.899882)"
+
+TEACHER="submissions/preds/preds_champion_perm_seedavg5.npz"
+DISTILL="--set seq.distill.enable=true --set seq.distill.teacher=$TEACHER"
+
+echo
+echo "=== STAGE 1b/2: champion_distill_alphamix10 (finalist #1) -- 10 runs + pool ==="
+# alpha is marginalized, not tuned: iteration 42 swept it over a 5x range and the entire ladder
+# moved ONE true positive out of 309 public rows. When a knob is that flat you average over it
+# rather than picking a value, which removes the choice from the private-slice gamble at zero cost.
+for SD in 42 7 13 21 29; do
+  python run_pipeline.py --full --model seq $PERM --set seed=$SD \
+    $DISTILL --set seq.distill.alpha=0.7 --name "amix_s${SD}"
+done
+for SD in 3 17 23 31 37; do
+  python run_pipeline.py --full --model seq $PERM --set seed=$SD \
+    $DISTILL --set seq.distill.alpha=1.5 --name "amix_s${SD}"
+done
+python tools/seed_average.py --variant amix --name champion_distill_alphamix10
+audit "submissions/submission_champion_distill_alphamix10.csv" "finalist #1"
 
 if [ "$QUICK" = "1" ]; then
   echo; echo "=== --quick: stopping before stage 2. ==="; exit 0
@@ -161,6 +201,9 @@ audit "submissions/submission_champion_archblend4.csv" "finalist #2"
 
 echo
 echo "=== Done. ==="
-echo "  finalist #1  submissions/submission_champion_perm_seedavg5.csv  (LB 0.899882)"
-echo "  finalist #2  submissions/submission_champion_archblend4.csv     (LB 0.899643)"
+echo "  finalist #1  submissions/submission_champion_distill_alphamix10.csv  (LB 0.906104)"
+echo "  finalist #2  submissions/submission_champion_archblend4.csv          (LB 0.899643)"
+echo
+echo "  (stage 1a also emits submission_champion_perm_seedavg5.csv, LB 0.899882 -- that is the"
+echo "   TEACHER finalist #1 is distilled from, not a designated finalist itself.)"
 echo "  Compare the printed fingerprints against the banner above."

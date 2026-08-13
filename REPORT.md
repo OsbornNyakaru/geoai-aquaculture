@@ -40,13 +40,22 @@ about **52 rows out of 309**.
 
 | quantity | value |
 |---|---|
-| **finalist #1 (designated)** | **0.909868** — `champion_distill_seedavg5`, transductive self-distillation, 5-seed pool |
+| **finalist #1 (designated)** | **0.906104** — `champion_distill_alphamix10`, transductive self-distillation, **10 distinct seeds**, distillation weight α marginalized over {0.7, 1.5} |
 | **finalist #2 (designated)** | **0.899643** — `champion_archblend4`, a 4-architecture pool (decorrelated hedge) |
+| best *pooled* public score ever recorded | 0.910837 — `champion_distill_a15_seedavg5`, **not designated**; a 5-seed pool at one α. It differs from finalist #1 by 4 concordant AUC pairs and **one row at the cut**, i.e. zero ranking information, while finalist #1's extra seeds reduce variance across all 721 private rows |
+| best **AUC** ever recorded | **0.946460** — `champion_dualpol_add_seedavg5`, **above the leader's 0.944897**. It still loses on composite (0.907616): see the next row |
 | previous ceiling, held by 4 separate constructions | ~0.8995 — broken at iteration 41, see §4(iii) and §9 |
 | best *single* public score ever recorded | 0.914179 — **not designated; it is seed luck, see §4** |
 | **measured seed-to-seed sd** | **0.0191** — larger than most effects in our own ledger |
 | public-slice binomial noise (n=309) | ≈ ±0.012 on the composite |
-| LB-gated iterations / submissions | 41 iterations, ~50 of 100 submissions |
+| LB-gated iterations / submissions | 44 iterations, ~60 of 100 submissions |
+
+**Where the remaining gap is, stated precisely.** The F1 column is the small-denominator rational
+`2·TP/(PP+P)` and inverts exactly (matching to 10 decimals). At an AUC we have now *matched*, the
+leader converts **≈173 true positives** to our **≈164** — so the entire residual ~0.022 is **~9 true
+positives at the decision boundary**, not ranking. Closing it by moving the cut toward a
+leaderboard-inferred positive count is exactly the move the rules forbid, and we did not make it.
+See §8.2.
 
 The gap between rows 2 and 3 of that table is the single most important fact in this report, and
 §4 is about why we deliberately submit the lower number.
@@ -468,7 +477,7 @@ a score we would genuinely have wanted.
 
 ---
 
-## 7. Negative results (41 LB-gated iterations)
+## 7. Negative results (44 LB-gated iterations)
 
 A competition report that lists only what worked hides most of the information. Every row below cost
 a submission or a screened experiment, and each is reproducible from `experiments/LB_LOG.md`.
@@ -489,6 +498,10 @@ a submission or a screened experiment, and each is reproducible from `experiment
 | **More masking views / longer training** | ❌ | K=4 → −0.0115; K=2 is a sharp optimum |
 | **Seed averaging as a climber** | ➖ variance only, and now capped | lands at the member mean; §4(iii) bounds all further pooling at ≤+0.005 |
 | **TTA (hole-punching)** | ➖ −0.0023 | diagnosed in §6 terms: masking random *interior* months produces windows that occur in neither train nor test — off-manifold augmentation |
+| **Distillation weight α** | ❌ closed *exactly*, iter42 | a 5× sweep of α moved nothing: 0.907370 / 0.910837 / 0.906642, total spread 0.0035 inside ±0.012 noise. The F1 column inverts to **TP = 165, 165, 164** at predicted-positive counts differing by one — **the entire ladder is one true positive out of 309 rows.** α=0.7 at 5 and at 10 seeds have *bit-identical* AUC (0.944024425), so the seed count changed the ranking not at all and the whole −0.0032 was one row crossing the cut |
+| **Cross-polarization contrast, *indicator* form** | ❌ closed, iter43 — completing the lane above | the dual-pol gate `1[VH<−21]·1[(VH−VV)<−8]`, as a width-neutral replacement (0.904005) and as an addition (0.907616), neither clearing +0.006. **VH−VV is now closed with three independent forms of the same quantity failed:** raw (−0.0228), affine/SDWI (provably spanned), indicator (this round). Note the honest split: the added form posted our **best AUC ever, 0.946460, above the leader** — the gate genuinely improves *ranking* and loses it back at the cut |
+| **F-measure surrogate losses (sigmoidF1)** | ❌ **cancelled before it ran**, iter44 | three independent refutations. (i) **Platt annihilation, a theorem:** any affine logit reparameterization `z'=αz+β` satisfies `σ(a(αz+β)+b) = σ((aα)z+(aβ+b))`, so a train-refit Platt recovers the identical function — sigmoidF1's boundary effect, logit-adjusted loss and balanced softmax lie *exactly* in Platt's span, and our pipeline refits Platt on the next line. (ii) **No published evidence** any F-surrogate beats BCE at a *pre-specified* fixed 0.5 with all hyperparameters fixed a priori; sigmoidF1's own fixed-0.5 result is defeated because its `η` is a logit offset, so the `η` grid search *is* a threshold search. (iii) **Measured density:** only 29–38 of 1030 rows lie in [0.45,0.55]; the move needed to reach the F1 optimum is 0.21–0.33 and the mechanism supplies ~0.006 — roughly 35× short |
+| **Regime-matched calibration (`R=1`)** | 🔬 iter44, result pending | the one calibration defect that is a *fact of the code*: an OOF row is the mean of R=2 masked window views from 1 fold-model, a test row is 1 real window averaged over `n_splits` models, and Platt is fit across that mismatch. Corrected offline by `tools/regime_match.py` at zero extra training cost. **We pre-registered a null as the expected outcome** — with ~3% of test mass within 0.05 of the cut, a slope change this size cannot move enough rows |
 
 **What the blending failures do and do not show.** Under a metric with a hard threshold, the
 error-ambiguity decomposition that justifies ensemble diversity **does not apply** — there is no such
@@ -570,17 +583,35 @@ thing that should be found and corrected before review, not during it.
 ### 8.2 A second lever we found and deliberately did not pull
 
 Late in the competition we noticed the leaderboard exposes **F1 and ROC-AUC as separate columns**
-alongside the composite. Because `F1 = 2·TP/(P̂+P)` and `AUC = U/(A·(N−A))` are both ratios of small
-integers on a 309-row slice, the published digits are enough to **algebraically constrain the number
-of positives in the public slice**. We carried out that inversion as a diagnostic.
+alongside the composite. Because `F1 = 2·TP/(P̂+P)` is a ratio of small integers on a 309-row slice,
+the published digits are enough to recover `TP` and `P̂+P` exactly. We carried out that inversion as
+a diagnostic.
 
-**We did not, and will not, use it to set our operating point.** Tuning the decision boundary to a
-reverse-engineered public-slice composition would be leaderboard probing — a clear violation of the
-same rule as §8.1, and one that would also overfit the 309 public rows against the 721 private rows
-that actually decide the competition. The analysis is retained only in scratch notes as a *diagnosis*
-of where our gap lives (it is ~83% in the F1 term), and no number derived from it enters
+**⚠️ A correction to our own earlier claim, recorded here rather than quietly edited out.** An
+earlier revision of this report and of `experiments/LB_LOG.md` asserted that the **AUC** column
+inverts too — that its quantum `1/(P·N)` pins the public-slice positive count at `P=188, N=121`.
+**It does not, and that claim is withdrawn.** An integrality sweep over every split of 309 (plus
+308/310, plus the tie half-quantum `1/(2PN)`) returns a best max-residual of **0.070**, where
+9-decimal reporting would allow ~1e-5. Every split is rejected, so `P` is **not** derivable from the
+AUC column, and the quantities we had built on it — `P̂`, FP, FN, FPR, precision, recall — were never
+established. The honest figure is **P = 190 ± 7, an ESTIMATE** from our own logged full-test positive
+rate (0.5874 → E[public P̂] = 181.5, hypergeometric sd 7.2), bounded `P ∈ [164, 208]`. What survives
+is only what the F1 column gives directly: the `TP` counts, and the ~9-true-positive gap in §0, both
+of which are `P`-independent.
+
+**We did not, and will not, use any of it to set our operating point.** Tuning the decision boundary
+to a reverse-engineered public-slice composition would be leaderboard probing — a clear violation of
+the same rule as §8.1, and one that would also overfit the 309 public rows against the 721 private
+rows that actually decide the competition. The analysis is retained only as a *diagnosis* of where
+our gap lives (it is entirely in the F1 term), and no number derived from it enters
 `config/config.yaml`, `src/calibration.py`, or any submitted artifact. We record it here because a
 reviewer should know we found the channel and chose not to use it.
+
+**The standing rule this produced**, which governed the rest of the project: *any leaderboard-inverted
+quantity is diagnosis only and must never feed the operating point.* It is what ruled out the
+otherwise-obvious fix for the ~9-true-positive gap — lowering the cut until our predicted-positive
+count matched the leader's — and it is why iteration 44 pursued a **train-only** calibration
+correction (§7) instead.
 
 ### 8.3 Reproducibility caveats, stated plainly
 
@@ -669,6 +700,9 @@ tools/
   shift_audit.py                adversarial probes + the 2-D band screen
   label_shift_gate.py           the mixture goodness-of-fit test that vetoed Saerens
   arch_blend.py, seed_average.py   pooled artifacts
+  regime_match.py               regime-matched calibration (§7): refits Platt on an OOF vector
+                                whose averaging structure matches deployment. Its `--views all`
+                                control reproduces seed_average.py bit-for-bit.
 experiments/
   reproduce_champion.sh         ONE COMMAND REPRODUCTION of the designated finalists
   anchors.tsv                   known-LB anchors for the retro-fit (incl. the falsifier)
@@ -680,6 +714,17 @@ PROJECT_STATE.md                full state, ledger and lessons
 **Cross-validation is masking-aware and leak-free:** folds are defined on the *original* rows, every
 augmented view inherits its row's fold (a row's masked twins never straddle the split), and each
 held-out row is scored on *R* independent masked views averaged into one OOF probability.
+
+**One consequence of that last clause, which we found late and record against ourselves.** Averaging
+*R* views makes the OOF vector a *better* estimate of each row's score — but it also makes it a
+**differently-shaped** one than the vector it calibrates. A test row shows exactly **one** window
+(and is averaged over `n_splits` fold-models); an OOF row is **R=2** windows from **one** model. Each
+side is variance-shrunk on the axis the other is not, and Platt is fit across that mismatch. This was
+harmless under the prevalence pin, because the cut was re-derived downstream and only the ranking
+survived — but under a **literal 0.5 cut the Platt slope is the operating point.** `R` is read only
+on the held-out path, so it is the one lever in this pipeline that can move the decision boundary
+without touching any member's ranking; `tools/regime_match.py` exploits that to rebuild the
+calibration set at R=1 offline, at zero extra training cost. See §7.
 
 **A deliberate inversion a reviewer should expect:** our best-leaderboard models have our *lowest*
 OOF. Local OOF sits near 0.975 against a leaderboard near 0.90, and has been **anti-correlated** with
