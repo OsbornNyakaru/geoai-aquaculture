@@ -40,15 +40,16 @@ about **52 rows out of 309**.
 
 | quantity | value |
 |---|---|
-| **finalist #1 (designated)** | **0.906104** — `champion_distill_alphamix10`, transductive self-distillation, **10 distinct seeds**, distillation weight α marginalized over {0.7, 1.5} |
+| **finalist #1 (designated)** | **0.907368983** — `champion_dualpolmix10_regimematch`, transductive self-distillation + the dual-pol gate, **10 distinct seeds**, α marginalized over {0.7, 1.5}, R=1 regime-matched calibration. **AUC 0.945841814 — above the leader's 0.944897** |
 | **finalist #2 (designated)** | **0.899643** — `champion_archblend4`, a 4-architecture pool (decorrelated hedge) |
-| best *pooled* public score ever recorded | 0.910837 — `champion_distill_a15_seedavg5`, **not designated**; a 5-seed pool at one α. It differs from finalist #1 by 4 concordant AUC pairs and **one row at the cut**, i.e. zero ranking information, while finalist #1's extra seeds reduce variance across all 721 private rows |
-| best **AUC** ever recorded | **0.946460** — `champion_dualpol_add_seedavg5`, **above the leader's 0.944897**. It still loses on composite (0.907616): see the next row |
+| best *pooled* composite ever recorded | 0.910837 — `champion_distill_a15_seedavg5`, **not designated**; a 5-seed pool at one α. iter42 proved that class of edge carries **zero ranking information** — α=0.7 at 5 and 10 seeds returned *bit-identical* AUC (0.944024425) and the whole composite gap was **one row crossing the cut** — while a 10-distinct-seed pool reduces variance across all 721 private rows |
+| runner-up not designated | 0.910446704 — `champion_dualpol_add_regimematch`, beats finalist #1 on **both** public columns (+0.003078 composite, +0.000545 AUC) but on **5** seeds. Declined for the reason in the row above; the AUC difference is ≈12 concordant pairs |
+| best **AUC** ever recorded | 0.946460 — `champion_dualpol_add_seedavg5` (5 seeds, not designated). Finalist #1 is second at **0.945842**, and is the first artifact to out-rank the leader on **10 distinct seeds** |
 | previous ceiling, held by 4 separate constructions | ~0.8995 — broken at iteration 41, see §4(iii) and §9 |
 | best *single* public score ever recorded | 0.914179 — **not designated; it is seed luck, see §4** |
 | **measured seed-to-seed sd** | **0.0191** — larger than most effects in our own ledger |
 | public-slice binomial noise (n=309) | ≈ ±0.012 on the composite |
-| LB-gated iterations / submissions | 44 iterations, ~60 of 100 submissions |
+| LB-gated iterations / submissions | 45 iterations, ~61 of 100 submissions |
 
 **Where the remaining gap is, stated precisely.** The F1 column is the small-denominator rational
 `2·TP/(PP+P)` and inverts exactly (matching to 10 decimals). At an AUC we have now *matched*, the
@@ -616,7 +617,8 @@ the fixes, in full:
 | emitter | status |
 |---|---|
 | `run_pipeline.py` (all models) | ✅ compliant — `calibrate_legal`, train-only Platt, literal 0.5 |
-| `tools/seed_average.py` → **finalist #1** | ✅ compliant — `calibrated_pool`, literal 0.5 |
+| `tools/seed_average.py` → the 10-seed pool behind **finalist #1** | ✅ compliant — `calibrated_pool`, literal 0.5 |
+| `tools/regime_match.py` → **finalist #1** (the shipped artifact) | ✅ compliant — refits Platt on an **R=1** calibration set, literal 0.5 preserved. Audited against all three prongs below |
 | `tools/arch_blend.py` → **finalist #2** | ✅ compliant — `calibrated_pool`, literal 0.5 |
 | `run_presto.py` | 🔴 **was non-compliant → FIXED** — emitted `target_prevalence_shift` (a threshold shift) + `score_for_auc` (ranks, not probabilities). Now routed through `calibrate_legal`. Any Presto artifact produced before this fix was ineligible |
 | `tools/blend.py` | 🔴 **was non-compliant → now GUARDED** — same illegal pair. It is retained to reproduce historical pinned anchors, and now refuses to run unless `compliance_mode=pinned` is set explicitly |
@@ -625,6 +627,32 @@ the fixes, in full:
 **Both designated finalists are clean.** The defects were in secondary tooling — but a reviewer opens
 those files too, and a comment asserting that threshold-shifting is legal is precisely the kind of
 thing that should be found and corrected before review, not during it.
+
+**`tools/regime_match.py` deserves its own paragraph, because it is the one place we touch the
+operating point.** It is worth stating exactly why it is legal rather than asserting it, since
+"we refit the calibration" is superficially close to "we tuned the threshold," and it is not.
+
+The defect it fixes is real. Platt is fit on out-of-fold predictions, but OOF rows and test rows do
+not share an averaging structure: an **OOF row is the mean of R=2 masked window views from ONE
+fold-model**, while a **test row is ONE real window averaged over `n_splits` fold-models**. Each
+side is variance-shrunk on an axis the other is not. Under the old prevalence pin this was harmless
+because the cut was re-derived downstream — but under a **literal 0.5 cut the Platt slope *is* the
+operating point**, so fitting it across that mismatch is a genuine bug. `regime_match` rebuilds the
+calibration set at R=1 and refits offline, at zero extra training cost.
+
+Against the three-prong test we hold ourselves to:
+
+| prong | verdict |
+|---|---|
+| (a) the decision rule stays a literal `0.5` | ✅ unchanged; the emitted CSV passes the same row-wise audit as every other artifact |
+| (b) every knob fixed by a **train-only** criterion, never against a realized positive rate or leaderboard feedback | ✅ `R` is read **solely on the held-out path** — it is the one operating-point lever in the pipeline that structurally cannot see test outcomes. It was pre-committed in version control (`run_current.sh`, iteration 44) with the rule *"R=1 ships whatever positive rate it produces"* **before any score for it existed** |
+| (c) it corrects `p(y|x)` under a *demonstrably* mis-specified model, rather than relabeling a fixed estimate | ✅ the mis-specification is measured, not assumed: the two averaging structures are visibly different in the code, and the correction was pre-registered to produce a NULL — which it did, twice (+0.001006 and +0.002831, both inside the ±0.006 band) |
+
+It also ships with its own **bit-for-bit control**: at `--views all` the rebuild must reproduce
+`tools/seed_average.py` byte-identically, which `reproduce_champion.sh` asserts and aborts on. That
+control is not decoration — getting it to pass required replicating the native-float32 reduction
+exactly, because the obvious float64 `np.add.at` rewrite agrees only to ~1e-9, which is invisible in
+OOF metrics but survives Platt into the reported `TargetRAUC` decimals.
 
 ### 8.2 A second lever we found and deliberately did not pull
 

@@ -31,8 +31,30 @@
 
 1. `git pull` the repo (see §2 for the per-platform loop).
 2. Read this file top-to-bottom — you're now caught up.
-3. **Current next action: iter44 = FINALIST CONSOLIDATION + the code-review package (35% of the final
-   score). The experimental phase is over.** iter43 RESULT, pre-registered read applied verbatim:
+3. 🔒 **FINALISTS ARE LOCKED (iter45, 2026-08-14). THE EXPERIMENTAL PHASE IS OVER.**
+
+   | # | artifact | public LB | why |
+   |---|---|---|---|
+   | 1 | `champion_dualpolmix10_regimematch` | **0.907368983** (AUC **0.945841814**, F1 0.881720430) | 10 distinct seeds, α marginalized, dual-pol gate, R=1 calibration. **AUC above the leader's 0.944897.** |
+   | 2 | `champion_archblend4` | 0.899643 | the decorrelated hedge — predates the entire distillation lane |
+
+   iter45 applied the pre-registered read verbatim: the branch **"AUC ≥ ~0.945"** fired
+   (0.945842), so the dual-pol ranking edge **survived seed expansion** — +0.003271 AUC over the
+   otherwise-identical 25-channel build, and only −0.000545 (≈12 concordant pairs) below the 5-seed
+   dual-pol version. F1 inverts to **328/372, TP=164** — the *identical* cell to `alphamix10` and
+   `dualpol_add5`, so **the gate buys pure ranking and moves the cut not at all**. Two artifacts beat
+   finalist #1 on public composite (`a15_seedavg5` 0.910837, `dualpol_add_regimematch` 0.910447) and
+   both are declined on the ground iter42 proved: a 5-seed composite edge of that size is **one row
+   crossing the cut** at bit-identical AUC, while 10-distinct-seed variance reduction applies to all
+   721 private rows. ⚠️ A **duplicate leaderboard row** was read first (bit-identical to iter44's amix
+   score on *both* columns); it was caught and the read suspended — see `LB_LOG.md` for the standing
+   rule. `experiments/reproduce_champion.sh` STAGE 1 now rebuilds finalist #1 (1a teacher 25 ch →
+   1b 10 students 26 ch → 1c R=1 refit with its bit-for-bit control).
+
+   **NEXT AND ONLY REMAINING ACTION: iter46 = the code-review package (35% of the final score).
+   No further experiments. Deadline 2026-08-16.**
+
+4. *(superseded)* iter43 RESULT, pre-registered read applied verbatim:
    ARM E `champion_distill_alphamix10` **0.906104** (AUC 0.942680, F1 0.881720) → clears the ≥0.903 bar,
    **BANKED AS FINALIST #1**; ARM F `champion_dualpol_rep_seedavg5` **0.904005** (AUC 0.941953, F1 0.878706);
    ARM G `champion_dualpol_add_seedavg5` **0.907616** (AUC **0.946460**, F1 0.881720). Neither gate arm
