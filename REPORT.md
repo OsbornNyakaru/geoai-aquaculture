@@ -736,6 +736,66 @@ against, and we flag our physics-derived expectations as **unvalidated for this 
 
 ---
 
+### 8.5 The one hole in our own central theorem — found by an outside reviewer, tested, and closed
+
+We put considerable weight on what this report calls the **Platt Annihilation Theorem**: because
+`σ(a(αz+β)+b) = σ((aα)z + (aβ+b))`, a train-refit two-parameter Platt map *exactly* removes any affine
+reparameterization of the logit. That single identity closed a large number of lanes for us — every
+additive logit prior, logit-adjusted loss, balanced softmax, and the planned sigmoidF1 arm.
+
+An external deep-research review found a real gap in how we were applying it, and we record the
+correction because it was a good one. The theorem's scope is *affine maps only* — and **the calibrator
+we deploy is itself a map on the logit.** We had only ever used Platt, which is a two-parameter
+affine-on-logit map. Substituting a monotone but NON-affine family therefore moves the fixed-0.5
+crossing onto rows no Platt fit can reach, while preserving the ranking and hence the whole
+`TargetRAUC` column. That is not a loophole in the rules; it is a modelling choice the theorem simply
+does not constrain, and we had not tested it. The review ranked it the single cheapest and cleanest
+remaining lever.
+
+**We tested it before spending a submission** (`tools/calib_family_gate.py`, zero submissions,
+deterministic, on 10 `amix` and 5 `dpa` seed bundles at the R=1 regime-matched OOF). The contribution
+worth recording is the reframing. Beta calibration (Kull, Silva Filho & Flach, AISTATS 2017, PMLR
+54:623–631) fits
+
+    p = σ( a·ln(s) + b·(−ln(1−s)) + c )
+
+and at `a == b` the two log terms collapse to `a·logit(s)` — so **beta contains Platt exactly as its
+`a == b` submodel.** The entire non-affine content of the lever is one degree of freedom, `|a − b|`,
+which turns "is this lever real?" from a judgement call into a **nested likelihood-ratio test on 1 df**
+that costs nothing to run. Three findings:
+
+| test | result | reading |
+|---|---|---|
+| LR test, beta vs Platt | 1/10 and 1/5 members reject at 0.05 (0.5 / 0.25 expected by chance). **Pooled — the fit an artifact actually ships — p = 0.134 and p = 0.290** | the extra parameter buys no significant likelihood |
+| **direction of the test crossings** | beta **15 down, 0 up**; isotonic **23 down, 0 up**. Not one row moves up, in any configuration | **the lever's sign is reversed** |
+| isotonic OOF AUC | in-sample **+0.00197**, 5-fold cross-fitted **−0.00273** | overfits the calibration set at n=1817 |
+
+The middle row is the decisive one, and it is the review's own argument turned against the proposal.
+Its mechanism was that a calibrator anchored at the train base rate sits too HIGH at a fixed 0.5 and
+suppresses true positives — so the lever must move rows **UP**. Measured, it moves them exclusively
+DOWN. That is not a weaker version of the proposal; it is the proposal with its sign flipped, and it
+would cost F1. **Direction was not in the proposed kill condition**, which is precisely why that kill
+condition was insufficient — and why the gate we committed reports direction first.
+
+Two further corrections we owe the record. First, the review's premise that our probabilities are
+"anchored at the 40.23% train base rate" is **empirically false for this model**: our realized test
+positive rate is **0.5845**, already sitting on the independent k-NN graph estimate of 0.587–0.591
+(§5.4). The model's own test scores carry the base-rate shift; Platt is not pulling us back to the
+train prior. That removes the mechanism behind the proposed follow-up (refitting the calibration set
+to the deployment prevalence), which the review itself flagged as the compliance-fragile option under
+Elkan's equivalence theorem (IJCAI 2001) — a reviewer could legitimately read prevalence-reweighting
+as threshold-moving in disguise. **We did not attempt it.** Second, the isotonic result is a
+methodological warning larger than the result: Niculescu-Mizil & Caruana (ICML 2005, DOI
+10.1145/1102351.1102430) put the Platt/isotonic crossover near 1000 calibration points, and at 1817 we
+are close enough to it that the in-sample and cross-fitted numbers **disagree in sign**. The in-sample
+number is the obvious one to compute and it points the wrong way.
+
+**Outcome: the lane is closed, no submission was spent, and the shipped operating point is unchanged**
+— a train-only Platt map and a literal 0.5. We regard this as the model of how the offline instruments
+in §5 are supposed to work: a plausible, well-argued, correctly-motivated idea refuted for free.
+
+---
+
 ## 9. What we would do with more time
 
 Stated so a reviewer can see we know where the remaining value is, not as a claim of results.
@@ -809,6 +869,10 @@ tools/
   graph_gate.py                 the k-NN graph instrument (§5.4): connectivity, homophily,
                                 parameter-free propagation, and the independent test-prevalence
                                 estimate that answered a question MLLS/BBSE could no longer answer
+  calib_family_gate.py          the calibrator-family gate (§8.5): tests whether a NON-AFFINE
+                                monotone calibrator (beta, isotonic) buys anything at the fixed 0.5
+                                cut. Reframes the question as a nested LR test, because beta contains
+                                Platt exactly as its a==b submodel. Closed the lane at zero cost.
   arch_blend.py, seed_average.py   pooled artifacts
   regime_match.py               regime-matched calibration (§7): refits Platt on an OOF vector
                                 whose averaging structure matches deployment. Its `--views all`

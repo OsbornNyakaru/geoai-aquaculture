@@ -54,6 +54,45 @@
    **NEXT AND ONLY REMAINING ACTION: iter46 = the code-review package (35% of the final score).
    No further experiments. Deadline 2026-08-16.**
 
+   ✅ **iter46 part 1 done (2026-08-13): the calibrator-family lane is CLOSED on a free
+   measurement.** An external deep-research memo (`gemini_loop/findings/God_mode.md`) found a genuine
+   scope limit in our Platt Annihilation Theorem — it covers only *affine* maps, and **the deployed
+   calibrator is itself a map on the logit**, so a monotone NON-affine family (beta, isotonic) can
+   move the 0.5 crossing where no Platt fit reaches while preserving the ranking. That was correct,
+   and it was the one hole in the theorem. We built the check it demanded
+   (`tools/calib_family_gate.py`) and the lever is dead on three counts:
+
+   - **It is not significant.** Beta calibration contains Platt *exactly* as its `a == b` submodel, so
+     the whole lever is one degree of freedom and reduces to a nested likelihood-ratio test. On the
+     pooled score that would actually ship: **p = 0.134** (`amix`) and **p = 0.290** (`dpa`).
+   - **Its sign is reversed.** The memo argues our cut sits too HIGH and suppresses true positives, so
+     the lever must move rows UP. Measured: beta **15 down / 0 up**, isotonic **23 down / 0 up**. Not
+     one row moves up in any configuration. It would cost F1, not buy it.
+   - **Isotonic overfits at n=1817.** In-sample OOF AUC **+0.00197**, 5-fold cross-fitted
+     **−0.00273** — the sign flips. The in-sample number, which is the obvious one to compute, would
+     have pointed the wrong way. Isotonic also drops pooled test rank correlation to 0.9973/0.9922,
+     threatening the one column we are winning.
+
+   **A premise correction to carry.** The memo asserts our probabilities are "anchored at the 40.23%
+   train base rate" and therefore under-predict positives. False for us: realized test pos-rate is
+   **0.5845**, already matching the independent k-NN graph estimate **0.587–0.591**. The model's own
+   test scores carry the base-rate shift; Platt is not pulling us back to the train prior. That
+   removes the mechanism behind the memo's Slot 2 (base-rate-corrected calibration) — which it itself
+   flagged as compliance-fragile under Elkan's equivalence theorem — so **Slot 2 is not attempted**.
+
+   **What the memo confirmed rather than changed.** Its finalist-selection rule (when two artifacts
+   differ by less than the noise floor, prefer the more-seed-averaged one selected on fewer public-LB
+   decisions) independently reproduces the iter45 choice from Dwork et al. and Roelofs et al. rather
+   than from our iter42 crossing analysis. **Finalists unchanged.**
+
+   ⛔ **The subagent research lane is closed by account capacity, not by judgement.** Seven agents
+   were launched three times and a reduced batch of three once; all four attempts died on API session
+   limits, and the limit is now **weekly, resetting Aug 16 5am (Africa/Nairobi) — i.e. at the
+   deadline**. No agent research can land before submission closes. One unverified lead was visible in
+   a dying agent's reasoning and is recorded only as a lead, not a finding: Presto may expose
+   `construct_single_presto_input` as an official partial-band entry point. **Nobody verified this;
+   do not cite it.**
+
 4. *(superseded)* iter43 RESULT, pre-registered read applied verbatim:
    ARM E `champion_distill_alphamix10` **0.906104** (AUC 0.942680, F1 0.881720) → clears the ≥0.903 bar,
    **BANKED AS FINALIST #1**; ARM F `champion_dualpol_rep_seedavg5` **0.904005** (AUC 0.941953, F1 0.878706);
