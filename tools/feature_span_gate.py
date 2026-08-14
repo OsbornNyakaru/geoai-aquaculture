@@ -68,6 +68,17 @@ def _nanmed(x):
         return np.nanmedian(x, axis=1)
 
 
+def _nanmax(x):
+    with np.errstate(invalid="ignore"):
+        return np.nanmax(x, axis=1)
+
+
+def _nanrange(x):
+    """Observed-window max minus min. Defined on 4 months exactly as on 12 -- no period, no phase."""
+    with np.errstate(invalid="ignore"):
+        return np.nanmax(x, axis=1) - np.nanmin(x, axis=1)
+
+
 def candidates(c: np.ndarray) -> dict:
     """Literature-motivated candidates, each computable from ONE location's 12x12 table."""
     vh, vv = _nm(c, "VH"), _nm(c, "VV")
@@ -80,8 +91,27 @@ def candidates(c: np.ndarray) -> dict:
         # Feyisa et al., RSE 140:23-35 (2014), no-shadow form.
         awei = 4.0 * (g - sw1) - (0.25 * nir + 2.75 * sw2)
         # fmars 2025.1551260: pond-type separation from red/red-edge slopes alone.
+        # ⚠️ ROUND 23: both of these are EXACTLY LINEAR in two supplied columns (the denominators
+        # are wavelength CONSTANTS, not data). Gemini-Pro and our own Q6 agent caught this
+        # independently. Their per-month form is (band - band)/const = two of the 144 columns with
+        # fixed coefficients, so the model can already represent them at zero cost. They are kept
+        # here only as EXTRA CONTROLS: the *median* rows below must score like a median, not like
+        # a linear form, which is the same median-vs-difference confound documented for VH-VV.
         lasci = (nira - r) / 200.1
         spci = (re1 - r) / 39.5
+
+        # ---- ROUND 23, the water-QUALITY axis (as opposed to water-EXTENT). -------------------
+        # Every index screened before this line (MNDWI, NDWI, AWEI) answers "is this wet?", which
+        # the model already knows from VH permanence -- hence their span R2 of 0.86-0.93. NDTI and
+        # NDCI answer "WHAT KIND of water is this?", which is the axis the confusable classes
+        # (rice paddy, natural lake, seasonal wetland) actually live on.
+        #   NDTI  Lacaux et al., RSE 106(1):66-74 (2007), DOI 10.1016/j.rse.2006.07.012 -- turbidity
+        #   NDCI  Mishra & Mishra, RSE 117:394-406 (2012), DOI 10.1016/j.rse.2011.10.016 -- chl-a
+        # Both are genuine normalized differences (variable denominator => nonlinear) and both are
+        # per-month pointwise, so they carry no period/phase/peak-date and survive 4-6 month
+        # truncation by construction.
+        ndti = (r - g) / (r + g)
+        ndci = (re1 - r) / (re1 + r)
 
     # THE CONTROL MUST BE EXACTLY LINEAR IN THE 144 RAW VALUES, or it does not validate the gate.
     # A first version of this tool used median_over_months(VH − VV) as the control and it scored
@@ -99,9 +129,17 @@ def candidates(c: np.ndarray) -> dict:
         "MNDWI_median": _nanmed(mndwi),
         "NDWI_median": _nanmed(ndwi),
         "AWEI_nsh_median  (Feyisa 2014)": _nanmed(awei),
-        "LASCI_median     (fmars 2025)": _nanmed(lasci),
-        "SPCI_median      (fmars 2025)": _nanmed(spci),
+        "LASCI_median     (LINEAR per-month! control)": _nanmed(lasci),
+        "SPCI_median      (LINEAR per-month! control)": _nanmed(spci),
         "red_edge_curv    (nira-nir, extrapolated)": _nanmed(nira - nir),
+        # CONTROL for the round-23 pair: the per-month value, no temporal statistic. A true
+        # normalized difference should sit WELL BELOW the ~1.0 that a linear form scores here.
+        "CONTROL NDTI @1 month (nonlinear ratio)": ndti[:, m_mid],
+        "CONTROL LASCI @1 month (linear, expect 1.0)": lasci[:, m_mid],
+        "NDTI_median      (turbidity, Lacaux 2007)": _nanmed(ndti),
+        "NDTI_range       (turbidity swing)": _nanrange(ndti),
+        "NDCI_median      (chl-a, Mishra 2012)": _nanmed(ndci),
+        "NDCI_max         (peak productivity)": _nanmax(ndci),
     }
     # Cross-band temporal correlation: nonlinear in the raw columns by construction, so it is the
     # family most likely to escape the span. Flagged in round-22 as an extrapolation with no paper.

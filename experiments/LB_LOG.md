@@ -898,6 +898,110 @@ for the writeup, **not executed**, and we should not claim otherwise.
 
 ---
 
+## ROUND 23 — THREE CORRECTIONS TO US, AND THE F1 LANE CLOSES BY ARITHMETIC (2026-08-14)
+
+Four in-house agents (killed mid-run by a session limit, but all four wrote incrementally to disk and
+salvaged 1,872 lines) plus two external Gemini Deep Research reports. **The most valuable output of
+the round is that three separate claims of ours were refuted**, two of them claims I had already
+written into this ledger. They are corrected below rather than quietly patched.
+
+### ⛔ CORRECTION 1 — "precision exceeds recall ⇒ the cut is too high" is NOT a theorem. My iter47 entry asserted it was.
+
+The iter47 RESULT entry below says: *"precision exceeding recall by 0.047 is the signature of a cut
+placed too HIGH"* and *"we are predicting roughly ten too few positives."* **The first is a folk
+heuristic, not a theorem, and the second overstates the correct count by ~5×.** Explicit
+counterexample, four lines of arithmetic, verified independently here:
+
+A calibrated two-point model with mass 0.60 at s = 0.9 and 0.40 at s = 0.3. Prevalence
+= 0.6(0.9) + 0.4(0.3) = 0.66.
+
+| threshold | PP | TP | precision | recall | F1 |
+|---|---|---|---|---|---|
+| all positive | 1.00 | 0.66 | 0.660 | 1.000 | 0.7952 |
+| 0.3 < t ≤ 0.9 | 0.60 | 0.54 | **0.900** | **0.818** | **0.8571** ← optimum |
+
+The middle row is the F1 optimum (check: F/2 = 0.4286 ∈ (0.3, 0.9], so t = 0.5 *is* optimal here),
+and **at that exact optimum precision exceeds recall by 0.082** — larger than the 0.047 we observed.
+So the spread carries no directional information on its own. **The correct diagnostic is the Lipton
+condition and only that: the cut is above optimal iff `t > F(t)/2`.** For us 0.5 > 0.881720/2 =
+0.4409, so our *conclusion* (cut is above optimal) survives — but the reason I gave for it was wrong,
+and the magnitude that matters is the mass in [0.441, 0.500), which we measured at ≈7 rows of 1030
+≈ **2 public rows, not ten.**
+
+### ⛔⛔ CORRECTION 2 (THE HEADLINE) — the threshold is worth ≈ +0.0004 F1. The entire operating-point lane is dead by ARITHMETIC, not by our compliance rule.
+
+Because F1 is at a *maximum* at `t*`, the penalty for sitting at 0.5 instead is **second order**, and
+its coefficient is the score density near the cut — the very quantity we measured to be tiny:
+
+```
+dF/dt = −(2 f(t)/B)·(t − F(t)/2)      ⇒      F(t*) − F(0.5) ≈ (f(t*)/B)·(0.5 − t*)²
+f ≈ 15/(0.10 × 1030) = 0.146     B = 0.583 + 0.618 = 1.201     t* ≈ 0.441
+F(t*) − F(0.5) ≈ 0.1216 × 0.003364 = 4.1 × 10⁻⁴
+```
+
+**Moving the cut to its true optimum is worth +0.0004 F1 = +0.00025 composite — about 1% of 1% of our
+0.037–0.048 F1 gap, and ~60× below the noise floor.** An assumption-light cross-check (flip every row
+in [0.45, 0.50), ≈2.3 public rows at local precision ≈0.5) gives ΔF1 = +0.0005, the same order by an
+independent route.
+
+**We had been treating the sparse density near the cut purely as an obstacle. It is simultaneously an
+exemption:** the same sparsity that stops us flipping many rows is what makes the threshold not worth
+flipping. This is a *better* reason to close the lane than "illegal", because it survives any future
+relaxation of the compliance rule and it is publishable as a measured negative.
+
+**And prevalence matching is actively HARMFUL, which retires the temptation for good.** To lift the
+public positive rate from 0.583 to the estimated 0.618 we would flip ~33 rows reaching down to ≈0.28.
+Every row in [0.28, 0.441) has `s < F/2`, so by Lipton's Corollary 1 flipping it **strictly reduces
+F1**: at honest calibrated precision ≈0.40 on that band, TP 164→168, PP 181→191, F1 = 336/382 =
+0.8796 = **−0.0021.** Those "ten too few positives" are, in expectation, majority-negative.
+
+> **What survives, over-determined and now theorem-backed:** *the F1 gap is not a calibration or
+> boundary-placement problem; it is a recall problem on positives the model is confidently wrong
+> about.* Three independent arguments now force it. Cite Corollary 1 of arXiv:1402.1892 in the report.
+
+### ⛔ CORRECTION 3 — LASCI is EXACTLY LINEAR, so our "one candidate clears both gates" claim was wrong
+
+Both the external Gemini-Pro report and our own Q6 agent caught this independently, and a new control
+row confirms it: **`CONTROL LASCI @ 1 month` = span R² 0.9999.** LASCI = (nira − red)/Δλ where Δλ is a
+**wavelength constant**, so per-month it is two of the 144 columns with fixed coefficients — precisely
+the VH−VV situation. Our reported LASCI_median R² = 0.7526 was measuring **the median**, not LASCI —
+the identical median-vs-difference confound we had already documented for VH−VV and thought we had
+learned from. **The `feature_span_gate` conclusion "LASCI is the only candidate clearing both gates"
+is RETRACTED.** SPCI falls the same way.
+
+### 🔑 And a general result that closes the whole optical-index lane
+
+Adding a per-month control for a *genuine* normalized-difference ratio gives **`CONTROL NDTI @ 1
+month` = span R² 0.9717.** So even a true nonlinear ratio is **97% linearly reachable** over the
+observed data range. **This empirically refutes the argument — made explicitly by Gemini-Pro — that
+"it is a ratio, therefore nonlinear, therefore it adds information."** Being formally nonlinear is not
+the same as being unreachable.
+
+Round-23 additions to the gate (water-*quality* rather than water-*extent* indices, the axis on which
+rice paddy / natural lake / seasonal wetland actually differ from a stocked pond):
+
+| candidate | span R² | window ρ | univ AUC | verdict |
+|---|---|---|---|---|
+| CONTROL LASCI @1 month | **0.9999** | 1.0000 | 0.8997 | linear — retracts our LASCI claim |
+| CONTROL NDTI @1 month | **0.9717** | 1.0000 | 0.7556 | a real ratio, still 97% reachable |
+| NDTI_median (Lacaux 2007, turbidity) | 0.6367 | 0.7906 | 0.8254 | passes both gates, unremarkable AUC |
+| NDTI_range | 0.3197 | **0.6733** | 0.5473 | window-unstable |
+| NDCI_median (Mishra 2012, chl-a) | 0.5095 | **0.6405** | 0.5876 | window-unstable |
+| NDCI_max | 0.5619 | 0.7562 | 0.6206 | weak |
+
+**Only `NDTI_median` survives, and its univariate AUC (0.825) is below MNDWI (0.896), NDWI (0.916) and
+VH_median (0.834) — all of which we already have or have rejected.** The gate can only veto, and a low
+span R² is not a go signal, so this does not fund anything.
+
+**The real conclusion is sharper than any single index.** Every optical index we have now tested is
+≥97% linearly reachable *at the per-month level*. What is genuinely outside the model's span is not
+the index but the **nonlinear temporal statistic** (median, min, threshold-count) — and that is
+exactly what our one winning hand feature already is: `1[VH_dB < −21]`, a threshold indicator, not a
+band ratio. **The optical-index lane is closed; the nonlinear-temporal-statistic lane is where the
+only feature win in this project's history actually came from.**
+
+---
+
 ## iter47 RESULT — Presto transfers, badly; and OUR OWN CAPACITY LAW MISSED (2026-08-14)
 
 | arm | composite | AUC | F1 | F1 cell (TP, PP+P) |
@@ -966,8 +1070,16 @@ Three artifacts from two unrelated model families agree on **P ≈ 190–192**, 
 `190 ± 7`. At P = 191 the champion's public confusion cell is **PP = 181, TP = 164, precision 0.906,
 recall 0.859** — and the implied public prevalence is **0.618 against our operating rate of 0.583**.
 
-**Read that carefully: precision exceeds recall by 0.047, which is the signature of a cut placed too
-HIGH.** We are predicting roughly ten too few positives on the public slice.
+~~**Read that carefully: precision exceeds recall by 0.047, which is the signature of a cut placed too
+HIGH.** We are predicting roughly ten too few positives on the public slice.~~
+
+⛔ **STRUCK — see ROUND 23 CORRECTIONS 1 and 2 above.** "Precision exceeds recall ⇒ the cut is too
+high" is a folk heuristic, not a theorem, and there is an explicit counterexample where precision
+exceeds recall by 0.082 *at the exact F1 optimum*. The correct diagnostic is the Lipton condition
+`t > F(t)/2`, which our numbers do satisfy (0.5 > 0.4409) — so the conclusion survives but the reason
+given here was wrong. The flip count is ≈2 public rows, not ten, and **moving the cut to its true
+optimum is worth +0.0004 F1 ≈ +0.00025 composite, ~60× below the noise floor.** Prevalence matching
+to 0.618 would *lose* 0.0021 F1.
 
 ⛔ **AND WE MUST NOT ACT ON IT.** Every number in that table is derived from the leaderboard's F1
 column. The standing rule — *any leaderboard-inverted quantity is DIAGNOSIS ONLY and must never feed

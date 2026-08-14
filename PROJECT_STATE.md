@@ -110,8 +110,15 @@
    frozen arm inverts uniquely; combined with each artifact's pos-rate × 309/1030, three artifacts from
    two unrelated model families give **P = 191.9 / 190.9 / 189.8**, tightening `190 ± 7` to **190–192**.
    At P = 191 the champion's public cell is PP = 181, TP = 164, **precision 0.906 vs recall 0.859**,
-   implied public prevalence **0.618 against our operating 0.583** — precision exceeding recall is the
-   signature of a cut placed **too HIGH**, by roughly ten positives on the public slice.
+   implied public prevalence **0.618 against our operating 0.583**. ⛔ **PARTIALLY RETRACTED by round
+   23 — see `LB_LOG.md` "ROUND 23 CORRECTIONS".** "Precision exceeds recall ⇒ the cut is too high" is a
+   folk heuristic, not a theorem (counterexample: precision exceeds recall by 0.082 *at* the F1
+   optimum). The correct test is Lipton's `t > F(t)/2`, which we do satisfy (0.5 > 0.4409), so the
+   direction stands — but the flip count is ≈2 public rows, not ten, and **moving the cut to its true
+   optimum is worth +0.0004 F1 ≈ +0.00025 composite, ~60× below the noise floor.** Matching prevalence
+   to 0.618 would *lose* 0.0021 F1, because every row in [0.28, 0.441) sits below `F/2` and flipping it
+   strictly reduces F1. **The operating-point lane is therefore dead by ARITHMETIC, independently of
+   our compliance rule** — a better reason, and a publishable measured negative.
    ⛔ **DIAGNOSIS ONLY. Every number there is LB-inverted and `compliance_mode: legal` forbids
    threshold tuning outright.** It is logged as the sharpest OPEN question in the project — *is there a
    **train-only** criterion that independently reaches the same conclusion, and a legal mechanism that
