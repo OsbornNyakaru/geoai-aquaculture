@@ -3,134 +3,134 @@
 # CURRENT EXPERIMENT — edited + pushed by Claude each iteration.
 # The Colab notebook (colab_run.ipynb, Cell 4) runs exactly this file.
 #
-# ITERATION 47 — THE PRESTO LANE, REOPENED AND ACTUALLY SUBMITTED.
+# ITERATION 49 — JTT (Just Train Twice): the LAST live candidate for the F1 gap.
 #
-#   WHY THIS IS BEING REOPENED, AND WHY THAT IS NOT A RENEGOTIATION.
-#   iter17 built the entire Presto lane (run_presto.py, src/presto_features.py,
-#   tools/fetch_presto.py) and then killed it for ZERO submissions using three instruments:
-#       - adversarial AUC on the embeddings   -> RETIRED at round 18, which recorded that
-#                                                adv-AUC as a selection criterion is "DEAD ...
-#                                                BACKWARDS"
-#       - ATC-F1                              -> RETIRED at iter25/26, proven invalid OUT OF
-#                                                FAMILY (rho +0.964 in-family -> +0.738 out), and
-#                                                frozen Presto embeddings are the most
-#                                                out-of-family candidate we have ever screened
-#       - OOF                                 -> blind by standing rule (OOF ~0.975 for everything
-#                                                while the LB spans 0.72-0.907)
-#   All three have since been retired BY THIS PROJECT. So the Presto kill rests entirely on
-#   evidence we have ourselves invalidated, and Presto has never been submitted even once.
-#   Reopening a lane whose only evidence has been withdrawn is not renegotiation; leaving it
-#   closed on retracted evidence would be the error.
+#   WHY THIS IS THE ONLY THING LEFT, AND WHY THAT IS A MEASURED CLAIM, NOT A MOOD.
+#   Round 23 closed every OPERATOR-level lane on arithmetic:
+#     - the THRESHOLD is worth +0.0004 F1. F1 is at a MAXIMUM at t*, so the penalty for sitting at
+#       0.5 is second order, and its coefficient is the near-cut score density -- which we measured
+#       at ~15 rows of 1030. Confirmed two independent ways. ~60x below the noise floor.
+#       Prevalence-matching to the estimated 0.618 would LOSE 0.0021 F1.
+#     - the CALIBRATOR FAMILY reversed direction (iter46 part 1: beta 15 down/0 up).
+#     - both POOLING OPERATORS moved 4-13 rows of 1030 (iter46 part 2; iter48 majority vote,
+#       +0.00004/+0.00080, and dead even under the illegal post-hoc-k version of itself).
+#     - EVERY POINTWISE LOSS is order-invariant at the population optimum. Focal, ASL, LDAM,
+#       PolyLoss and label smoothing all minimize to T(eta(x)) for ONE fixed monotone T, so ROC-AUC
+#       is EXACTLY unchanged and the F1 effect is a pure threshold slide. Focal's warp is proven
+#       strictly order-preserving: Charoenphakdee et al., CVPR 2021, arXiv:2011.09172, Thm 3/5/11 +
+#       Lemma 14. ⚠️ BOTH external round-23 reports ranked Asymmetric Loss as their #1
+#       recommendation. That recommendation is refuted by this theorem and we are NOT running it.
 #
-#   ROUND-22 RESEARCH CONFIRMED THE SHAPE FITS (gemini_loop/findings/round22_pretrained_models.md):
-#       - construct_single_presto_input is real, in presto/dataops/utils.py -- the official
-#         partial-band entry point. Verified by reading the code, not inferred.
-#       - our 12 bands (VH VV blue green nir nira re1 re2 re3 red swir1 swir2) map 1:1 onto
-#         Presto's S1+S2 slots. We are missing only B9, which Presto itself drops.
-#       - the mask_tokens uniform-mask assert exists ONLY in single_file_presto.py; presto/presto.py
-#         uses attn_mask and handles our variable 4/5/6-month rows correctly. tools/fetch_presto.py
-#         already vendors the correct one, and says so in its docstring.
-#       - lat/lon is a mandatory ARG but the paper itself runs S2-Agri100 from a single shared
-#         location and reports Presto "remained performant". We pass zeros.
-#       - month=0 is supported; absolute calendar identity is not required.
+#   WHY JTT ESCAPES THE THEOREM. Liu et al., ICML 2021, arXiv:2107.09044. The theorem assumes ONE
+#   fixed pair (l1, l0) shared by every x. JTT's weight depends on whether the stage-1 model erred
+#   on row i, so it is x-dependent AND class-asymmetric. The pointwise objective becomes
+#   eta*w1(x)*l1 + (1-eta)*w0(x)*l0, minimized at T(eta_eff) with
+#   eta_eff = eta*w1 / (eta*w1 + (1-eta)*w0). Since w1/w0 varies with x, eta_eff is NOT monotone in
+#   eta alone. JTT genuinely REORDERS -- the only cheap candidate round 23 found that does.
 #
-#   THE ONE THING THAT WAS NEVER TRIED: FINE-TUNING. iter17 only ever ran the FROZEN encoder with a
-#   ~129-parameter logistic head. PROJECT_STATE flags this gap itself. run_presto.py now has a
-#   --finetune path that unfreezes all 404,160 encoder parameters and trains end-to-end.
+#   ⚠️⚠️ THE REORDERING IS PROVABLE. ITS SIGN IS NOT. Stated before the numbers, as always.
+#   Three specific reasons this may well LOSE, all measured before the run:
+#     1. |E| = 38 rows of 1817 (2.09%). `balance` therefore sets lambda_up = 46.8, putting HALF the
+#        gradient mass on 38 rows in a 71k-parameter model. That is a memorization setup, and
+#        "added capacity fitted to these shifted rows hurts" is this project's most reliable law.
+#     2. OOF UNDER-REPRESENTS THE DEPLOYMENT FAILURE RATE BY ~7x. We see a 2.09% error rate on
+#        held-out train; the leaderboard says deployment recall is 0.859, i.e. ~14% of positives
+#        missed. JTT can only upweight failures we can SEE, and most of ours are created by the
+#        covariate shift, which OOF is blind to. So it addresses a fraction of the problem at best.
+#     3. Those 38 rows may simply be mislabeled or intrinsically ambiguous, in which case
+#        upweighting them 47x is fitting noise very hard.
+#   The one thing genuinely in its favour: our OOF is computed on MASKED 4-6 month held-out views
+#   (_mask_views(..., oof=True)), so the 38 errors are rows that fail UNDER TEST-LIKE TRUNCATION.
 #
-#   ⚠️ WHAT THIS PROJECT'S OWN MEASURED LAW PREDICTS. "Added capacity fitted to our 1,817 shifted
-#   rows hurts" is one of the most reliable findings in this ledger. Frozen Presto fits ~129
-#   parameters and therefore never tested that law -- its capacity is amortized over a global
-#   pretraining corpus. Fine-tuning fits 404k parameters ONTO the shifted rows, which is exactly
-#   the condition the law was measured under. So the honest prior is that the fine-tuned arm LOSES
-#   to the frozen arm. We are running it because it is the untried arm, not because we expect it to
-#   win. Say so now, before the numbers, so we cannot claim afterwards that we expected either.
+#   THE ERROR SET, measured before the run (free, train-only):
+#     |E| = 38 of 1817 (2.09%) = 24 false NEGATIVES + 14 false positives.
+#     The 24 missed positives are CONFIDENTLY missed -- median OOF 0.170, ten of them below 0.10,
+#     and ZERO in [0.45, 0.50). That is direct confirmation of round 23's central finding: the rows
+#     we need are nowhere near the boundary, which is exactly why no operator-level fix can reach
+#     them, and exactly what JTT is designed to attack.
 #
-#   TWO ARMS, TWO UPLOADS, ONE VARIABLE BETWEEN THEM. Both go through the identical legal operating
-#   point (calibrate_legal: Platt on train OOF only, literal 0.5). The frozen arm has NEVER been on
-#   the leaderboard, so submitting both answers two separate questions for two slots:
-#       (a) does Presto transfer to this task AT ALL?          <- the frozen arm
-#       (b) does fine-tuning help or hurt on a shifted set?    <- the pair
-#   Answering (b) without (a) would be uninterpretable, which is why this is two uploads and not
-#   one. Single seed (42) each: this is a probe, and if it surprises us we expand to a seed pool.
-#
-#   ⚠️ FINALISTS ARE NOT AT RISK BY DEFAULT. champion_dualpolmix10_regimematch (0.907368983) and
-#   champion_archblend4 (0.899643) stay designated unless the pre-registered read below fires the
-#   top branch, which it almost certainly will not.
+#   THREE RUNS, ONE VARIABLE. The control is run LOCALLY ALONGSIDE the arms rather than compared to
+#   a banked Colab-era bundle, so the comparison is exact and shares every seed, fold split and
+#   teacher. lambda_up is the ONLY thing that differs between ARM A and ARM B, and both values were
+#   fixed from a TRAIN-ONLY quantity (|E|) before any score existed -- never against F1, a realized
+#   positive rate, or the leaderboard.
 # =====================================================================
 set -euo pipefail
 
-# ---- STEP 0: vendor Presto (source + 3.3 MB MIT-licensed checkpoint) and verify it loads. ----
-#      Pretrained WEIGHTS are explicitly legal; external DATA is not, and we add none.
-#      The verify step asserts the encoder is ~404k params, so an upstream layout change fails
-#      loudly here rather than silently producing garbage embeddings.
-python tools/fetch_presto.py
+PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
+DP="--set seq.channels.dualpol_gate=true"
+TEACHER="submissions/preds/preds_teacher_perm5.npz"
+DISTILL="--set seq.distill.enable=true --set seq.distill.teacher=$TEACHER --set seq.distill.alpha=0.7"
+STAGE1="submissions/preds/preds_champion_distill_alphamix10.npz"
 
-# ---- STEP 1: ARM A — FROZEN encoder + ~129-parameter logistic head. The iter17 arm, but now
-#      routed through calibrate_legal and actually submitted. ----
-python run_presto.py --month-mode const --seed 42 --name presto_frozen
+# ---- CONTROL: the champion single-member recipe at seed 42, no JTT. ----
+python run_pipeline.py --full --model seq $PERM $DP $DISTILL --set seed=42 \
+  --name jtt_control_s42
 
-# ---- STEP 2: ARM B — FINE-TUNED, all 404,160 encoder params trainable. The untried arm. ----
-#      Fixed 8 epochs, no early stopping and no LR search: early stopping needs a selection signal
-#      and every offline signal we have is retired or blind (LB_LOG iter46). A fixed, pre-committed
-#      budget is the only honest option and it keeps this to ONE variable against ARM A.
-python run_presto.py --month-mode const --seed 42 --finetune \
-  --ft-epochs 8 --ft-batch 64 --ft-lr-encoder 1e-4 --ft-lr-head 1e-3 --name presto_finetune
+# ---- ARM A: JTT with the PRE-COMMITTED parameter-free `balance` rule (lambda_up = 46.8). ----
+python run_pipeline.py --full --model seq $PERM $DP $DISTILL --set seed=42 \
+  --set seq.jtt.enable=true --set seq.jtt.source=$STAGE1 --set seq.jtt.lambda_up=balance \
+  --name jtt_balance_s42
+
+# ---- ARM B: JTT at lambda_up = 5, the conservative end of Liu et al.'s own published range. ----
+#      Included because |E| is small enough that `balance` is aggressive; this is a pre-registered
+#      SENSITIVITY pair, not a knob to be selected after the fact.
+python run_pipeline.py --full --model seq $PERM $DP $DISTILL --set seed=42 \
+  --set seq.jtt.enable=true --set seq.jtt.source=$STAGE1 --set seq.jtt.lambda_up=5 \
+  --name jtt_lam5_s42
 
 cat <<'NEXT'
 =====================================================================
  PASTE BACK:
-   - the "Presto encoder loaded: NNN,NNN params" line from BOTH runs. It MUST say 404,160.
-   - the "adversarial AUC on Presto embeddings" line from ARM A (descriptive only - do NOT let it
-     gate anything; that is precisely the iter17 mistake we are correcting).
-   - the per-fold "combined@0.5" lines and the "OOF: f1@0.5=... auc=... combined=..." line for BOTH.
-   - the "FITTED params = N" line from both (expect 129 for frozen, 404,289 for fine-tuned).
-   - the per-epoch "train BCE" lines from ARM B — if BCE does not fall, the fine-tune did not train
-     and the arm is VOID rather than negative.
-   - the LEGAL calibration line from both (Platt slope + realized test pos-rate).
-   - the Zindi AUC and F1 columns for BOTH uploads, not just the composite.
+   - the "JTT stage-1 error set" line and the "JTT lambda_up" line from BOTH arms.
+     ARM A must read lambda_up = 46.816; ARM B must read 5.000. If ARM A's |E| is not 38, the
+     stage-1 bundle is not the one this read was pre-registered against and the arm is VOID.
+   - the "seq input width" line from all three. It MUST be 26 channels/month on all three -- if
+     JTT changed the width, something other than the loss weighting changed and the arm is void.
+   - "oof_f1@0.5", "oof_auc", "oof_combined" for all three.
+   - the LEGAL calibration line (Platt slope + realized test pos-rate) for all three.
+   - the Zindi AUC and F1 columns for whatever gets uploaded, never just the composite.
 
- UPLOAD (2 files):
-   submissions/submission_presto_frozen.csv
-   submissions/submission_presto_finetune.csv
+ UPLOAD: NOTHING AUTOMATICALLY. Read the offline block below first; it may spend zero slots.
 
  COMMITTED READ (pre-registered; do NOT renegotiate after seeing the numbers):
 
- Read the FROZEN arm first — it establishes whether the lane exists at all. Then read the PAIR.
+ STEP 1 -- THE VOID CHECKS, before any comparison.
+   - width 26 on all three, |E| = 38, lambda_up 46.816 / 5.000. Any mismatch => VOID, not negative.
+   - CONTROL's OOF must land near the champion's usual ~0.975-0.980 combined. If the control is
+     itself anomalous, the whole iteration is void and nothing is uploaded.
 
-   ARM A (frozen), composite:
-     >= 0.913        Presto beats our best-ever public (0.910837) by more than the +-0.015 binomial
-                     band. A genuinely new lane on the last weekend. THEN AND ONLY THEN reconsider
-                     the finalist lock, and only after a seed pool, never off one seed.
-     0.895 - 0.913   Presto is COMPETITIVE with a purpose-built champion while fitting 129
-                     parameters. That is a striking result for the writeup and it does NOT make it
-                     a finalist: an unmeasured artifact tying a measured one loses on the standing
-                     rule (prefer the more-seed-averaged artifact, selected on fewer LB decisions).
-     0.80 - 0.895    the lane transfers but loses. Expected outcome. Record and close.
-     < 0.80          Presto does not transfer to this task. Also a clean result: it would say the
-                     pretraining corpus (global crop/land-cover pixel series) does not cover
-                     aquaculture ponds, which is worth stating in the report.
+ STEP 2 -- THE OFFLINE READ, which may close this for ZERO submissions.
+   Compute, against the CONTROL, on the 1030 test rows:
+     (a) Spearman rank correlation. If rho > 0.999 for an arm, JTT did NOT meaningfully reorder --
+         it collapsed to a threshold slide, the mechanism did not fire, and that arm is CLOSED with
+         no submission. This is the single most likely outcome and it is a real result.
+     (b) the number of rows changing side at the literal 0.5 cut.
+     (c) OOF recall at 0.5 on the 24 known false negatives. JTT's ENTIRE thesis is that it recovers
+         them. ⚠️ This is IN-SAMPLE for the arms (those rows were upweighted during training), so a
+         high number here is NOT evidence of transfer -- it is only a check that the mechanism did
+         what it claims mechanically. If it did NOT recover them even in-sample, the arm is dead.
 
-   ARM B (fine-tuned) MINUS ARM A, composite:
-     <= -0.006       the "added capacity fitted to shifted rows hurts" law HOLDS, now demonstrated
-                     on a pretrained model. This is the expected outcome and it is the single most
-                     valuable thing this run can produce for the code review: the law was measured
-                     on our own architectures, and this would extend it out-of-family.
-     within +-0.006  inconclusive at our noise floor. Report as such; do NOT call it a win.
-     >= +0.006       fine-tuning HELPS, which would CONTRADICT our own capacity law and is the one
-                     outcome that should change what we do next. It would mean the law is about
-                     RANDOM initialization, not capacity per se. Do not act on one seed; expand to
-                     five and re-read.
+ STEP 3 -- SPEND A SLOT ONLY IF STEP 2 SHOWS A REAL REORDERING.
+   Upload at most ONE arm. Prefer ARM B (lambda 5) if both reordered, on the standing rule that the
+   less aggressive intervention is the safer unmeasured artifact.
 
-   BOTH arms < 0.60 -> something is broken, not negative. Check the width line, the BCE trace, and
-                     the Platt slope before concluding anything.
+   Reading the LB result of the uploaded arm against the CONTROL's own LB (upload the control too
+   ONLY if a slot is spare; otherwise compare to champion 0.907368983 and say so):
+     >= +0.006     JTT works. This would be the first thing to move the F1 term in 8 iterations.
+                   Do NOT designate off one seed -- expand to five and re-read, exactly as the
+                   alpha ladder taught us at iter42.
+     within ±0.006 inconclusive at our noise floor. Report as such; do NOT call it a win. The lane
+                   closes and the report records that the last live F1 candidate was measured.
+     <= -0.006     the capacity law holds again, now demonstrated on an x-dependent reweighting.
+                   This is a GOOD outcome for the writeup: it would mean the confidently-missed
+                   positives are not recoverable from the source distribution at all, which is the
+                   strongest possible form of round 23's conclusion.
 
- A NOTE ON WHAT COUNTS AS SUCCESS HERE. The likeliest outcome is two mediocre scores and a clean
- negative. That is a fine result: it converts a lane we closed on RETRACTED evidence into a lane
- closed on a MEASUREMENT, which is exactly the trade this ledger exists to make, and it removes the
- last "but you never actually tried the pretrained model" objection from the code review.
+ ⚠️ FINALISTS ARE NOT AT RISK. champion_dualpolmix10_regimematch (0.907368983) and
+ champion_archblend4 (0.899643) stay designated. A single-seed arm cannot replace a 10-seed
+ measured artifact under the standing rule, whatever it scores.
 
- FINALISTS unless the top branch fires: champion_dualpolmix10_regimematch + champion_archblend4.
  DEADLINE 2026-08-16.
 =====================================================================
 NEXT

@@ -338,6 +338,26 @@ seq:
                        # submissions/preds/preds_teacher_perm5.npz. Must be regenerated in the
                        # same run: submissions/preds/ is gitignored.
     warmup_frac: 0.5
+  # ---- JTT: Just Train Twice (Liu et al., ICML 2021, arXiv:2107.09044). iter49. ----
+  # Upweight the rows a banked OUT-OF-FOLD stage-1 model got wrong at a literal 0.5, then retrain.
+  #
+  # WHY THIS AND NOT A LOSS FUNCTION. Round 23 established POINTWISE-LOSS ORDER INVARIANCE: for any
+  # decomposable objective the population minimizer is T(eta(x)) for one fixed monotone T, so AUC is
+  # exactly unchanged and the F1 effect is a pure threshold slide. Focal, ASL, LDAM, PolyLoss and
+  # label smoothing are ALL in that class (focal's warp is proven strictly order-preserving:
+  # Charoenphakdee et al., CVPR 2021, arXiv:2011.09172, Thm 3/5/11 + Lemma 14). JTT escapes it
+  # because its weight is x-dependent AND class-asymmetric, making the effective posterior
+  # eta*w1/(eta*w1 + (1-eta)*w0) non-monotone in eta -- so it genuinely REORDERS.
+  #
+  # lambda_up: 'balance' is parameter-free and PRE-COMMITTED -- it sets (n-|E|)/|E|, giving the error
+  # set and its complement equal total loss mass. Not tuned against F1, a positive-rate target, or
+  # the leaderboard. A number is accepted for pre-registered sensitivity arms only.
+  #
+  # source must be REGENERATED IN THE SAME RUN: submissions/preds/ is gitignored.
+  jtt:
+    enable: false
+    source: null       # stage-1 preds bundle carrying `oof_prob` (+ `y` for the row-order check)
+    lambda_up: balance
   antithetic_views: false  # draw view 2 maximally distant from view 1 (K=2 only), preserving the
                            # marginal window distribution. Makes the cross-view invariance penalty
                            # (+0.0047, our champion) informative on every row instead of vacuous

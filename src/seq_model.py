@@ -498,13 +498,20 @@ def _build_model(n_months: int, in_dim: int, cfg: dict):
     return PondTransformer()
 
 
-def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | None = None):
+def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | None = None,
+           w_view: np.ndarray | None = None):
     """Train one fold-model.
 
     `u` (optional) carries the TRANSDUCTIVE terms over the unlabeled test rows — see
     `run_seq_cv` for how it is built. Keys: x, pad (K_u views per test row, owner-major),
     Ku, lam_u (cross-view invariance on test rows), alpha + p_teacher (soft self-distillation),
     warmup_frac. u=None reproduces the champion bit-for-bit.
+
+    `w_view` (optional) is the JTT per-VIEW loss weight, aligned to `y`. It multiplies the LABELED
+    BCE term only — the transductive terms are deliberately left untouched so this arm changes
+    exactly one variable against the champion. w_view=None reproduces the champion bit-for-bit,
+    and the weighted branch is skipped entirely rather than run with a vector of ones, so there is
+    no floating-point reassociation risk on the default path.
     """
     import torch
     import torch.nn as nn
@@ -514,6 +521,27 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | 
     model.to(device).train()
     opt = torch.optim.AdamW(model.parameters(), lr=s["lr"], weight_decay=s["weight_decay"])
     lossf = nn.BCEWithLogitsLoss()
+
+    # JTT: weighted BCE over the labeled term. `sum(w*l)/sum(w)` reduces to `mean(l)` at w==1, but
+    # we branch on `wt is None` rather than relying on that, so the champion path is untouched.
+    wt = None
+    if w_view is not None:
+        if len(w_view) != len(y):
+            raise SystemExit(f"JTT weights {len(w_view)} != {len(y)} training views")
+        wt = torch.from_numpy(np.asarray(w_view, dtype=np.float32)).to(device)
+        lossf_none = nn.BCEWithLogitsLoss(reduction="none")
+        if resampler is not None:
+            # The resampler redraws a fresh owner-major view set every epoch, so a weight vector
+            # built against the FIRST draw would silently misalign from epoch 1 onward. Fail loudly.
+            raise SystemExit("seq.jtt is incompatible with seq.resample_per_epoch: the per-epoch "
+                             "view resampler invalidates the per-view weight alignment.")
+
+    def _sup_loss(out, tgt, idx):
+        """Supervised BCE, weighted by JTT if enabled."""
+        if wt is None:
+            return lossf(out, tgt)
+        wsel = wt[idx]
+        return (wsel * lossf_none(out, tgt)).sum() / wsel.sum()
 
     # ---- SWA / SWAD: capacity-NEUTRAL weight averaging over the training tail (round-16, Agent 5).
     #      Training here uses a CONSTANT LR (no scheduler), so the tail iterates genuinely explore the
@@ -618,7 +646,7 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | 
                 vidx = (oidx.unsqueeze(1) * K + ar).reshape(-1).to(device)
                 opt.zero_grad()
                 out = model(xt[vidx], pt[vidx])
-                loss = lossf(out, yt[vidx])
+                loss = _sup_loss(out, yt[vidx], vidx)
                 out_g = out.view(len(oidx), K)
                 cons = ((out_g - out_g.mean(dim=1, keepdim=True)) ** 2).mean()
                 loss = loss + lam * cons
@@ -660,7 +688,7 @@ def _train(model, x, pad, y, cfg, device, K: int = 1, resampler=None, u: dict | 
             idx = perm[i:i + bs]
             opt.zero_grad()
             out = model(xt[idx], pt[idx])
-            loss = lossf(out, yt[idx])
+            loss = _sup_loss(out, yt[idx], idx)
             loss.backward()
             opt.step()
             _swa_maybe(ep)
@@ -813,6 +841,74 @@ def _test_views(test_cube: np.ndarray, K_u: int, seed: int, min_len: int = 4):
     return np.stack(out), np.array(owners)
 
 
+def _load_error_set(path, y: np.ndarray) -> np.ndarray:
+    """JTT stage-1 error set: rows a banked out-of-fold prediction got WRONG at a literal 0.5.
+
+    WHY A BANKED BUNDLE INSTEAD OF RETRAINING STAGE 1.
+    Just Train Twice (Liu et al., ICML 2021, arXiv:2107.09044) trains an ERM model for T epochs,
+    collects its misclassified examples into an error set E, then retrains from scratch upweighting
+    E by lambda_up. We already own a stage-1 artifact: every champion run banks `oof_prob`. Reusing
+    it makes JTT a ONE-run, config-only change and — more importantly — removes JTT's worst knob.
+    Liu et al. must choose T by early stopping, because an ERM model trained to convergence
+    memorizes its training set and its in-sample error set degenerates to noise. Our `oof_prob` is
+    genuinely OUT-OF-FOLD, so it cannot memorize, and T disappears entirely.
+
+    NO LEAKAGE, and the argument is worth stating precisely. For fold f we upweight row i only if i
+    is in fold f's TRAINING split. The error flag for i is `1[oof_i != y_i]`, which uses (a) y_i,
+    already legitimately available because i is a training row, and (b) a prediction produced by a
+    model that never saw y_i. Fold f's own validation labels never enter fold f's training.
+
+    THE 0.5 IS THE MODEL'S OWN RAW OUTPUT, not a calibrated one. That keeps this free of any
+    dependence on the calibrator and adds no knob; JTT is about where ERM itself failed.
+    """
+    from pathlib import Path
+
+    p = Path(path)
+    if not p.exists():
+        raise SystemExit(f"seq.jtt.source not found: {p}")
+    d = np.load(p, allow_pickle=True)
+    if "oof_prob" not in d.files:
+        raise SystemExit(f"{p.name}: no `oof_prob` — not a usable JTT stage-1 bundle")
+    oof = np.asarray(d["oof_prob"], dtype=float)
+    if oof.shape[0] != y.shape[0]:
+        raise SystemExit(f"{p.name}: oof_prob has {oof.shape[0]} rows, train has {y.shape[0]}")
+    if "y" in d.files and not np.array_equal(np.asarray(d["y"]).astype(int), y.astype(int)):
+        raise SystemExit(f"{p.name}: bundle labels differ from this run's — row order mismatch")
+    err = (oof >= 0.5).astype(int) != y.astype(int)
+    fn = int((err & (y == 1)).sum())      # confidently-missed POSITIVES: our actual target
+    fp = int((err & (y == 0)).sum())
+    log.info("JTT stage-1 error set from %s: |E|=%d of %d (%.2f%%) | %d false NEG, %d false POS",
+             p.name, int(err.sum()), len(y), 100 * err.mean(), fn, fp)
+    if err.sum() == 0:
+        raise SystemExit(f"{p.name}: empty error set — nothing for JTT to upweight")
+    return err
+
+
+def _jtt_weights(err: np.ndarray, lambda_up) -> np.ndarray:
+    """Per-ROW weights: 1.0 off the error set, lambda_up on it.
+
+    `lambda_up: balance` is the PRE-COMMITTED, PARAMETER-FREE default and the reason this arm needs
+    no tuning: it sets lambda_up = (n - |E|) / |E|, i.e. exactly the value that gives the error set
+    and its complement EQUAL total loss mass. That is a train-only, self-describing rule fixed
+    before any result is seen — it is not selected against F1, a realized positive rate, or the
+    leaderboard, so it satisfies prong (b). A numeric override is accepted for pre-registered
+    sensitivity arms only; it must never be chosen after seeing a score.
+    """
+    n, ne = len(err), int(err.sum())
+    if isinstance(lambda_up, str):
+        if lambda_up != "balance":
+            raise SystemExit(f"seq.jtt.lambda_up: expected a number or 'balance', got {lambda_up!r}")
+        lam = (n - ne) / ne
+        how = "balance (equal loss mass on E and its complement)"
+    else:
+        lam = float(lambda_up)
+        how = "explicit"
+    w = np.where(err, lam, 1.0).astype(np.float32)
+    log.info("JTT lambda_up = %.3f [%s] | error-set share of total loss mass %.1f%% -> %.1f%%",
+             lam, how, 100 * ne / n, 100 * (lam * ne) / (lam * ne + (n - ne)))
+    return w
+
+
 def _load_teacher(path, test_ids, n_test: int) -> np.ndarray:
     """Banked teacher probabilities for test rows, realigned to the cube's row order.
 
@@ -903,6 +999,40 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
              Xte.shape[2], s.get("pooling", "mean"),
              {k: v for k, v in channels_cfg.items() if v} or "none")
 
+    # ---- JTT (iter49): Just Train Twice, Liu et al. ICML 2021, arXiv:2107.09044. -----------------
+    #      WHY THIS ARM. Round 23 proved every OPERATOR-level lane is closed: the threshold is worth
+    #      +0.0004 (F1 is at a maximum at t*, so the penalty is second order and the near-cut density
+    #      is tiny), the calibrator family reversed direction, both pooling operators moved 4-13 rows,
+    #      and EVERY pointwise loss is order-invariant at the population optimum (focal/ASL/LDAM/
+    #      PolyLoss/label smoothing -- Charoenphakdee et al., CVPR 2021, arXiv:2011.09172, Thm 3/5/11
+    #      + Lemma 14 give focal's warp as STRICTLY ORDER-PRESERVING). So no post-processing and no
+    #      reweighted-by-class objective can close a 0.037-0.048 F1 gap.
+    #
+    #      WHY JTT ESCAPES THAT THEOREM, which is the whole reason this arm exists. The theorem
+    #      assumes ONE fixed pair (l1, l0) shared by every x. JTT's weight depends on whether the
+    #      stage-1 model erred on row i -- so it is BOTH x-dependent AND class-asymmetric. The
+    #      pointwise objective at x becomes eta*w1(x)*l1(q) + (1-eta)*w0(x)*l0(q), whose minimizer is
+    #      T(eta_eff) with eta_eff = eta*w1 / (eta*w1 + (1-eta)*w0). Because w1/w0 varies with x,
+    #      eta_eff is NOT a monotone function of eta alone. **JTT genuinely reorders.** It is, as far
+    #      as round 23 could establish, the only such candidate that is also cheap.
+    #
+    #      ⚠️ THE REORDERING IS PROVABLE; ITS SIGN IS NOT. This is an empirical bet, and our own
+    #      measured law ("added capacity fitted to these shifted rows hurts") is a reason for caution
+    #      even though iter47 just missed that prediction. Stated before the run, as always.
+    #
+    #      LEGALITY. (a) literal 0.5 everywhere, untouched. (b) the error set is out-of-fold and
+    #      lambda_up defaults to the parameter-free `balance` rule -- no leaderboard quantity and no
+    #      realized-positive-rate target enters. (c) it does not relabel a fixed estimate; it changes
+    #      what the network learns. enable:false reproduces the champion bit-for-bit. ----
+    _jtt_cfg = s.get("jtt") or {}
+    _jtt_w = None
+    if bool(_jtt_cfg.get("enable")):
+        src = _jtt_cfg.get("source")
+        if not src:
+            raise SystemExit("seq.jtt.enable=true needs seq.jtt.source=<stage-1 preds .npz>")
+        _jtt_err = _load_error_set(src, y)
+        _jtt_w = _jtt_weights(_jtt_err, _jtt_cfg.get("lambda_up", "balance"))
+
     # ---- TRANSDUCTIVE bundle (iter41). Built ONCE: the test cube is fixed across folds, and the
     #      views are seeded off cfg["seed"] only, so every fold-model sees the same unlabeled set
     #      (the folds partition LABELS, and there are none here to leak). Standardization uses the
@@ -969,6 +1099,9 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
             tr_cube, tr_owner = _mask_views(train_cube, tr, schema, wd, cfg,
                                             K, cfg["seed"] + rep, oof=False)
             ytr = y[tr_owner]
+            # JTT (iter49): per-VIEW weights are the per-ROW weights broadcast through tr_owner,
+            # exactly as ytr is. Only rows in THIS fold's training split are ever weighted.
+            w_view = None if _jtt_w is None else _jtt_w[tr_owner]
             Xtr, pad_tr = to_inputs(tr_cube, mean, std, schema, channels_cfg, ex_mean, ex_std,
                                     relative_time=rel)
 
@@ -992,7 +1125,7 @@ def run_seq_cv(train_cube, y, test_cube, schema: Schema, wd: WindowDist,
                              "(K=%d fresh views/row each of %d epochs)", K, s["epochs"])
 
             model = _train(model, Xtr, pad_tr, ytr, cfg, device, K=K, resampler=resampler,
-                           u=u_bundle)
+                           u=u_bundle, w_view=w_view)
 
             va_cube, va_owner = _mask_views(train_cube, va, schema, wd, cfg,
                                             R, cfg["seed"] + rep, oof=True)
