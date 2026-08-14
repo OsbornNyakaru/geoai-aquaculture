@@ -898,6 +898,74 @@ for the writeup, **not executed**, and we should not claim otherwise.
 
 ---
 
+## iter48 — DECISION-LEVEL POOLING (hard majority vote): closed for FREE, zero submissions (2026-08-14)
+
+Round 23's one candidate that both external reports AND our own Q5 agent proposed independently, and
+the only pooling idea that is not killed by the pointwise-loss theorem — because a hard vote is not a
+pointwise loss at all, it replaces the *aggregation* rather than warping a score. Built as
+`tools/vote_gate.py` and measured on both local pools at zero submission cost.
+
+**The theory was sound and prong (c) was genuinely satisfied.** Ranjan & Gneiting (JRSS-B 2010,
+72(1):71–91) prove any non-trivial average of distinct *calibrated* forecasts is necessarily
+uncalibrated and under-dispersed. Our shipped operator does exactly that. The concrete failure mode is
+real: if six members say 0.55 and four say 0.10, the mean is 0.37 and the row goes NEGATIVE even
+though a clear majority individually call it positive — **averaging lets a confident minority veto a
+weak majority**, and we under-predict positives.
+
+**The two-column design, which neither external report stated.** A vote *count* takes only `n+1`
+distinct values, so using it as `TargetRAUC` would collapse the ranking we are already winning
+(0.945842 vs the leader's 0.944897). The vote may therefore only ever touch `TargetF1`, leaving
+`TargetRAUC` as the averaged probability. AUC is then unchanged **by construction** and the composite
+delta is exactly `0.6 × ΔF1`. `k` was **pre-committed** to the strict majority `⌈n/2⌉` before running.
+
+Measured, Platt **cross-fitted** (iter46 showed in-sample and cross-fitted calibration can disagree in
+sign at n=1817):
+
+| pool | operator | OOF f1 | ΔF1 | Δcomposite | OOF rows disagreeing | net TP gained | test rows changed |
+|---|---|---|---|---|---|---|---|
+| `amix` (10 seeds) | A mean | 0.97316 | — | — | — | — | — |
+| | B majority ≥5/10 | 0.97323 | **+0.00007** | **+0.00004** | 4 / 1817 | **+2** (4 up, 0 down) | 4 / 1030 (all up) |
+| `dpa` (5 seeds) | A mean | 0.96978 | — | — | — | — | — |
+| | B majority ≥3/5 | 0.97111 | **+0.00133** | **+0.00080** | 6 / 1817 | **+0** (1 up, 4 down… 1 TP each way) | 7 / 1030 (1 up, 6 down) |
+
+🚫 **LANE CLOSED. The effect is 1.2–2.1 public rows and the two pools disagree in DIRECTION** (amix
+moves 4 rows up and none down; dpa moves 6 down and 1 up). Net true positives gained: +2 and +0.
+Against a +0.006 bar and a 0.015 binomial noise floor, +0.00004 / +0.00080 is two to three orders
+short.
+
+**And it is dead even under the ILLEGAL version of itself**, which is the strongest form of the
+result. The `k` sweep is printed for diagnosis only; had we cheated and selected the best `k` post hoc
+(k=6 on amix, OOF f1 0.97447), the gain would still be only +0.0013 F1 = +0.0008 composite — **~19×
+below the significance bar.** So the lane does not close on our compliance rule; it closes on
+arithmetic, and it would stay closed if the rule were lifted.
+
+### 🔑 THE GENERAL LAW THIS ESTABLISHES — the pooling-operator axis is EXHAUSTED
+
+This is now the second pooling-operator change measured to be theoretically right, directionally
+plausible, and numerically irrelevant:
+
+| iteration | operator change | rows it can act on | Δcomposite |
+|---|---|---|---|
+| iter46 | pool-then-calibrate (Rahaman–Thiery remedy) | 13 of 1030 | +0.0003 to +0.002 |
+| **iter48** | **hard majority vote (decision-level)** | **4–7 of 1030** | **+0.00004 to +0.0008** |
+
+The mechanism is the same both times and it generalizes: **our pool members are near-duplicates
+(inter-seed rank correlation ≈0.95, and ≈0.99998 for the pooled artifacts), so ANY operator that
+differs from the mean only where members straddle 0.5 has almost nothing to act on.** The size of
+every such intervention is bounded above by the members' disagreement set, and that set is tiny by
+construction because seed replicates agree. No re-parameterization of *how we combine* a
+near-duplicate pool can close a 0.037–0.048 F1 gap. **Stop searching the pooling axis.**
+
+This also composes with the round-23 corrections into a single closed argument. The F1 gap cannot be
+reached by (i) moving the threshold (+0.0004, Correction 2), (ii) changing the calibrator family
+(iter46 part 1, direction reversed), (iii) changing the pooling operator (iter46 part 2 + iter48), or
+(iv) any pointwise loss (order-invariance theorem, arXiv:2011.09172). **Every operator-level lane is
+now closed on a measurement.** What remains is the one thing all four exclusions point at: recovering
+positives the model is confidently wrong about — which requires changing *what the model learns*, not
+how its output is post-processed.
+
+---
+
 ## ROUND 23 — THREE CORRECTIONS TO US, AND THE F1 LANE CLOSES BY ARITHMETIC (2026-08-14)
 
 Four in-house agents (killed mid-run by a session limit, but all four wrote incrementally to disk and
