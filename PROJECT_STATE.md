@@ -85,7 +85,29 @@
    decisions) independently reproduces the iter45 choice from Dwork et al. and Roelofs et al. rather
    than from our iter42 crossing analysis. **Finalists unchanged.**
 
-   🔬 **iter49 RESULT (2026-08-14): JTT REORDERS — PROVABLY AND MEASURABLY — AND STILL FAILS.**
+   ➖ **iter49 LB RESULT (2026-08-14): JTT RECOVERED ZERO TRUE POSITIVES. LANE CLOSED; ROUND 23 IS
+   FINISHED.** `submission_jtt_lam5_s42.csv` = **0.908387851** (AUC 0.944824076, F1 0.884097035).
+   vs champion 0.907368983 — stated explicitly because no slot was spent on the control, as the
+   pre-registered read requires: composite **+0.001019**, AUC **−0.001018**, F1 **+0.002377**. That
+   is the `within ±0.006` branch: **inconclusive at our noise floor, NOT a win**, and the comparison
+   is worse than it looks because this is a SINGLE-SEED arm against a 10-SEED artifact (single seeds
+   carry sd 0.019 here and have produced three mirages).
+   🔑 **THE F1 CELL INVERTS UNIQUELY AND REFUTES THE THESIS: TP=164, PP+P=371** against the
+   champion's TP=164, PP+P=372. **TP is IDENTICAL; PP fell by exactly one. The whole F1 gain is ONE
+   FALSE POSITIVE REMOVED AND ZERO TRUE POSITIVES RECOVERED.** JTT exists to recover confidently-
+   missed positives and recovered none. It also **forfeits the column we were winning** — AUC
+   0.944824076 falls BELOW the leader's 0.944897, where the champion's 0.945841814 beats it: 22
+   concordant pairs traded for one FP, and ranking is the stabler half on the private 721 rows.
+   🔬 **A METHODOLOGICAL RESULT WORTH MORE THAN THE ARM.** OOF composite said +0.00091 and was
+   uninformative as always; the **mechanism-specific, control-baselined** instrument said "+1 of 24
+   ≈ nothing" and **correctly predicted 0 TP on the leaderboard**. Hypothesis for the report (n=1,
+   flagged as a hypothesis): our offline instruments fail when they measure AGGREGATE performance and
+   can work when they measure THE SPECIFIC MECHANISM an arm claims, against a control that isolates
+   it. Every retired instrument here — OOF, adv-AUC, ATC-F1 — is of the aggregate kind.
+   **FINALISTS UNCHANGED** (single seed, inside noise, below our best-ever 0.910837, forfeits the
+   AUC lead), exactly as pre-registered.
+
+   🔬 **iter49 OFFLINE (2026-08-14): JTT REORDERS — PROVABLY AND MEASURABLY — AND STILL FAILS.**
    All void checks pass (width 26 on all three, |E|=38, lambda_up 46.816/5.000, control OOF 0.97676).
    **The mechanism fired:** ρ vs control 0.9427 (λ=46.8) and 0.9840 (λ=5), far below the
    pre-registered 0.999 degeneracy line, so JTT did NOT collapse to a threshold slide. This is the
