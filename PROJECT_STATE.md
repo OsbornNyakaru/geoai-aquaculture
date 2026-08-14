@@ -85,6 +85,44 @@
    decisions) independently reproduces the iter45 choice from Dwork et al. and Roelofs et al. rather
    than from our iter42 crossing analysis. **Finalists unchanged.**
 
+   ❌ **iter47 RESULT (2026-08-14): PRESTO TRANSFERS BADLY — LANE CLOSED ON A MEASUREMENT.**
+   `presto_frozen` **0.805184519** (AUC 0.827675196, F1 0.790190735, cell **145/367** — a UNIQUE
+   inversion) and `presto_finetune` **0.811475341** (AUC 0.836907531, F1 0.794520547, cell 145/365),
+   i.e. −0.102 and −0.096 against the champion. ARM A lands in the pre-registered "0.80–0.895 →
+   transfers but loses, record and close" branch, clearing "does not transfer at all" by 0.005. This
+   was the point of reopening: a lane closed on **retracted evidence** is now closed on data, and the
+   "you never actually tried the pretrained model" objection is gone from the code review.
+
+   ⚠️ **AND OUR OWN PRE-REGISTERED PREDICTION MISSED, IN SIGN.** ARM B − ARM A = **+0.006290821**. We
+   committed in writing at `8998042`, before any number existed, that fine-tuning would LOSE by ≥0.006
+   under the "added capacity fitted to our 1,817 shifted rows hurts" law. It won, firing the
+   `>= +0.006` "CONTRADICTS our capacity law" branch — **by 0.00029, which is 1/50th of the ±0.015
+   binomial band.** All three of the following are true and we assert all three: the prediction missed
+   in sign; we **cannot** claim the law is refuted; we **cannot** claim it held out-of-family. The
+   writeup deliverable this run was meant to produce ("the law extends to a pretrained model") **did
+   not happen and is not being written up as though it had.** Decomposition: 59% ranking / 41% cut.
+   The F1 cell is exact — **TP = 145 in BOTH arms while PP+P falls 367→365, so fine-tuning deleted two
+   predicted positives and BOTH were FALSE POSITIVES.** Five seeds would resolve it; two days out and
+   0.10 below champion, we decline. Decorrelation (ρ 0.816/0.841) bought **nothing**, as pre-registered
+   — a weak decorrelated member has now lost three times (ROCKET, GBDT, Presto).
+
+   🔑 **THE VALUABLE BYPRODUCT: P IS PINNED THREE WAYS AND SAYS WE UNDER-PREDICT POSITIVES.** The
+   frozen arm inverts uniquely; combined with each artifact's pos-rate × 309/1030, three artifacts from
+   two unrelated model families give **P = 191.9 / 190.9 / 189.8**, tightening `190 ± 7` to **190–192**.
+   At P = 191 the champion's public cell is PP = 181, TP = 164, **precision 0.906 vs recall 0.859**,
+   implied public prevalence **0.618 against our operating 0.583** — precision exceeding recall is the
+   signature of a cut placed **too HIGH**, by roughly ten positives on the public slice.
+   ⛔ **DIAGNOSIS ONLY. Every number there is LB-inverted and `compliance_mode: legal` forbids
+   threshold tuning outright.** It is logged as the sharpest OPEN question in the project — *is there a
+   **train-only** criterion that independently reaches the same conclusion, and a legal mechanism that
+   acts on it?* — and it is in tension with our own train-only `δ̂ = F*/2 = 0.479–0.485`, which agrees
+   in DIRECTION but sizes the effect at ~0.02 rather than ~0.035.
+
+   🎯 **THE ENTIRE REMAINING GAP TO FIRST PLACE IS THE F1 TERM.** Our AUC 0.945841814 already beats the
+   leader's 0.944897, so their composite of 0.929–0.936 implies an F1 of **0.918–0.930 against our
+   0.881720** = +0.037 to +0.048 F1 = +0.022 to +0.029 composite. **Round 23 is about F1 and nothing
+   else** — see `gemini_loop/UPDATE_23.md`.
+
    🔬 **iter47 STAGED (2026-08-13): the Presto lane is REOPENED and will actually be submitted.**
    This reverses the "no further experiments" line above, deliberately and on the user's explicit
    instruction, for a reason that is not a renegotiation: **iter17 killed Presto using three
