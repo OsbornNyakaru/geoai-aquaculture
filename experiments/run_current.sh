@@ -57,11 +57,69 @@
 # =====================================================================
 set -euo pipefail
 
+# ⚠️ FIXED 2026-08-14, AFTER THIS SCRIPT FAILED ON COLAB. The first version pointed straight at
+# `submissions/preds/preds_teacher_perm5.npz` and `preds_champion_distill_alphamix10.npz`. Those
+# live in `submissions/preds/`, which is **GITIGNORED** — it holds arrays derived from the
+# competition CSVs, which we do not redistribute. They existed on the machine the arm was developed
+# on and do not exist on a fresh clone, so Colab died four minutes in with a numpy FileNotFoundError
+# from inside `_load_teacher`. `config.yaml` states this constraint verbatim ("Must be regenerated
+# in the same run: submissions/preds/ is gitignored") and this script ignored it.
+#
+# Two fixes. (1) STEP 0 below REGENERATES both dependencies, so the file is self-contained on a
+# bare clone — which is also what the code review requires. (2) The preflight fails in SECONDS with
+# a readable message instead of minutes in with a stack trace.
+#
+# ⚠️ AND A HONEST CAVEAT ABOUT RE-RUNNING THIS. The committed read below was pre-registered against
+# a SPECIFIC stage-1 bundle for which |E| = 38. A rebuild on different hardware will not necessarily
+# reproduce that error set exactly. **iter49 has already been run and measured** (see LB_LOG iter49);
+# a rebuild is a REPRODUCTION, not the measurement. If a rebuild yields |E| != 38, that is expected
+# and is NOT a void of the recorded result — it voids only the rebuild's claim to be the same arm.
+
 PERM="--set seq.channels.permanence=true --set seq.channels.cdf_taus=[-21.0]"
 DP="--set seq.channels.dualpol_gate=true"
+# TEACHER RESOLUTION. `preds_teacher_perm5.npz` is the exact bundle the RECORDED iter49 measurement
+# used; `preds_champion_perm_seedavg5.npz` is the canonical name STAGE 1a of reproduce_champion.sh
+# writes. They are the same recipe under two names. Prefer the recorded one when it exists so a
+# re-run on the development machine reproduces the measurement rather than silently rebuilding a
+# near-identical but not bit-identical teacher.
 TEACHER="submissions/preds/preds_teacher_perm5.npz"
+[ -f "$TEACHER" ] || TEACHER="submissions/preds/preds_champion_perm_seedavg5.npz"
 DISTILL="--set seq.distill.enable=true --set seq.distill.teacher=$TEACHER --set seq.distill.alpha=0.7"
 STAGE1="submissions/preds/preds_champion_distill_alphamix10.npz"
+echo "teacher resolved to: $TEACHER"
+
+# ---- STEP 0: regenerate the two gitignored bundles this arm depends on. ----
+#      Skipped individually if already present, so re-running the file locally costs nothing.
+if [ ! -f "$TEACHER" ]; then
+  echo "=== STEP 0a: rebuilding the 5-seed permanence TEACHER (5 runs, 25 channels) ==="
+  for SD in 42 7 13 21 29; do
+    python run_pipeline.py --full --model seq $PERM --set seed=$SD --name "perm_single_s${SD}"
+  done
+  python tools/seed_average.py --variant perm_single --name champion_perm_seedavg5
+else
+  echo "STEP 0a: teacher already present, skipping rebuild."
+fi
+
+if [ ! -f "$STAGE1" ]; then
+  echo "=== STEP 0b: rebuilding the JTT stage-1 source (10 runs, 26 channels) ==="
+  for SD in 42 7 13 21 29; do
+    python run_pipeline.py --full --model seq $PERM $DP --set seed=$SD \
+      $DISTILL --set seq.distill.alpha=0.7 --name "amix_s${SD}"
+  done
+  for SD in 3 17 23 31 37; do
+    python run_pipeline.py --full --model seq $PERM $DP --set seed=$SD \
+      $DISTILL --set seq.distill.alpha=1.5 --name "amix_s${SD}"
+  done
+  python tools/seed_average.py --variant amix --name champion_distill_alphamix10
+else
+  echo "STEP 0b: JTT stage-1 bundle already present, skipping rebuild."
+fi
+
+# ---- PREFLIGHT: fail in seconds, not minutes, and say exactly what is missing. ----
+for f in "$TEACHER" "$STAGE1"; do
+  [ -f "$f" ] || { echo "PREFLIGHT FAIL: $f still missing after STEP 0. Not starting the arms."; exit 1; }
+done
+echo "PREFLIGHT OK: both gitignored dependencies present."
 
 # ---- CONTROL: the champion single-member recipe at seed 42, no JTT. ----
 python run_pipeline.py --full --model seq $PERM $DP $DISTILL --set seed=42 \
