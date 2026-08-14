@@ -924,6 +924,14 @@ not train and the arm is VOID rather than negative."* It fell by a factor of ~3.
 landed in a tight 0.087–0.101 band across all five folds. ARM B trained. Whatever the LB says about
 it will be a real measurement of fine-tuning, not of a broken optimizer.
 
+**The reopening is validated by an exact reproduction.** ARM A's adversarial AUC on the frozen
+embeddings comes back **0.975721743**, which reproduces iter17's `c_presto_const` value of **0.9757**
+to every digit iter17 recorded. The pinned re-vendored build (SHA `11e207a6` + SHA-256 checkpoint
+gate) therefore produces *the same embeddings iter17 killed the lane on*. Nothing about the evidence
+changed — only whether we let that statistic decide, and round 18 retired it as a selection criterion
+("DEAD … BACKWARDS"). It is emitted as `NaN` in the fine-tuned arm, correctly: a per-fold encoder has
+no single frozen embedding space for the statistic to be defined on.
+
 **The OOF column above is BLIND and is recorded only to satisfy the paste-back list.** ARM B leads
 ARM A by +0.005 OOF; this project's OOF has sat at ~0.97 for artifacts spanning 0.72–0.907 public, so
 that number forecasts nothing. It is *not* the answer to the ARM B − ARM A question. The LB is.
