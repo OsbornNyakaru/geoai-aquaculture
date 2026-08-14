@@ -107,21 +107,52 @@
    encoder parameters onto our 1,817 shifted rows, which *is* the condition the law was measured
    under. ⚠️ **Pre-registered prediction: the fine-tuned arm loses.** Recorded before the run.
 
-   Verified locally before staging: pinned fetch + SHA-256 gate passes, encoder loads at 404,160
-   params, and the **frozen arm runs end to end — OOF combined 0.9673, realized test pos-rate
-   0.570**, independently close to our champion's 0.5845 and the graph estimate 0.587–0.591.
-
    Two real bugs fixed in the inherited lane: `fetch_presto.py` said `REV = "main"` under a comment
    claiming it was a pin (now a commit SHA + checksum gate), and `run_presto.py` gated the lane on
    adversarial AUC (now descriptive-only, which is the iter17 mistake being corrected).
 
-   ⛔ **The subagent research lane is closed by account capacity, not by judgement.** Seven agents
-   were launched three times and a reduced batch of three once; all four attempts died on API session
-   limits, and the limit is now **weekly, resetting Aug 16 5am (Africa/Nairobi) — i.e. at the
-   deadline**. No agent research can land before submission closes. One unverified lead was visible in
-   a dying agent's reasoning and is recorded only as a lead, not a finding: Presto may expose
-   `construct_single_presto_input` as an official partial-band entry point. **Nobody verified this;
-   do not cite it.**
+   ✅ **BOTH ARMS NOW RAN LOCALLY END TO END (2026-08-14). Neither is void; both CSVs are staged.**
+
+   | | ARM A frozen | ARM B fine-tuned |
+   |---|---|---|
+   | fitted params | **129** | **404,289** |
+   | train BCE fold 0 | — | **0.31768 → 0.09933** (folds 1–4 end 0.087–0.101) |
+   | OOF combined / AUC / f1@0.5 | 0.9673 / 0.9909 / 0.9515 | 0.9723 / 0.9917 / 0.9593 |
+   | Platt slope (train OOF only) | **1.299** | **1.021** |
+   | realized test pos-rate | 0.5699 | 0.5670 |
+
+   The pre-registered **void check passes** — `run_current.sh` said "if BCE does not fall, the arm is
+   VOID rather than negative", and it fell ~3.4× on fold 0 and stayed in a tight band across folds.
+   The OOF column is **blind** and forecasts nothing (this project's OOF sits at ~0.97 for artifacts
+   spanning 0.72–0.907 public); ARM B's +0.005 OOF lead is **not** the answer to the ARM B − ARM A
+   question. The free finding worth keeping is the **Platt slope, 1.299 → 1.021**: the frozen linear
+   probe is systematically under-confident exactly as a probe on a frozen general-purpose
+   representation should be, while the end-to-end model is nearly natively calibrated. Descriptive
+   only — Platt annihilation means `calibrate_legal` refits the slope on the next line either way.
+
+   **Two upload slots were justified by measurement, not assumption.** ρ(A,B) = **0.9205** (71/1030
+   hard-label disagreement) so ARM B is not a re-upload of ARM A; ρ(A, `champion_archblend4`) =
+   **0.8157** and ρ(B, champion) = **0.8405** (135 / 124 rows disagreeing) make these **the most
+   decorrelated artifacts this project has ever produced** — seed replicates sit at ρ≈0.95 and the
+   iter46 pooling arms at ρ≈0.99998. ⚠️ Decorrelation buys the second upload slot and nothing else:
+   a weaker decorrelated member has lost twice here (ROCKET −0.009, GBDT −0.0155).
+
+   **A third independent pos-rate check passes.** 0.5699 / 0.5670 against the champion's 0.5670, from
+   a model sharing no architecture, code path or training corpus — joining graph propagation
+   (0.591–0.599) and the graph estimate (0.587). Diagnosis only; its value is that the operating point
+   survived a check it could have failed, on a question iter43 left formally OPEN.
+
+   ✅ **CORRECTION — the subagent research lane REOPENED.** An earlier version of this block recorded
+   the lane as "closed by account capacity … no agent research can land before submission closes".
+   That was true when written and is now false: capacity resumed, and **four round-22 agents completed
+   in full**, writing incrementally to disk so findings survive a mid-run limit —
+   `round22_pretrained_models.md` (577 lines), `round22_transfer_instruments.md` (854),
+   `round22_aquaculture_features.md` (811), `round22_irregular_timeseries.md` (876). The
+   `construct_single_presto_input` lead flagged here as unverified **has since been verified by
+   reading the upstream code** and is cited in the paragraph above. Two of the agents' results are
+   corrections to *us* — see `LB_LOG.md` iter47 — and one of their recommendations (contiguous 4–6
+   month crop augmentation) was **already implemented** in `_mask_views`, which we caught and logged
+   rather than adopting.
 
 4. *(superseded)* iter43 RESULT, pre-registered read applied verbatim:
    ARM E `champion_distill_alphamix10` **0.906104** (AUC 0.942680, F1 0.881720) → clears the ≥0.903 bar,

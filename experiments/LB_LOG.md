@@ -365,6 +365,7 @@ xview + NoPE, which differ by 0.0038 and are two draws of the same thing rather 
 | 44 | 2026-08-14 | **REGIME-MATCHED CALIBRATION (R=1) + the instrumentation fix.** sigmoidF1 CANCELLED before running (Platt annihilation + no fixed-0.5 literature + measured density). The arm: an OOF row is the mean of R=2 masked window views from 1 fold-model while a test row is 1 real window over n_splits models, so Platt is fit across an averaging mismatch; `tools/regime_match.py` rebuilds the calibration set at R=1 offline at zero training cost. | champion_alphamix10_regimematch / champion_dualpol_add_regimematch | legal | **0.907109506 / 0.910446704** | ➖➖ **NULL ON BOTH, EXACTLY AS PRE-REGISTERED — and the lane is now closed on a MEASUREMENT, not an argument.** vs their own comparators: amix **+0.001006** (AUC 0.942571, F1 0.883469), dpa **+0.002831** (AUC 0.946387, F1 0.886486). Both inside ±0.006. **THE PRE-REGISTERED KILL FIRED: δ̂ = F*_masked/2 ∈ [0.4791, 0.4852] across all 30 seed×regime combinations — decisively above the 0.47 threshold, and this is the branch we declared ROBUST in advance** (δ̂ is a lower bound because OOF prior 0.4023 < deployment 0.587 and F1 rises with prevalence, so "cut is fine" cannot be an artifact of the bound). **THE MECHANISM IS VALIDATED EVEN THOUGH THE EFFECT IS SMALL — three quantitative predictions all landed.** (1) Crossings: tool predicted ~1.2 / ~2.4 public rows, observed PP −3 / −2. (2) AUC drift: we predicted the pooled artifact is near- but NOT exactly AUC-neutral (pooling averages per-member-calibrated probabilities, so per-member slope changes reshape the average); observed −0.0001095 / −0.0000730 = **−2.5 / −1.7 concordant pairs**. (3) Direction: only the cut moved; per-member rankings were asserted bit-identical. **EXACT F1 INVERSION (diagnosis only).** amix 328/372 → **326/369** = TP 164→**163**, PP+P 372→**369**: PP fell by 3, removing 1 TP and 2 FP. dpa 328/372 → **328/370** = TP **164→164**, PP+P 372→**370**: PP fell by 2 and **BOTH removed rows were FALSE POSITIVES — zero true positives lost.** Methodological note: Zindi **TRUNCATES** the 9th decimal, it does not round (0.883468834688 → …834); the inversion is unique over D ∈ [250,500]. **CONTROL PASSED BIT-FOR-BIT on Colab** for both variants (`--views all` == `seed_average`, rebuild max-drift 0.0e+00 on all 15 bundles). **THE BINORMAL MODEL IS REJECTED BY OUR OWN DATA:** first labelled measurement gives b ≈ 0.61–0.81 (mean 0.70), but the implied AUC is **1.0000 vs empirical 0.9885** — the goodness check we built in fires loudly, which **voids round-20's 40/60 cut-placement split AND our own binormal ceiling arithmetic**. Density corrected downward too: **9–28 rows of 1030 in [0.45,0.55] (mean ~15, 1.5%)**, not the ~3% we had been quoting. Model-axis asymmetry measured and left uncorrected as planned: per-row sd across 5 fold-models 0.033 → sd of their mean 0.015 (2.24× shrink present in test, absent from OOF). **`champion_dualpol_add_regimematch` = 0.910446704 is our SECOND-BEST composite ever** (best 0.910837) **with our best-ever AUC 0.946387, still above the leader's 0.944897.** Finalists unchanged per pre-registration (replacement required ≥ +0.006). → iter45 = finalist lock + code-review package. |
 | 45 | 2026-08-14 | **THE FINALIST LOCK — `champion_dualpolmix10` = the alphamix10 recipe EXACTLY plus the dual-pol gate.** Same 10 distinct seeds (42/7/13/21/29 @α=0.7, 3/17/23/31/37 @α=1.5), same teacher, same R=1 regime-matched calibration; differs from finalist #1 in ONE variable, the gate channel (26 ch vs 25). Pre-registered as a VARIANCE decision keyed on **AUC**, not composite. | champion_dualpolmix10_regimematch | 0.583 | **0.907368983** [AUC **0.945841814**, F1 0.881720430] | ✅ **NEW FINALIST #1 — the branch "AUC ≥ ~0.945" fires cleanly and the dual-pol ranking edge SURVIVED seed expansion.** vs the one-variable pair `alphamix10_regimematch` (0.942571): **AUC +0.003271**, composite +0.000259 — the edge was NOT a 5-seed artifact. vs the 5-seed dual-pol (0.946387): AUC **−0.000545 ≈ 12 concordant pairs**, i.e. doubling the seed count cost essentially nothing in ranking, exactly as iter42 predicted (α=0.7 at 5 and 10 seeds returned bit-identical AUC). **+0.000945 above the leader's 0.944897** — second artifact ever to out-rank the leader, first to do it on 10 distinct seeds. **F1 inverts exactly to 328/372 → TP=164, PP+P=372 — the IDENTICAL F1 cell to alphamix10 (ARM E) and dualpol_add5 (ARM G): the gate buys pure RANKING and moves the cut not at all** (diagnosis only). **Every pre-run gate passed:** width guard 26 ch/month on all 10 `dpam` runs (gate attached, iteration not void), CONTROL `regime_match --views all == seed_average` **bit for bit** (max drift 0.0e+00 on all 10 bundles), per-member rank identity exact 10/10, pooled rank corr vs control 0.99997870, transductive gate 10/10 (pos-rates 0.5699–0.5990), seed rank corr mean 0.9826 / min 0.9729, **δ̂ 0.4812–0.4836 reconfirming the iter44 kill**, 7/1030 rows crossing 0.5. **THE TENSION WE ACCEPT:** `dualpol_add5_regimematch` beats this on BOTH public columns (composite +0.003078, AUC +0.000545) and we decline it, on the pre-registered ground proven at iter42 — a 5-seed composite edge of this size is cut-luck on 309 rows (iter42's whole 5-vs-10 gap was ONE row at bit-identical AUC) while 10-distinct-seed variance reduction applies to all 721 private rows. **⚠️ A DUPLICATE LEADERBOARD ROW WAS READ FIRST** (AUC 0.942570514 / F1 0.883468834 = iter44's amix row, bit-identical on both columns); the read was SUSPENDED and the duplicate diagnosed from local measurement before the true score arrived — see the iter45 RESULT section for the standing rule. **FINALISTS: {champion_dualpolmix10_regimematch 0.907368983, champion_archblend4 0.899643}.** → iter46 = code-review package ONLY. No further experiments. |
 | 46 | 2026-08-13 | **CALIBRATOR-FAMILY GATE — the one hole in the Platt Annihilation Theorem, tested and closed for FREE.** External memo (God_mode.md) correctly noted the theorem covers only AFFINE maps while the deployed calibrator is itself a map on the logit. Reframed as a NESTED test: beta contains Platt as its a==b submodel, so the lever is one d.o.f. Ran tools/calib_family_gate.py on 10 amix + 5 dpa seeds | *(none — offline instrument)* | legal | — | 🚫 **LANE CLOSED, ZERO SUBMISSIONS.** (1) LR test: pooled p=0.134/0.290, the non-affine d.o.f. is insignificant. (2) **DIRECTION: beta 15 down / 0 up, isotonic 23 down / 0 up — the memo argued the cut sits too HIGH, so the lever must move rows UP. Its sign is reversed.** (3) isotonic in-sample AUC +0.00197 but CROSS-FITTED −0.00273, sign flips → overfits at n=1817. Also: memo premise "anchored at the 40.23% train prior" is FALSE for us — realized pos-rate 0.5845 already matches the graph estimate 0.587–0.591, so Slot 2 (base-rate correction) loses its mechanism and is not attempted |
+| 47 | 2026-08-14 | **THE PRESTO LANE, REOPENED AND ACTUALLY SUBMITTED — 2 arms, 1 variable (frozen vs fine-tuned).** iter17 killed this lane for ZERO submissions on adv-AUC (retired round 18), ATC-F1 (retired iter25/26) and OOF (blind by standing rule) — all three withdrawn by this project since, so the kill rested entirely on retracted evidence and Presto has never been on the leaderboard. ARM A = frozen 404,160-param encoder + 129-param logistic head (the iter17 arm, now routed through `calibrate_legal` and uploaded). ARM B = all 404,160 params unfrozen, 8 fixed epochs, no early stopping and no LR search (early stopping needs a selection signal and every offline signal we have is retired or blind). Pre-registered read committed at `8998042` BEFORE any number existed. `fetch_presto.py` fixed en route: `REV` said `"main"` under a comment claiming byte-identical reproducibility — now pinned to SHA `11e207a6` + SHA-256 checkpoint gate. | submission_presto_frozen.csv / submission_presto_finetune.csv | 0.5699 / 0.5670 | *(awaiting upload)* | ⏳ **RAN LOCALLY, BOTH ARMS VALID, AWAITING LB.** Void check PASSES: ARM B train BCE fell 0.31768 → 0.09933 on fold 0 and landed 0.087–0.101 across all five folds, so the fine-tune trained and its result will measure fine-tuning rather than a broken optimizer. Local OOF (BLIND, recorded only for the paste-back list): frozen combined 0.9673 / AUC 0.9909 / f1 0.9515; fine-tuned 0.9723 / AUC 0.9917 / f1 0.9593. **Platt slope 1.299 → 1.021** is the clean free finding: the frozen linear probe is systematically under-confident exactly as a probe on a frozen general-purpose representation should be, while the end-to-end model is nearly natively calibrated — descriptive only, since Platt annihilation means `calibrate_legal` refits the slope regardless. **TWO SLOTS WERE JUSTIFIED BY MEASUREMENT, not assumed:** ρ(A,B) = 0.9205 (71/1030 hard-label disagreement) so ARM B is not a re-upload of ARM A, and ρ(A,champion) = **0.8157** / ρ(B,champion) = **0.8405** (135 and 124 rows disagreeing) make these **the most decorrelated artifacts this project has ever produced** — for scale, seed replicates sit at ρ≈0.95 and the iter46 pooling arms at ρ≈0.99998. ⚠️ That decorrelation justifies the second UPLOAD SLOT and nothing else: a weaker decorrelated member has lost twice here (ROCKET −0.009, GBDT −0.0155) and Presto's level is still unknown. **THIRD INDEPENDENT POS-RATE CHECK PASSES:** 0.5699/0.5670 vs champion 0.5670 from a model sharing no architecture, code path or training corpus — joining graph propagation (0.591–0.599) and the graph estimate (0.587) in the band we already operate in. Diagnosis only; its value is that the operating point survived a check it could have failed. Honest prior stated before the run: this project's own most reliable law ("added capacity fitted to our 1,817 shifted rows hurts") predicts ARM B LOSES to ARM A, and frozen Presto's 129 fitted params never tested that law. **Finalists {champion_dualpolmix10_regimematch 0.907368983, champion_archblend4 0.899643} unchanged unless ARM A ≥ 0.913**, the only branch that reopens the lock. Also this round, zero submissions: `tools/feature_span_gate.py`, a free VETO instrument — VH−VV is EXACTLY linear in two supplied columns so a model receiving both can already represent it, which is the mechanical form of iter43's three VH−VV nulls. **The gate's v1 FAILED ITS OWN CONTROL** (used `median(VH−VV)`, R²=0.6206, because a median is nonlinear in the raw values) and was caught before publication; the honest single-month control returns 1.0000/1.0000. LASCI (span R² 0.7526, window ρ 0.8992, univ AUC 0.8891) is the only candidate clearing both gates — recorded, NOT built, two days out. Round-22 also corrected two of OUR premises: the Ottinger canonical feature is **VH alone, pixel-wise temporal median** (the dual-pol ratio is not in that pipeline at all; Ullmann 2022 measures polarimetric derivatives at **+0.1%** for water), so the VH−VV null was the literature's prediction and we had mis-cited our own motivation; and the agent's #1 recommendation (contiguous 4–6 month crop augmentation) **is already implemented** in `_mask_views` via `sample_window(wd, ...)` — the second time a research round has proposed the masked replica we already had. |
 | 42 | 2026-08-11 | **ALPHA LADDER on the distillation direction + the 10-seed finalist upgrade** (3 arms, all config-only on the iter41 build; teacher = the same non-distilled 5-seed permanence pool). ARM A alpha=0.3 x5 seeds, ARM B alpha=1.5 x5, ARM C alpha=0.7 x10. | champion_distill_a03_seedavg5 / champion_distill_a15_seedavg5 / champion_distill_seedavg10 | legal | **0.907370 / 0.910837 / 0.906642** | ❌❌❌ **THE ALPHA KNOB IS CLOSED — and this is a real result, not a null one.** Against the banked alpha=0.7 5-seed (0.909868): a03 −0.002498 (AUC 0.942280, F1 0.884097), a15 **+0.000969** (AUC 0.942861, F1 0.889488), a07x10 −0.003226 (AUC 0.944024, F1 0.881720). Nothing clears the pre-committed +0.006 bar across a **5x range of alpha**; total spread 0.0035, inside the ±0.012 public binomial noise. **EXACT READ OF THE LADDER.** Zindi's F1 column is a small-denominator rational, so it inverts exactly: 55/62, 330/371 and 82/93 = **TP=165, TP=165, TP=164** at predicted-positive counts differing by one. The entire ladder is ONE true positive and ONE predicted positive out of 309 public rows. Stop tuning alpha permanently. **THE DECISIVE DETAIL: alpha=0.7 at 5 and at 10 seeds have BIT-IDENTICAL AUC (0.944024425)** — the same concordant-pair count, i.e. adding 5 seeds did not degrade the RANKING at all, and the whole −0.0032 is one row crossing the 0.5 cut. So the 5-seed public edge carries **zero ranking information**, while the 10-seed variance reduction is real and applies to all 721 private rows. The pre-committed rule ("seedavg10 becomes finalist #1 iff ≥ 0.909868") keyed a VARIANCE decision on a NOISY LEVEL read and was badly specified; flagged rather than silently reinterpreted — see iter43 ARM E, which supersedes both candidates with a 10-DISTINCT-SEED alpha-marginalized pool. **PREDICTION MISS (logged before the scores):** inter-seed rank corr rose monotonically with alpha (0.9666/0.9770/0.9863), so alpha=1.5 was predicted to lose pooling gain and underperform; it came top instead, by one row. Mechanism unrefuted but unmeasurable at this resolution; no rescue attempted. All 20 runs passed the transductive gate (pooled pos-rates 0.5854/0.5883/0.5903). Interim finalists {champion_distill_a15_seedavg5 0.910837, champion_archblend4 0.899643}. → iter43: the dual-pol gate (last feature shot) + the alpha-marginalized finalist. |
 | 41 | 2026-08-10 | **THE TRANSDUCTIVE LANE — the 1030 unlabeled TEST rows** (2 zero-parameter arms on the perm champion; teacher rebuilt in-run). ARM D = soft self-distillation vs the 5-seed teacher (alpha=0.7, T=1, never thresholded). ARM T = the proven Var_k(logit) cross-view penalty pointed at test rows (lambda_u=0.5, on-manifold contiguous sub-windows). | champion_distill_seedavg5 / champion_tcons_seedavg5 | legal | **0.909868 / 0.893752** | ✅❌ **ARM D IS THE FIRST ARTIFACT EVER TO BREAK THE ~0.8995 BIAS FLOOR: 0.909868 = +0.009986 over the 0.899882 finalist, clearing BOTH the pre-committed +0.006 bar and the 0.9059 read. Seed-averaged over 5 seeds, so this is NOT the single-seed mirage that killed perm/vhsq/mean_min.** Round-18's convergent prediction (Agent 2 semi-supervised + Agent 7 variance, from opposite directions) is CONFIRMED: the ceiling was BIAS under the covariate shift, and the only lever that moves it is test-distribution information. **Both metric terms improved** — AUC 0.935->0.944024 (+0.0086), F1 0.876->0.887097 (+0.0110) — so this is a genuine ranking gain, not an operating-point trick. **Our AUC is now within 0.00087 of the leaderboard leader's (0.944897); the ENTIRE remaining 0.0202 gap is the F1 term.** Pooling behaved normally (3 reported members mean 0.903761 -> pooled 0.909868 = +0.0061, matching the historical +0.0055 pooling gain). **ARM T FAILED, and anomalously.** Its individual seeds are our two highest single scores ever (s42 0.914179, s13 0.908873) yet the 5-seed pool LOST 0.0178 to 0.893752 (-0.006130 vs the finalist) — the only negative pooling gain in the entire ledger. Diagnostic: pooled AUC 0.926687 sits BETWEEN its members' (0.9334, 0.9259) so the RANKING pooled normally, but pooled F1 0.871795 is BELOW BOTH members' (0.9013, 0.8975) -> the OPERATING POINT moved. Mechanism: the unlabeled variance penalty compresses the logit distribution toward a constant (the known attractor of this term), per-seed Platt slopes then diverge, and calibrated_pool's probability average lands at a drifted pos-rate. NOTE this means tcons_s42 = 0.914179 is a single-seed high of exactly the kind that has washed out three times before — DO NOT designate it. **Finalists RE-DESIGNATED: {champion_distill_seedavg5 0.909868, champion_archblend4 0.899643}** — archblend4 kept as the decorrelated private-LB hedge (perm seed-avg is now highly correlated with the distill student built on top of it). -> iter42: alpha ladder on the winning direction + extend the distill pool to 10 seeds for the finalist. ONE round only — do not iterate distillation (Kumar et al.: error compounds per step at our W-infinity).** |
 | 40 | 2026-08-09 | **SHIFT-ROBUST CATBOOST lane** (feature-shift removal 78→51 + depth4/l2=20/Ordered/Bernoulli-subsample; gate said GO) | champion_catboost_sr / champion_catboost_sr_nodrop | legal | **0.718607 / 0.690295** | ❌❌ **TREES DO NOT TRANSFER — the <0.86 branch, decisively. Feature-shift removal is REAL but tiny (+0.028 = sr − nodrop) against a ~0.18 gap to the Transformer. THE ADVERSARIAL GATE'S [GO] WAS A FALSE POSITIVE: the "most-test-like 30% of train" still carries TRAIN labels drawn from the train conditional P(y\|x) — a test-like-COVARIATE holdout cannot detect CONDITIONAL shift (same blindness as OOF, one level up; consistent with the label-shift gate's FAIL = conditional component confirmed). Tree lane now closed with THREE independent fails at every sophistication level: naive 0.6976 (iter30) → blend −0.0136 (iter30) → shift-robust 0.7186 (iter40). Whatever the leader's ~0.94 CatBoost does, it is NOT reachable by regularization + feature-dropping on OUR feature bank — they must have shift-INVARIANT features or use test-distribution information (pseudo-labeling / alignment). Also: seq_a_meanmin_s13 = 0.898372 (consistent w/ the ~0.8995 ceiling). Finalists stand {perm seed-avg 0.899882, archblend4 0.899643}. → ROUND-18 deep research: the path to 0.95 (user directive).** |
@@ -893,6 +894,145 @@ needs runs we do not have time for.
 Westfall–Young step-down max-T across pre-registered instruments, five-condition pass bar). We hold
 only ~23 bundles on this machine; the rest lived on Colab. The protocol is banked in the findings file
 for the writeup, **not executed**, and we should not claim otherwise.
+
+---
+
+## iter47 — the Presto lane, reopened and RUN LOCALLY; both arms staged for upload (2026-08-14)
+
+The reopening argument is in `experiments/run_current.sh` and is not repeated here: iter17 killed
+this lane for zero submissions using three instruments (adversarial AUC, ATC-F1, OOF) that this
+project has since retired by its own hand, so the kill rested entirely on withdrawn evidence.
+**Presto has never been on the leaderboard.** The pre-registered read for both arms was committed at
+`8998042`, before any number below existed.
+
+### Both arms completed locally. Neither is void.
+
+| | ARM A `presto_frozen` | ARM B `presto_finetune` |
+|---|---|---|
+| encoder params | 404,160 (frozen) | 404,160 (**trainable**) |
+| FITTED params | **129** | **404,289** |
+| train BCE, fold 0 | — (no training) | **0.31768 → 0.09933** |
+| train BCE, folds 1–4 final | — | 0.09020 / 0.08740 / 0.09379 / 0.10075 |
+| OOF AUC | 0.9909 | 0.9917 |
+| OOF f1@0.5 | 0.9515 | 0.9593 |
+| OOF combined | 0.9673 | 0.9723 |
+| Platt slope (train OOF only) | **1.299** | **1.021** |
+| realized test pos-rate | 0.5699 | 0.5670 |
+
+**The void check passes.** `run_current.sh` pre-registered: *"if BCE does not fall, the fine-tune did
+not train and the arm is VOID rather than negative."* It fell by a factor of ~3.4 on fold 0 and
+landed in a tight 0.087–0.101 band across all five folds. ARM B trained. Whatever the LB says about
+it will be a real measurement of fine-tuning, not of a broken optimizer.
+
+**The OOF column above is BLIND and is recorded only to satisfy the paste-back list.** ARM B leads
+ARM A by +0.005 OOF; this project's OOF has sat at ~0.97 for artifacts spanning 0.72–0.907 public, so
+that number forecasts nothing. It is *not* the answer to the ARM B − ARM A question. The LB is.
+
+**One genuinely interesting free reading: the Platt slope.** The frozen 129-parameter head needs a
+slope of **1.299** — it is systematically under-confident, which is what a linear probe on a frozen
+general-purpose representation should look like. Fine-tuning drives it to **1.021**, i.e. the
+end-to-end model is very nearly natively calibrated on its own OOF. That is a clean, textbook
+distinction between the two arms and it costs nothing to state. It is descriptive: by the Platt
+annihilation theorem, `calibrate_legal` refits the slope on the next line anyway, so the slope
+*difference* cannot itself move either submission's score.
+
+### The measurement that justified spending TWO slots instead of one
+
+Before uploading both, we checked the arms are not near-duplicates of each other or of the champion —
+the same rank-correlation screen that killed the arch-blend expansion at iter18–20:
+
+| pair | Spearman ρ on test | hard-label disagreement @0.5 |
+|---|---|---|
+| ARM A frozen vs ARM B fine-tuned | **0.9205** | 71 / 1030 (6.89%) |
+| ARM A frozen vs `champion_archblend4` | **0.8157** | 135 / 1030 (13.11%) |
+| ARM B fine-tuned vs `champion_archblend4` | **0.8405** | 124 / 1030 (12.04%) |
+
+For scale, the artifacts this ledger has previously refused to treat as distinct sit at ρ ≈ 0.95
+(seed replicates) and ρ ≈ 0.99998 (the iter46 pooling arms). **ρ ≈ 0.82 against the champion is by a
+wide margin the most decorrelated artifact this project has ever produced** — unsurprising, since it
+shares no code path, no architecture and no training corpus with the seq net. The two arms are also
+distinct from *each other* (ρ 0.92), so ARM B is not a re-upload of ARM A and the pair genuinely
+answers two questions rather than one.
+
+⚠️ **That decorrelation is NOT a licence to blend it in.** A weaker, decorrelated member has lost
+twice here (ROCKET −0.009, GBDT −0.0155), and we do not yet know Presto's level at all. Decorrelation
+only justified the second *upload slot*; it funds nothing else until the LB reports.
+
+### A third structurally independent estimate of the test positive rate
+
+Both Presto arms realize **0.5699 / 0.5670** against `champion_archblend4`'s **0.5670** — to three
+decimals, identical, from a model that shares nothing with the champion but the input CSV. Recorded
+because iter43 left "is our operating pos-rate too LOW?" formally OPEN after the KS gate retired MLLS
+(0.578) and BBSE (0.559) at iter41. This is now the third structurally different estimator (graph
+propagation 0.591–0.599, the graph estimate 0.587, Presto 0.567–0.570) to land in the same band as
+where we already operate. **Diagnosis only — it moves nothing.** Its value is exactly that it fails
+to move anything: the operating point survives an independent check it could have failed.
+
+**Status: both CSVs staged, awaiting Colab + upload. Finalists unchanged** unless ARM A clears 0.913,
+which the pre-registered read says is the only branch that reopens the lock.
+
+### Round-22 research: two premise corrections we owed ourselves
+
+`round22_aquaculture_features.md` (811 lines) and `round22_irregular_timeseries.md` (876 lines),
+committed alongside this entry. Two of their results are corrections to *us*, which is the more
+valuable half:
+
+1. **Our VH−VV motivation was mis-cited, and the null was the predicted result.** The canonical
+   aquaculture SAR feature in Ottinger et al. (IGARSS 2018, DOI 10.1109/IGARSS.2018.8651419) is **VH
+   alone, pixel-wise temporal median** — *"we used scenes in VH polarization"*, *"the pixel-wise
+   median was calculated … to identify permanent and stable low scatterers"*. The dual-pol **ratio is
+   not in that pipeline at all**. Ullmann et al. (Front. Remote Sens. 3:905713, 2022) measured what
+   polarimetric derivatives add over plain intensity for water: **0.1%**. So iter43's three
+   independent VH−VV nulls were not a surprise to be explained; they were the literature's own
+   prediction, and we had been citing a paper for a feature it does not use.
+2. **The agent's #1 recommendation was already implemented.** It proposed "random contiguous 4–6
+   month cropping of training rows" as a new augmentation. `src/seq_model.py::_mask_views` has done
+   exactly that since the beginning, via `sample_window(wd, ...)` drawing from the **measured** test
+   window distribution with antithetic pairing. Recorded as an agent error we caught, not as a lever.
+   This is the second time a research round has proposed the masked replica we already had (iter44).
+
+### `tools/feature_span_gate.py` — a free VETO instrument, and it caught its own author
+
+The mechanical explanation for the VH−VV family of nulls is cheap enough that it should have been a
+gate all along: `VH − VV` is an **exactly linear** function of two supplied columns, so a model that
+already receives both can represent it at zero cost. Handing it over as a new input adds no
+information, only width — and added width has lost every time in this project. The gate cross-fits a
+ridge of each candidate on the 144 raw values and reports R²; R² → 1 means the feature is already
+inside the model's reachable span.
+
+**The first version of this tool FAILED ITS OWN CONTROL, and that is why the table below is
+trustworthy.** v1 used `median_over_months(VH − VV)` as the "exactly linear" control and it scored
+R² = 0.6206, nowhere near 1.0 — because a **median is nonlinear** in the raw values, so that row was
+measuring the median, not the difference. Caught before the numbers entered any writeup. The honest
+control is the difference at one fixed month (literally two of the 144 columns, coefficients +1/−1),
+which returns 1.0000 / 1.0000 as it must. **If a gate's control does not return the value arithmetic
+guarantees, every other row it prints is void** — that is the general rule, and this project has now
+paid for it once.
+
+| candidate | span R² | window ρ | univ AUC | reading |
+|---|---|---|---|---|
+| **CONTROL** VH−VV @ 1 month | **1.0000** | **1.0000** | 0.6922 | gate validated |
+| VH−VV median | 0.6206 | 0.8102 | 0.7904 | the median, not the difference |
+| VH median (Ottinger canonical) | 0.9003 | 0.9316 | 0.8338 | ~in span |
+| MNDWI median | 0.9307 | 0.9418 | 0.8960 | **in span, expect null** |
+| NDWI median | 0.8619 | 0.9055 | 0.9161 | borderline |
+| AWEI_nsh median (Feyisa 2014) | 0.9086 | 0.9263 | 0.8796 | **in span, expect null** |
+| LASCI median (fmars 2025) | 0.7526 | 0.8992 | 0.8891 | clears both gates |
+| SPCI median (fmars 2025) | 0.5520 | 0.6483 | 0.6131 | **window-unstable** |
+| red-edge curvature | 0.7346 | 0.8661 | 0.8313 | reachable, weak |
+| corr(VH, nir) cross-band | 0.0474 | 0.5046 | 0.5024 | outside span, **no signal** |
+
+**LASCI is the only candidate clearing both gates with real discriminability.** The second gate is
+the competition-specific one: test rows show 4–6 contiguous months, so any feature that does not
+survive window truncation is disqualified regardless of its physics — which is also a candidate
+explanation for the ROCKET null (−0.009), since a 12-month period is unidentifiable from a 5-month
+window and that kills the whole Fourier/harmonic family.
+
+⚠️ **A LOW span R² IS NOT A GO SIGNAL, and this gate funds nothing.** It says a feature is unreachable
+*linearly*; it does not say the feature helps. `univ AUC` is train-only and train-only AUC has never
+predicted transfer here. **This instrument can only ever VETO.** With two days to the deadline and
+two finalists locked on measured scores, LASCI is recorded as the one surviving candidate and is
+**not** being built.
 
 ---
 

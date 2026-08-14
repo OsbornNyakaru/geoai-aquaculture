@@ -794,6 +794,57 @@ number is the obvious one to compute and it points the wrong way.
 — a train-only Platt map and a literal 0.5. We regard this as the model of how the offline instruments
 in §5 are supposed to work: a plausible, well-argued, correctly-motivated idea refuted for free.
 
+### 8.6 We mis-cited our own motivation for a feature, and built the gate that would have caught it
+
+Iteration 43 killed the cross-polarization feature `VH − VV` in three independent forms, all null. We
+recorded that as a surprise. It was not one, and the reason is worth stating against ourselves.
+
+**We cited the wrong thing.** The canonical SAR feature in the aquaculture-mapping literature is **VH
+alone, pixel-wise temporal median** — Ottinger et al. (IGARSS 2018, DOI 10.1109/IGARSS.2018.8651419):
+*"we used scenes in VH polarization"*, *"the pixel-wise median was calculated … to identify permanent
+and stable low scatterers"*. The dual-pol **ratio does not appear in that pipeline at all**. Ullmann
+et al. (Front. Remote Sens. 3:905713, 2022) measured what polarimetric derivatives add over plain
+intensity for water surfaces: **0.1%**. Our three nulls were the literature's own prediction; we had
+been citing a paper for a feature it does not use. (This also explains, retroactively, why the plain
+VH permanence indicator `1[VH_dB < −21]` is the one feature that ever *won* here, §6.6.)
+
+**And mechanically it could never have helped.** `VH − VV` is an **exactly linear** function of two
+columns the model already receives, so a model given both can represent it at zero cost. Handing it
+over as a new input adds no information — only width, and added width has lost every time in this
+project (§7). That is cheap enough to be a gate, so we built one: `tools/feature_span_gate.py`
+cross-fits a ridge of each candidate feature on the 144 raw values and reports R². R² → 1 means the
+feature is already inside the model's reachable span. A second, competition-specific gate reports the
+Spearman correlation between the feature computed on all 12 months and on a test-like contiguous 4–6
+month window drawn from the *measured* window distribution via the existing `_mask_views`; a feature
+that does not survive truncation is disqualified regardless of its physics. That second gate is also a
+candidate explanation for the ROCKET null (−0.009): a 12-month period is unidentifiable from a 5-month
+window, which disqualifies the entire Fourier/harmonic family.
+
+**The gate's first version failed its own control, and we are reporting that rather than the polished
+table alone.** v1 used `median_over_months(VH − VV)` as the "exactly linear" control and it returned
+R² = 0.6206, nowhere near the 1.0 arithmetic guarantees — because a **median is nonlinear** in the raw
+values, so the row was measuring the median, not the difference. The honest control is the difference
+at one fixed month (literally two of the 144 columns with coefficients +1 and −1), which returns
+1.0000 / 1.0000 as it must. The general rule this bought: **if a gate's control does not return the
+value arithmetic guarantees, every other number it prints is void.** We caught it before the numbers
+entered this report; we would not have caught it without a control row.
+
+| candidate | span R² | window ρ | univariate AUC |
+|---|---|---|---|
+| **CONTROL** VH−VV at one month | **1.0000** | **1.0000** | 0.6922 |
+| VH median (Ottinger canonical) | 0.9003 | 0.9316 | 0.8338 |
+| MNDWI median | 0.9307 | 0.9418 | 0.8960 |
+| AWEI_nsh median (Feyisa et al., RSE 140:23–35, 2014) | 0.9086 | 0.9263 | 0.8796 |
+| LASCI median | 0.7526 | 0.8992 | 0.8891 |
+| SPCI median | 0.5520 | **0.6483** | 0.6131 |
+| corr(VH, NIR), cross-band | 0.0474 | **0.5046** | 0.5024 |
+
+⚠️ **A low span R² is not a go signal, and this instrument funds nothing.** It says a feature is
+unreachable *linearly*, not that it helps; `univ AUC` is train-only, and train-only AUC has never
+predicted transfer in this project. **The gate can only ever VETO.** LASCI is the single candidate
+clearing both gates with real discriminability, and with two days left and two finalists locked on
+measured scores we recorded it and did **not** build it.
+
 ---
 
 ## 9. What we would do with more time
@@ -873,6 +924,11 @@ tools/
                                 monotone calibrator (beta, isotonic) buys anything at the fixed 0.5
                                 cut. Reframes the question as a nested LR test, because beta contains
                                 Platt exactly as its a==b submodel. Closed the lane at zero cost.
+  feature_span_gate.py          the feature-span VETO (§8.6): cross-fitted ridge R2 of a candidate
+                                feature on the 144 raw values (is it already inside the model's
+                                reachable span?) plus a window-truncation stability check, since test
+                                rows show only 4-6 contiguous months. Explains the VH-VV nulls
+                                mechanically. It can only VETO -- a low R2 is not a go signal.
   arch_blend.py, seed_average.py   pooled artifacts
   regime_match.py               regime-matched calibration (§7): refits Platt on an OOF vector
                                 whose averaging structure matches deployment. Its `--views all`
