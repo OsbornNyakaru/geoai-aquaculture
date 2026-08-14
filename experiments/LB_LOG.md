@@ -898,6 +898,96 @@ for the writeup, **not executed**, and we should not claim otherwise.
 
 ---
 
+## iter49 — JTT: the reordering is REAL, and it still does not recover the rows it was built for (2026-08-14)
+
+All void checks pass: width **26 channels/month** on all three runs, `|E| = 38`, `lambda_up` 46.816 /
+5.000, and the control's OOF combined 0.97676 sits in the champion's usual band. Nothing here is void.
+
+| run | OOF f1 | OOF auc | OOF comb | Platt slope | test pos-rate | ρ vs control | rows crossing 0.5 |
+|---|---|---|---|---|---|---|---|
+| CONTROL (no JTT) | 0.96783 | 0.98896 | 0.97628 | 1.499 | 0.5961 | — | — |
+| ARM A λ=46.8 (`balance`) | 0.94158 | 0.98698 | 0.95974 | 1.897 | 0.5835 | **0.9427** | 39 (~11.7 public) |
+| ARM B λ=5 | 0.96660 | **0.99309** | 0.97719 | 1.622 | 0.5874 | **0.9840** | 13 (~3.9 public) |
+
+### 🔑 THE MECHANISM FIRED. This is the first provable reordering this project has produced.
+
+Both arms sit far below the pre-registered ρ > 0.999 degeneracy line — 0.9427 and 0.9840, against
+0.99998 for the iter46 pooling arms and ~0.95 for seed replicates. **JTT did NOT collapse to a
+threshold slide.** The theoretical escape from round 23's pointwise order-invariance theorem — the
+weight is x-dependent *and* class-asymmetric, so `eta_eff = eta·w1/(eta·w1 + (1−eta)·w0)` is not
+monotone in `eta` alone — is now **empirically confirmed, not just derived.** Every other candidate
+we screened this round (focal, ASL, LDAM, PolyLoss, label smoothing) is provably incapable of this.
+
+### ⛔ AND THE ARM'S OWN THESIS FAILS ON ITS OWN TARGET SET
+
+JTT exists to recover the rows stage-1 got wrong. Measured **out-of-fold** against a **control
+baseline** — the number a non-JTT model recovers anyway through seed and pooling noise:
+
+| arm | FN recovered / 24 | control | **net** | FP fixed / 14 | control | **net** |
+|---|---|---|---|---|---|---|
+| ARM A λ=46.8 | 5 | 6 | **−1** | 3 | 3 | **+0** |
+| ARM B λ=5 | 7 | 6 | **+1** | 3 | 3 | **+0** |
+
+**Net +1 of 24 at λ=5 and −1 at λ=46.8, with the false-positive column identical across all three.**
+That is noise. Upweighting the confidently-missed positives by 5× and by 47× recovers no more of them
+than not doing it at all. ARM A also paid for the attempt: OOF combined −0.0166, exactly the
+memorization failure pre-registered as risk #1 (half the gradient mass on 38 rows in a 71k-parameter
+model).
+
+⛔ **A CORRECTION TO OUR OWN INSTRUMENT, made after reading its first output.** `tools/jtt_gate.py`
+v1 labelled the recovery count "IN-SAMPLE" and warned it was not transfer evidence. **That was wrong
+and the error mattered.** For fold *f* only fold-*f* TRAINING rows are upweighted, so row *i* is never
+upweighted in the model that predicts it — the count is a genuine out-of-fold measure. v1 also omitted
+**the control baseline**, without which "7 of 24 recovered" reads as a success when it is in fact a
+null. Both are fixed and the tool now prints only the difference. This is the second time this round
+that a gate of ours was uninterpretable until a control row was added.
+
+### The decision, and a tension in our own pre-registration that we resolve in the open
+
+Our committed read contains two criteria that now point opposite ways, and we are not going to pick
+whichever we prefer after the fact:
+
+* **STEP 2(c)** said *"if it did NOT recover them, the arm is dead."* With the control baseline, it
+  did not. **Fires: dead.**
+* **STEP 3** said *"spend a slot only if STEP 2 shows a real reordering… prefer ARM B."* It did.
+  **Fires: upload ARM B.**
+
+The honest resolution: **(c) was the flawed criterion** — we wrote it without a baseline and under a
+mistaken belief about in-sample-ness, and a criterion that cannot be interpreted is not a criterion.
+STEP 3's condition is met literally. Slots are also not the binding constraint (5/day, two days left,
+finalists locked on measured scores), so the cost of the probe is ~zero and it answers the last open
+question of round 23: **does a provable reordering that fails on its target set still move the LB?**
+
+**ARM A is CLOSED OFFLINE — no slot.** It is worse than the control on every offline measure and
+recovers fewer target rows than doing nothing.
+
+**ARM B (λ=5) is uploaded as an INFORMATION PROBE, with the expectation stated first: null to
+negative.** Its FN recovery is +1/24, its OOF F1 is −0.0012, and OOF has never predicted transfer
+here. The one thing that could surprise us is the AUC column (OOF AUC +0.00412 vs control) — but AUC
+is the half we already win, and an OOF AUC delta has no established relationship to an LB AUC delta.
+**Finalists are not at risk regardless: a single-seed arm cannot replace a 10-seed measured artifact.**
+
+### What this closes
+
+Round 23 asked whether anything legal can move the F1 term. The answer is now complete and every
+branch is closed on a measurement rather than an argument:
+
+| lane | closed by |
+|---|---|
+| moving the threshold | +0.0004 F1, ~60× below noise (arithmetic) |
+| calibrator family | direction reversed, 15 down / 0 up |
+| pooling operator | 4–13 rows of 1030, two independent measurements |
+| any pointwise loss | order-invariant at the population optimum (arXiv:2011.09172) |
+| **an x-dependent reweighting that provably reorders** | **reorders, but recovers +1 of 24 target rows** |
+
+> **The strongest form of the conclusion, and it is now over-determined: the confidently-missed
+> positives are not recoverable from the source distribution.** Not by post-processing, not by
+> reweighting, not by any loss. They are missed because the 4–6 month test window genuinely does not
+> contain the evidence — which is a property of the data the organizers built, not of our model. That
+> is the finding this project should lead its report with.
+
+---
+
 ## iter48 — DECISION-LEVEL POOLING (hard majority vote): closed for FREE, zero submissions (2026-08-14)
 
 Round 23's one candidate that both external reports AND our own Q5 agent proposed independently, and

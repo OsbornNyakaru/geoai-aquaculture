@@ -18,10 +18,17 @@ washing out -- the trained model lands on essentially the same ranking and JTT d
 very thing the theorem describes. `rho > 0.999` against the control is the signature of that
 degeneration, and it CLOSES the arm for zero submissions.
 
-⚠️ (c) IS IN-SAMPLE AND MUST NOT BE READ AS TRANSFER. The recovered-false-negative count is measured
-on the same 24 rows the arms upweighted during training. A high number proves only that the
-mechanism fired mechanically; it is not evidence the arm generalizes. A LOW number, however, is
-decisive the other way: if JTT cannot recover the rows it explicitly optimized for, it is dead.
+⚠️ CORRECTION TO THIS TOOL'S FIRST VERSION (made after reading its own output). v1 labelled (c) the
+"IN-SAMPLE" recovery count and warned it was not transfer evidence. **That was wrong, and the error
+mattered.** For fold f only fold-f TRAINING rows are upweighted, so row i is never upweighted in the
+model that predicts it -- row i's OOF prediction comes from the fold where i is in VALIDATION. (c) is
+therefore a genuine OUT-OF-FOLD generalization measure.
+
+v1 also omitted the one number that makes (c) interpretable at all: **the CONTROL's own recovery
+count.** A non-JTT model recovers some of those rows anyway through nothing but seed and pooling
+noise (the error set was defined by a different, pooled artifact). Without that baseline "7 of 24
+recovered" reads as a success and is in fact a null. The baseline is now printed alongside, and the
+only quantity that means anything is the DIFFERENCE.
 
 USAGE
     python tools/jtt_gate.py --control jtt_control_s42 --arms jtt_balance_s42 jtt_lam5_s42
@@ -67,9 +74,19 @@ def main() -> None:
 
     # The error set the arms were trained to fix, recomputed here rather than trusted.
     err = (oof_s1 >= 0.5).astype(int) != y
-    fn = err & (y == 1)
+    fn, fp = err & (y == 1), err & (y == 0)
     log.info("stage-1 error set: |E|=%d (%d false NEG, %d false POS)",
-             int(err.sum()), int(fn.sum()), int((err & (y == 0)).sum()))
+             int(err.sum()), int(fn.sum()), int(fp.sum()))
+
+    def recovered(oof):
+        """Out-of-fold recovery on the error set: FN now called positive, FP now called negative."""
+        d = (oof >= 0.5).astype(int)
+        return int((d[fn] == 1).sum()), int((d[fp] == 0).sum())
+
+    base_fn, base_fp = recovered(oof_c)
+    log.info("CONTROL baseline on that same error set: %d/%d FN recovered, %d/%d FP fixed "
+             "-- a non-JTT model gets these anyway. Only the DIFFERENCE below means anything.",
+             base_fn, int(fn.sum()), base_fp, int(fp.sum()))
 
     def row(nm, oof, test):
         f1, auc = f1_at(y, oof, 0.5), roc_auc(y, oof)
@@ -88,15 +105,19 @@ def main() -> None:
 
         rho = spearmanr(test_c, test_a).statistic
         crossed = int(((test_c >= 0.5) != (test_a >= 0.5)).sum())
-        rec = int(((oof_a >= 0.5) & fn).sum())
+        rec_fn, rec_fp = recovered(oof_a)
 
         log.info("      (a) rank corr vs control : %.6f%s", rho,
                  "   <- DEGENERATE: no reordering, arm CLOSED, spend no slot"
                  if rho > RHO_DEGENERATE else "   <- genuinely reordered")
         log.info("      (b) test rows changing side at 0.5 : %d / %d  (~%.1f public rows)",
                  crossed, len(test_c), crossed * 309 / 1030)
-        log.info("      (c) false negatives recovered IN-SAMPLE : %d / %d  "
-                 "(⚠️ in-sample, NOT transfer evidence)", rec, int(fn.sum()))
+        log.info("      (c) error set, OUT-OF-FOLD vs the CONTROL baseline -- the whole point of "
+                 "this arm:")
+        log.info("            FN recovered %2d/%2d  (control %2d)  ->  NET %+d",
+                 rec_fn, int(fn.sum()), base_fn, rec_fn - base_fn)
+        log.info("            FP fixed     %2d/%2d  (control %2d)  ->  NET %+d",
+                 rec_fp, int(fp.sum()), base_fp, rec_fp - base_fp)
         log.info("      OOF delta vs control: f1 %+.5f  auc %+.5f  combined %+.5f",
                  f1_at(y, oof_a, 0.5) - f1_at(y, oof_c, 0.5),
                  roc_auc(y, oof_a) - roc_auc(y, oof_c),

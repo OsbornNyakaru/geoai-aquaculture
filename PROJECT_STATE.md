@@ -85,6 +85,34 @@
    decisions) independently reproduces the iter45 choice from Dwork et al. and Roelofs et al. rather
    than from our iter42 crossing analysis. **Finalists unchanged.**
 
+   🔬 **iter49 RESULT (2026-08-14): JTT REORDERS — PROVABLY AND MEASURABLY — AND STILL FAILS.**
+   All void checks pass (width 26 on all three, |E|=38, lambda_up 46.816/5.000, control OOF 0.97676).
+   **The mechanism fired:** ρ vs control 0.9427 (λ=46.8) and 0.9840 (λ=5), far below the
+   pre-registered 0.999 degeneracy line, so JTT did NOT collapse to a threshold slide. This is the
+   **first provable reordering this project has produced** — round 23's escape from the pointwise
+   order-invariance theorem is now empirically confirmed, and every other candidate screened (focal,
+   ASL, LDAM, PolyLoss, label smoothing) is provably incapable of it.
+   **But the arm's own thesis fails on its own target set.** Measured out-of-fold against a control
+   baseline: FN recovered 7/24 at λ=5 vs the control's **6** (net **+1**), and 5/24 at λ=46.8 (net
+   **−1**); the false-positive column is identical (3/14) across all three. Upweighting the
+   confidently-missed positives 5× and 47× recovers no more of them than not doing it. ARM A also paid
+   for it: OOF combined −0.0166, exactly the memorization risk pre-registered as #1.
+   ⛔ **We corrected our own instrument mid-read:** `jtt_gate.py` v1 called the recovery count
+   "in-sample" (wrong — row i is never upweighted in the model that predicts it) and omitted the
+   **control baseline**, without which "7 of 24" reads as a success when it is a null. Second time
+   this round a gate was uninterpretable until a control row was added.
+   **Decision, with a pre-registration tension resolved in the open:** STEP 2(c) ("dead if it doesn't
+   recover them") and STEP 3 ("upload if it reordered") now point opposite ways. (c) was the flawed
+   criterion — written without a baseline — so STEP 3 governs. **ARM A closed offline, no slot. ARM B
+   (λ=5) uploaded as an INFORMATION PROBE with the expectation stated first: null to negative.**
+   Finalists not at risk; a single-seed arm cannot replace a 10-seed measured artifact.
+   🎯 **ROUND 23 IS NOW COMPLETE AND EVERY BRANCH IS CLOSED ON A MEASUREMENT:** threshold +0.0004,
+   calibrator family direction-reversed, pooling operator 4–13 rows (×2), every pointwise loss
+   order-invariant, and now an x-dependent reweighting that *does* reorder but recovers +1 of 24.
+   **The confidently-missed positives are not recoverable from the source distribution** — the 4–6
+   month test window does not contain the evidence. That is a property of the data the organizers
+   built, and it is what the report should lead with.
+
    ❌ **iter47 RESULT (2026-08-14): PRESTO TRANSFERS BADLY — LANE CLOSED ON A MEASUREMENT.**
    `presto_frozen` **0.805184519** (AUC 0.827675196, F1 0.790190735, cell **145/367** — a UNIQUE
    inversion) and `presto_finetune` **0.811475341** (AUC 0.836907531, F1 0.794520547, cell 145/365),
