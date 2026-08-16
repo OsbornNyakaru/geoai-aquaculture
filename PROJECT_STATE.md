@@ -1,5 +1,41 @@
 # PROJECT_STATE — single source of truth (portable across cloud accounts)
 
+> ## 🔴 ROUND-24 CORRECTION, 2026-08-16 — READ BEFORE ANY NUMBER BELOW THAT MENTIONS THE PUBLIC SET
+>
+> **`n_public = 309` and `P_public = 191` are REFUTED. Everywhere they appear below, they are wrong.**
+> A round-24 researcher tested the trio `(AUC 0.945841814, F1 0.881720430, n 309)` for arithmetic
+> consistency. Finite-sample ROC-AUC is exactly `C/(P·N)` with `C` a half-integer, so a 9-decimal
+> printed AUC is a rational with a known denominator. **No `(P, N)` summing to 309 can produce that
+> readout** — nearest miss 1.9e-07 against a 1e-09 window. `309` was never read off Zindi; it is 30%
+> of 1030, inferred by us, and it propagated into three documents and two tools unchecked.
+>
+> Sieving all **five** reported `(AUC, F1)` pairs jointly leaves 15 candidate `(n, P)`; the full-test
+> predicted-positive counts on disk then select one. Reproduce with **`python tools/lb_cell_solve.py`**.
+>
+> ### THE CORRECTED CELL — `n = 333`, `P = 181`, `N = 152`, true public prevalence **0.5435**
+>
+> | | TP | FP | FN | TN | precision | recall |
+> |---|---|---|---|---|---|---|
+> | champion | 164 | **27** | **17** | 125 | **0.858639** | **0.906077** |
+> | jtt_lam5 | 164 | 26 | 17 | 126 | 0.863158 | 0.906077 |
+>
+> **Precision and recall are SWAPPED relative to everything written before today.** We carried
+> precision 0.9061 / recall 0.8586 and read it as a recall deficit with 27 positives to go and find.
+> The truth is 27 **false positives** against 17 misses: our dominant error is over-prediction, 1.6
+> to 1. `TP` and `PP` are invariant across the whole surviving family, so this swap does **not**
+> depend on `n = 333`.
+>
+> **Three consequences that change what to work on:**
+> 1. The "is our operating pos-rate too LOW?" question left open at iter43 is now **closed in the
+>    opposite direction** — we realise 0.5736 against a true 0.5435. Every lane motivated by "push
+>    more rows above the cut" is refuted, including the graph-gate prevalence reading (~0.59).
+> 2. Round 24's high-recall framing (partial-AUC, JTT recovery) targets the **smaller** half of the
+>    error budget. The method verdicts stand; the target moves.
+> 3. **iter49's JTT conclusion is unaffected** — it used only `PP+P`, which is `P`-independent.
+>
+> `tools/roc_probe.py` has been corrected to `P=181 / N=152`; its Probe A control value is now
+> **0.864222885**. Leaderboard-derived ⇒ **diagnosis only**, as always.
+
 > **What this file is.** The one document you carry to any cloud account. It lives in the
 > git repo, so a fresh Colab/Kaggle account gets it automatically on `git pull`. It holds
 > everything: how to resume anywhere, the current champion, every experiment + output + LB

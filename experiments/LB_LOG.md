@@ -2558,3 +2558,41 @@ pseudo-labeling / ROCKET. The offline screen cannot resolve an ensemble gain (AT
    Reproducibility check: the **full** seq run prints `final_oof ≈ 0.9827` (the
    `0.88046` in results.tsv is the `--smoke` fingerprint, not the full run).
 3. Paste the Zindi score into the table; mark ✅ only if it beats 0.8780.
+
+---
+
+## ROUND 24 — 🔴 THE PUBLIC CELL WAS WRONG SINCE iter42. SOLVED EXACTLY, ZERO SUBMISSIONS.
+
+**2026-08-16. Reproduce: `python tools/lb_cell_solve.py`. Leaderboard-derived ⇒ DIAGNOSIS ONLY.**
+
+**Refutation (credit: round-24 Q2 researcher).** `n_public = 309` is not a measurement — it is 30%
+of 1030, inferred by us at iter42 and never tested. Finite-sample ROC-AUC is exactly `C/(P·N)` with
+`C ∈ ½ℤ`, so a printed 9-decimal AUC is a rational with denominator `2·P·N`. **No `(P,N)` with
+`P+N = 309` reproduces `AUC 0.945841814`** — nearest realisable value is 1.9e-07 off a 1e-09 window,
+and our `P = 191` is off by 5.2e-06. Independent of the composite formula: Zindi prints AUC directly.
+The tell was already on the page — our §3.3 reported `discordant = 1220.6`, and **a pair count cannot
+end in .6**. Logged as error #7: *if a count comes out fractional, the inputs are wrong.*
+
+**Solution (ours).** Five reported `(AUC, F1)` pairs must hold at the *same* `(n, P)`. That sieve
+leaves 15 candidates; `PP_public/PP_full = n/1030` against the submission CSVs on disk gives four
+independent estimates — 324.0, 326.4, 324.5, 331.6 — selecting `n = 333` over the runner-up 70 to 6.
+
+| | n | P | N | TP | FP | FN | TN | precision | recall |
+|---|---|---|---|---|---|---|---|---|---|
+| **OLD, REFUTED** | 309 | 191 | 118 | 164 | 17 | 27 | 101 | 0.9061 | 0.8586 |
+| **NEW, SOLVED** | **333** | **181** | **152** | 164 | **27** | **17** | 125 | **0.8586** | **0.9061** |
+
+**Precision and recall are swapped.** True public prevalence 0.5435; we realise 0.5736. `TP` and
+`PP` are invariant across the entire surviving family, so the swap does not depend on `n = 333`.
+
+**What changes.** (1) The iter43 question "is our pos-rate too LOW?" closes in the *opposite*
+direction — **we over-predict**, and every lane motivated by pushing more rows above the cut is
+refuted. (2) Round 24's high-recall framing targets 17 errors while 27 sit on the other side; the
+method verdicts stand, the target moves. (3) `tools/roc_probe.py` corrected to `P=181/N=152`, Probe A
+control now **0.864222885**; Probe B demoted, the mirrored above-cut probe is the better instrument.
+(4) **iter49's JTT result is unaffected** — it used only `PP+P`, which is `P`-independent: TP
+identical at 164, one FP removed, zero true positives recovered. That entry stands as written.
+
+**Transferable lesson.** A leaderboard that prints enough digits is an exact measuring instrument.
+We should have been sieving reported scores for realisability since iter42 instead of trusting an
+inferred split size for seven iterations.

@@ -33,9 +33,16 @@ assumption.
   A match confirms P, TP and FP to the last decimal AND the grader's tie convention.
 
   PROBE B (measurement): 1.0 above the cut, 0.5 for the top-m rows below it, 0.0 for the rest.
-  Recovers p_B = how many of our missed positives sit in that top-m band. The leader is +16 TP for
-  +4 FP relative to us, so p_B >= 16 means our ranking ALREADY contains a point as good as theirs
-  (H_point) and p_B <= 8 means it does not (H_shape).
+  Recovers p_B = how many of our missed positives sit in that top-m band.
+
+⚠️ PROBE B IS NOW SECONDARY, AND SAY SO IN THE REPORT. It was designed when we believed the cell
+was TP 164 / FP 17 / FN 27 -- a RECALL deficit, 27 positives to go and find. The corrected cell is
+TP 164 / FP 27 / FN 17: our dominant error is FALSE POSITIVES, by 27 to 17. Probe B interrogates
+the smaller half of the error budget. The question it was built to settle -- "is our ranking flat
+in the high-recall corner?" -- is still well posed, but the corner that now costs us most is the
+one just ABOVE the cut, not below it. A mirrored probe (0.5 for the bottom-m rows ABOVE the cut,
+recovering how many of our 27 FPs sit just over the line) is the more valuable instrument and is
+the same one submission. Neither is worth a slot until the finalists are designated.
 
 ⛔⛔ THESE ARE DELIBERATELY LOW-SCORING SUBMISSIONS (~0.86 AUC vs our 0.9458). They are instruments,
 not entries. **DO NOT UPLOAD EITHER UNTIL THE TWO FINALISTS ARE DESIGNATED ON ZINDI AND CONFIRMED.**
@@ -68,8 +75,14 @@ from src.utils import get_logger  # noqa: E402
 log = get_logger()
 SUBS = Path(__file__).resolve().parents[1] / "submissions"
 
-P_PUBLIC = 191          # public positives, pinned three ways at iter47 (190-192)
-N_PUBLIC = 118          # 309 - 191
+# ⚠️ ROUND-24 CORRECTION. These were 191 / 118 (from n_public = 309), and that trio is
+# ARITHMETICALLY IMPOSSIBLE: see `tools/lb_cell_solve.py`. AUC on a finite sample is exactly
+# C/(P·N) with C a half-integer, so the reported 9-decimal AUC is a hard rational constraint, and
+# no (P, N) with P + N = 309 satisfies it -- the nearest miss is 76x the display window. Solving
+# the five reported (AUC, F1) pairs jointly leaves 15 candidate (n, P); the full-test predicted-
+# positive counts then select n = 333, P = 181 by a factor of ~9 over the next admissible value.
+P_PUBLIC = 181          # public positives, solved exactly at round 24 (was 191, refuted)
+N_PUBLIC = 152          # 333 - 181  (was 118)
 
 
 def auc_two_tier(tp, fp, fn, tn):
