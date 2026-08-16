@@ -234,7 +234,7 @@ the 721-row private slice rather than our best public score.
 
 ---
 
-## 5. 🔑 Four offline instruments — two certified then falsified, one that held
+## 5. 🔑 Four offline instruments — and by the last day, four for four falsified
 
 Given a 0.019 noise floor and 100 total submissions, screening candidates *without* spending a
 submission was worth more than any single feature. We built two such instruments. **Both passed
@@ -339,6 +339,15 @@ both equally blind, cancels the blindness in the difference.
 ---
 
 ### 5.4 Instrument four — a graph estimator that finally answered the prevalence question
+
+> ⚠️ **THIS INSTRUMENT WAS FALSIFIED TOO, ON THE LAST DAY. See §8.7.** Its estimate (~0.59) agreed
+> with our realised rate (0.587) and we read the agreement as confirmation. The solved public cell
+> puts the true prevalence at **0.5435**: we *over*-predict, and the graph estimator was reproducing
+> our bias rather than checking it. Retract the claim in this heading — all four instruments were
+> falsified, and the honest count is **four for four**, not three of four. The two retired
+> estimators it replaced, MLLS (0.578) and BBSE (0.559), were both **closer to the truth than the
+> instrument we preferred over them**, which is worth sitting with: we retired them for a sound
+> methodological reason and then trusted a replacement with no independent check.
 
 The two instruments above were certified and then falsified. This one is the exception, and it
 answered a question that had been formally open in our ledger.
@@ -467,6 +476,13 @@ apparent F1 gains we screened turned out to be cut placement, i.e. threshold tun
 ---
 
 ## 6.5 Where the remaining gap actually is
+
+> ⚠️ **CORRECTED IN §8.7 — read that first.** Every row count in this section is denominated in a
+> public test size of **309**, which we later proved cannot be the true value, and the decomposition
+> below reads our error as a *recall* deficit. Both are wrong. The correct public set is **n = 333,
+> P = 181**, and our champion makes **44** confusion errors on it — **27 false positives against 17
+> misses**. The qualitative conclusion of this section (the gap is local ranking near the cut, not
+> global calibration) survives; the direction does not.
 
 Because the leaderboard publishes F1 and AUC as separate columns, we can decompose our own score
 without any tuning (see §8.2 on the line we drew here). Our submitted artifact splits as
@@ -844,6 +860,83 @@ unreachable *linearly*, not that it helps; `univ AUC` is train-only, and train-o
 predicted transfer in this project. **The gate can only ever VETO.** LASCI is the single candidate
 clearing both gates with real discriminability, and with two days left and two finalists locked on
 measured scores we recorded it and did **not** build it.
+
+---
+
+### 8.7 🔑 We diagnosed the wrong half of our own error for seven iterations — and the leaderboard itself proved it
+
+This is the most expensive mistake in the project, we found it on the last day, and the way it was
+found is more useful than the mistake itself.
+
+**The unexamined number.** Since iter42 we have inverted the published F1 column to recover our
+public confusion matrix. `F1 = 2·TP/(PP+P)` pins the *sum* `PP+P` and `TP`, but it cannot say how
+that sum splits between our predicted positives and the ground truth. To split it we needed the
+public set size. We used **309** — which is exactly 30% of 1030. We never read it off the platform.
+We inferred it, wrote it down, and it propagated into three documents and two tools for seven
+iterations without one person asking where it came from.
+
+**The test that caught it, which we should have been running from the start.** A reported score is
+not a free real number. On a finite sample,
+
+$$\mathrm{AUC} = \frac{C}{P\cdot N}, \qquad C \in \tfrac{1}{2}\mathbb{Z}$$
+
+because under the Mann–Whitney convention each tied pair contributes exactly ½. So a leaderboard
+that prints nine decimals is publishing a **rational with a known denominator**, and one can simply
+ask whether the printed value is *reachable at all*. At `n = 309` the answer for our champion's
+`AUC 0.945841814` is no: the nearest realisable value over every `P` is **1.9 × 10⁻⁷** away from a
+**10⁻⁹** display window, and our own `P = 191` misses by 5.2 × 10⁻⁶. The trio was impossible.
+
+The tell had been sitting in our own working notes in plain sight: we had computed a discordant-pair
+count of **1220.6**. A pair count cannot end in `.6`. *If a count comes out fractional, the inputs
+are wrong* — logged as error #7 in our ledger.
+
+**Detection is not the interesting part; inversion is.** The same sieve that refutes 309 also solves
+for the truth, because we hold **five** reported `(AUC, F1)` pairs that must all be satisfied at the
+*same* `(n, P)`. That constraint cuts ~150 000 candidates to **15**. The full-test predicted-positive
+counts sitting in our own submission files then finish the job: `PP_public/PP_full ≈ n/1030` gives
+four independent estimates — 324.0, 326.4, 324.5, 331.6 — selecting `n = 333` over the runner-up by
+70 rows to 6. **Zero submissions were spent.** Reproduce with `python tools/lb_cell_solve.py`
+(exact `fractions` arithmetic; no floating point in any decision).
+
+| public set | n | P | N | TP | FP | FN | TN | precision | recall |
+|---|---|---|---|---|---|---|---|---|---|
+| what we carried | 309 | 191 | 118 | 164 | 17 | 27 | 101 | 0.9061 | 0.8586 |
+| **solved** | **333** | **181** | **152** | 164 | **27** | **17** | 125 | **0.8586** | **0.9061** |
+
+**Precision and recall were swapped.** We believed we were *missing* 27 ponds. We are *inventing*
+27 and missing 17 — the dominant error is false positives, 1.6 to 1, and we over-predict (realised
+positive rate 0.5736 against a true 0.5435). Note this is robust to the one soft step: `TP` and `PP`
+are invariant across every surviving candidate, so only `TN` depends on `n = 333`. The swap does not.
+
+**What it cost, stated honestly.**
+
+- §5.4's graph estimator "finally answered the prevalence question" at ~0.59 and we read its
+  agreement with our operating rate as confirmation. It was agreeing with our *error*. An estimator
+  that reproduces your bias is not a validation, and we had no independent check on it.
+- The iter43 question *"is our operating positive rate too LOW?"* was left open. It closes in the
+  **opposite** direction. Every lane motivated by pushing more rows above the cut was aimed away
+  from the problem.
+- Our final research round was organised around the "high-recall corner" — partial-AUC methods,
+  Neyman–Pearson, and a JTT arm built to recover missed positives. All of it targeted 17 errors
+  while 27 sat on the other side of the cut. The method verdicts stand (they rest on the
+  order-invariance theorem, which is indifferent to which corner you aim at); the *target* moved.
+
+**What survives untouched.** The iter49 JTT result is unaffected: it used only `PP+P`, which is
+`P`-independent, so "TP identical at 164, one false positive removed, zero true positives
+recovered" stands exactly as recorded. `tools/roc_probe.py` has been corrected to `P=181 / N=152`
+and its guaranteed control value is now 0.864222885.
+
+**The transferable lesson, and the reason this section exists.** *A leaderboard that prints enough
+digits is an exact measuring instrument, not a noisy score.* Every reported number carries an
+integrality constraint, and checking reachability costs nothing. We should have been sieving since
+iter42. Instead we trusted a round number we had made up ourselves, and it silently inverted our
+strategic reading of the problem for seven iterations. The credit for the catch belongs to an
+outside reviewer of our own brief — the second time in this project (see §8.5) that the highest-value
+contribution was someone refusing to accept one of our stated premises.
+
+*Compliance note:* every quantity here is leaderboard-derived and is therefore **diagnosis only**
+under the standing rule declared in §8.2. Nothing in this section sets a threshold, a
+hyperparameter, or a model choice; the decision rule remains a literal 0.5.
 
 ---
 
