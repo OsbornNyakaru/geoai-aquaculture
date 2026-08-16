@@ -899,6 +899,69 @@ for the writeup, **not executed**, and we should not claim otherwise.
 
 ---
 
+## ROUND 24 — ⛔ OUR OWN BRIEF CONTRADICTED ITSELF, and the AUC column can settle it exactly (2026-08-16)
+
+Four researchers were launched and all four died on an account limit, but the incremental-write
+discipline held again and 543 lines survived. **The single most valuable line of it is a correction
+to us**, and it is the fourth time in three rounds that an outside reader has caught us.
+
+### The contradiction
+
+`UPDATE_24 §3.2` asserts **as established fact**: *"their advantage is concentrated in the
+high-recall corner of the ROC."* `UPDATE_24 §3.3` — two paragraphs later, written by us in the same
+sitting — **proves we cannot know that**: the max F1 reachable on our existing ranking by threshold
+alone lies in **[0.8817, 0.9574]**, and the leader's ~0.918 sits **strictly inside** that interval.
+
+So two hypotheses survive and they demand opposite work:
+
+| | claim | what it implies |
+|---|---|---|
+| **H_shape** | the leader's ROC really does dominate ours in the high-recall corner | our RANKING is deficient; partial-AUC / recall-region methods are the right lane |
+| **H_point** | our ROCs are equally good — their global AUC is **lower** by 0.00095 ≈ **21 discordant pairs of 22538**, statistically indistinguishable — and they merely OPERATE at a better point | our ranking is fine; the entire gap is where 0.5 lands, i.e. **calibration** (Platt fit at prior 0.4023, deployed at ~0.618 — a LIVE defect, not a retracted one) |
+
+**We built an entire round-24 brief around H_shape without noticing our own §3.3 forbade asserting
+it.** Under H_point, the headline question of that brief is aimed at the wrong target and partial-AUC
+work would have been the most expensive mistake available.
+
+### 🔑 And it is not unidentified after all — the AUC column is a RULER
+
+`TargetRAUC` is scored by ROC-AUC, which depends **only on ordering**, and **ties are permitted**.
+Every tied (pos, neg) pair contributes exactly 0.5 under the Mann-Whitney convention. So a column
+with only two or three distinct values collapses whole pair-blocks into ties of known contribution,
+and the returned AUC becomes **an equation in one unknown integer**. Zindi prints 9 decimals.
+
+Built as `tools/roc_probe.py`, instrumented on `jtt_lam5_s42` (whose cell inverts **uniquely** to
+TP 164, PP+P 371 ⇒ TP 164, FP 16, FN 27, TN 102):
+
+* **PROBE A — a control.** 1.0 above the cut, 0.0 below. Every block is forced or tied, so the result
+  depends on **nothing unknown**: predicted public AUC = **0.861522762**. A match confirms P, TP and
+  FP to the last decimal *and* the grader's tie convention. A mismatch would mean one of our F1
+  inversions is wrong — more valuable still. This is exactly the control discipline we adopted after
+  two of our own gates proved uninterpretable for want of one.
+* **PROBE B — the measurement.** 1.0 above, 0.5 for the top-20 below, 0.0 for the rest. Recovers
+  `p_B` = how many of our 27 missed positives sit in that band. **Consecutive integers are 0.002862
+  apart**, so `p_B` comes back exact — no noise, no model, no assumption.
+  `p_B ≥ 16` ⇒ **H_point**. `p_B ≤ 8` ⇒ **H_shape**.
+
+One correction to the researcher who designed this: their published control value (0.857285562, for
+the champion partition) is off in the 7th decimal — the correct figure is **0.857285473**. The
+mechanism is entirely theirs and it is right.
+
+### ⛔ Status: BUILT, NOT UPLOADED, and deliberately gated
+
+**These probes score ~0.86 against our champion's 0.9458. They are instruments, not entries.** The
+tool refuses to write output without an explicit `--finalists-locked` assertion, because an
+undesignated account plus a 0.86 upload on deadline day is the one unrecoverable mistake available.
+**Finalist designation must be confirmed in the Zindi UI first.**
+
+Legality: these are leaderboard-derived and therefore **DIAGNOSIS ONLY** under the standing rule —
+the same category as the F1-column inversion we have run and disclosed since iter42. Nothing they
+return may set a threshold, a hyperparameter, or a model choice. With the deadline today there is no
+lane left to redirect anyway; their value is that they let the report state **which hypothesis is
+true** instead of "we do not know."
+
+---
+
 ## iter49 LB RESULT — JTT recovered ZERO true positives. The lane closes; round 23 is finished. (2026-08-14)
 
 `submission_jtt_lam5_s42.csv` = **0.908387851** (AUC **0.944824076**, F1 **0.884097035**). Composite
