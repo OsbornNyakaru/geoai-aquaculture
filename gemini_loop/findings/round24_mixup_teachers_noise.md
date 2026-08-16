@@ -958,3 +958,407 @@ The version *without* R2 and R3 is not defensible, and a reviewer who knows this
 | Does it escape the two theorems? | **Not applicable in the useful sense** â€” cleaning is not a loss change, so Theorem 2 has no purchase. âš ï¸ But note Theorem 1 **annihilates the prior-shift channel** (an affine intercept move), leaving only the non-affine decision-function-shape channel â€” which is where all the risk is |
 | **Should you ship it today?** | **No.** Expected effect â‰ˆ 1 pp accuracy â‰ˆ 3 rows of 309, versus a 0.015 bar needing ~16, with a plausible negative sign because the flagged set is your minority boundary set |
 | **Should you write it up?** | **Yes, prominently.** A cleaning analysis with an injected-noise operating characteristic (R3), a two-detector intersection (R2), a class-symmetry table (R4), and an explicit refusal to ship because the measured effect is below the pre-registered bar is *exactly* what a code review rewards. **A disciplined negative, properly instrumented, is worth more than an unvalidated positive.** |
+
+---
+---
+
+# Q4.6 -- CORRECTION TO MY OWN Q4: THE PUBLIC CONFUSION CELL WAS WRONG, AND THE SWAP CHANGES THE ANSWER
+
+**Written after Q4 was finished, against `tools/lb_cell_solve.py`. This is a correction, not a patch.
+Everything below supersedes the numbers in Q4.3 and Q4.5; the reasoning in Q4.1, Q4.2 and Q4.4
+survives, and in two places gets *stronger*.**
+
+## Q4.6.0 -- What changed, stated exactly
+
+| quantity | what Q4 and UPDATE_24 Sec 3.2 said | what is now established | source |
+|---|---|---|---|
+| `n_public` | 309 (inferred as 30% of 1030, never measured) | **333** | `tools/lb_cell_solve.py` steps 2-3 |
+| `P_public` | 191 | **181** | same |
+| `N_public` | 118 | **152** | same |
+| true public prevalence | 0.618 | **0.5435** | 181/333 |
+| champion cell | TP 164, **FP 17, FN 27** | TP 164, **FP 27, FN 17** | same |
+| precision / recall | 0.9061 / 0.8586 | **0.8586 / 0.9061** | swapped |
+| our realized pos-rate | -- | **0.5736 vs a true 0.5435: we OVER-predict** | 191/333 |
+| dominant error mode | recall deficit | **precision deficit, 1.6:1** | 27 FP vs 17 FN |
+
+The refutation of 309 is not a judgement call. Finite-sample ROC-AUC is exactly `C/(P*N)` with `C` a
+half-integer under the Mann-Whitney tie convention `sklearn.roc_auc_score` implements, so a printed
+9-decimal AUC is a rational with denominator `2*P*N`. No `(P,N)` with `P+N=309` lands inside the 1e-9
+display window of 0.945841814; the nearest miss is 1.9e-7, i.e. **76x the window**, and our own
+`P=191` misses by 5.2e-6, **2080x**. Five reported `(AUC,F1)` pairs sieved jointly leave one scaling
+family, and the full-test predicted-positive counts on disk select `n=333` within it. **TP and PP are
+invariant across the whole surviving family**, so precision 0.8586 / recall 0.9061 does not depend on
+`n=333` being exactly right.
+
+### The three sentences of my own Q4 that are now false
+
+1. **Q4.5, row 2:** *"Do we know these specific 27 FNs are mislabeled?"* -- there is no set of 27 FNs.
+   There are **17** FNs and **27 FPs**. The question I answered was about the smaller pile.
+2. **Q4.3, effect size:** *"On 309 public rows, 1 pp is about 3 rows. You need ~16."* -- both numbers
+   are wrong; recomputed in Q4.6.1 below. The bar is **9-11 rows of 333**, not 16 of 309, so the bar
+   is *easier* than I stated, and my "well below the bar" verdict has to be re-derived, not assumed.
+3. **Q4.3, opening:** *"Your gap is a recall gap (Sec 3.2: 16 more TPs)."* -- the premise of the whole
+   direction-problem section. Re-derived from scratch in Q4.6.4.
+
+### And one correction that is not mine but is the most consequential in the round
+
+**UPDATE_24 Sec 3.2's reading of the leader is unsupported.** It says *"They find 16 more true
+positives for 4 more false positives ... their advantage is concentrated in the high-recall corner."*
+Inverting F1 = 0.918 at `P = 181` gives a **family** of cells, not one:
+
+| leader cell | FP | FN | precision | recall | reading |
+|---|---|---|---|---|---|
+| TP 168, PP 185 | 17 | 13 | 0.9081 | 0.9282 | **nearest to ours: +4 TP and -10 FP** |
+| TP 174, PP 198 | 24 | 7 | 0.8788 | 0.9613 | high-recall |
+| TP 179, PP 209 | 30 | 2 | 0.8565 | **0.9890** | the Sec 3.2 reading: they miss 2 positives of 181 |
+| TP 163, PP 174 | 11 | 18 | 0.9368 | 0.9006 | pure-precision: same recall as us, half the FPs |
+| TP 157, PP 161 | 4 | 24 | 0.9752 | 0.8674 | *worse* recall than us, far better precision |
+
+> **The "high-recall corner" reading is now one of five, and it is no longer the natural one.** The
+> nearest-neighbour cell to ours says the leader's edge is **predominantly a PRECISION edge**, and the
+> cell that keeps Sec 3.2's story requires the leader to miss only **2 positives out of 181** while
+> running 30 false positives -- a detector far outside anything in this ledger. We over-predict
+> (0.5736 against a true 0.5435); every leader cell except the last two over-predicts *less* than we do.
+>
+> **This bears directly on Q1 and on `round24_partial_auc.md`.** Q1's premise -- "optimize the
+> high-recall region, the leader lives at recall 0.94 where we sit at 0.859" -- is built on the swapped
+> cell. We sit at recall **0.906**, not 0.859, and the region where we are demonstrably worse than the
+> leader is the **low-FPR** region, not the high-TPR region. A one-way pAUC restricted to a high-TPR
+> band is optimizing the half of the curve where the corrected arithmetic says we are already fine.
+> **The partial-AUC lane should be re-aimed at the low-FPR / high-precision end, or its premise
+> restated as unknown.** I flag this rather than resolve it; it is that agent's question.
+
+## Q4.6.1 -- The effect-size bar, recomputed exactly at n = 333
+
+Marginal value of one row, from `F1 = 2*TP/S` with `S = PP + P = 372`:
+
+```
+remove one FP (S -> S-1):        dF1 = F1/(S-1)            = 0.8817204/371  = +0.00237660
+recover one FN (TP+1, S+1):      dF1 = 2(S-TP)/(S(S+1))    = 416/138756     = +0.00299807
+ratio = (FN recovery)/(FP removal) = (S-TP)(S-1)/(TP(S+1)) = 1.26149
+```
+
+> **They are NOT worth the same.** In the large-`S` limit the ratio is exactly `2/F1 - 1`, which at
+> F1 = 0.8817 is **1.2683**. **One recovered false negative is worth 1.26 false positives suppressed.**
+> This is a general fact about F1 that we have never written down: recovering a miss both raises the
+> numerator and is charged once in the denominator, while suppressing a false alarm only shrinks the
+> denominator. The asymmetry grows as F1 falls (`2/F1 - 1 -> 1` only as `F1 -> 1`).
+
+Rows needed to clear the significance bar, with `d(composite) = 0.6 * dF1` when only the `TargetF1`
+column moves (`TargetRAUC` untouched, hence `dAUC = 0`):
+
+| rows moved | via FN recovery | via FP suppression |
+|---|---|---|
+| 5 | F1 0.89655, **+0.00890 comp** | F1 0.89373, +0.00721 comp |
+| 8 | F1 0.90526, +0.01413 comp | F1 0.90110, +0.01163 comp |
+| **9** | F1 0.90814, **+0.01585 comp -- CLEARS** | F1 0.90358, +0.01312 comp |
+| **11** | F1 0.91384, +0.01927 comp | F1 0.90859, **+0.01612 comp -- CLEARS** |
+
+**The bar in rows: 9 recovered false negatives, or 11 suppressed false positives, out of 333 public
+rows.** Not "~16 of 309". Two further notes:
+
+- The binomial noise floor scales as `sqrt(309/333) = 0.963`, so **0.015 becomes about 0.0145**. I keep
+  0.015 as the bar because loosening a significance bar after learning the sample is bigger is the same
+  species of error as Sec 8.5 (an LB-derived bar). Keep 0.015; note 0.0145 and do not use it.
+- **The public sample is 32.3% of the test set, not 30%.** So a mechanism that flips `X` rows test-wide
+  shows up as `0.323X` public rows. **To move 11 public FPs you must suppress about 34 FPs across all
+  1030 test rows.** Our test-wide error budget scales to roughly **84 FPs and 53 FNs**. So the bar,
+  stated in the currency an actual method has to pay in, is: **eliminate ~40% of every false positive
+  we make**, or **recover ~53% of every positive we miss.** That is the number to hold every proposal
+  in this round against, and it is far harsher than "9 rows" sounds.
+- Maximum reachable by fixing each pile completely: all 27 FPs -> F1 **0.95072**; all 17 FNs -> F1
+  **0.93059**. The FP pile is the larger prize (+0.0690 vs +0.0489 F1) purely because it is more
+  numerous, *despite* each individual FN being worth 1.26x more.
+
+## Q4.6.2 -- THE BIG ONE: is the label noise class-asymmetric, and does that give cleaning a sign?
+
+**This was R4, a hygiene check. Under the swap it is load-bearing, so I am doing it properly and I am
+going to kill most of it.**
+
+### (i) First, fix the direction. Two annotation error types, and they are not interchangeable
+
+The remote-sensing literature in Q4.1(b) names the confusers -- **rice paddies, salt pans, small
+reservoirs, wetland parks** -- and it names them as *negatives that look like ponds*. That produces two
+error types with **opposite** consequences, and the whole section turns on keeping them apart:
+
+```
+COMMISSION  (0 -> 1):  a salt pan / rice paddy annotated as a POND.   Row carries y = 1, truth 0.
+OMISSION    (1 -> 0):  a real pond the annotator missed.              Row carries y = 0, truth 1.
+```
+
+The cited sources say the confusers *"cause a lot of omission/commission errors"* -- both. But the
+domain argument is specifically about **abundant negatives that resemble the positive class**, and that
+is a commission mechanism. A liberal detector run over a landscape full of rice paddies makes
+commission errors. **So the domain asymmetry argument in my own Q4.1(b) predicts COMMISSION-dominant
+noise: rows labelled 1 that are truly 0.**
+
+### (ii) The channel the task brief proposed -- and it runs the wrong way
+
+The task put to me was: *if the noise is asymmetric in the confuser direction, some of our 27 false
+positives may be correctly-classified rows with wrong labels.* **Work the arrow through and it does not
+hold.** A false positive is `predicted 1, key says 0`. For that row to be *correctly classified*, its
+truth must be 1 while the key says 0 -- that is an **omission** error, not a commission error. The
+confuser mechanism produces the opposite:
+
+| noise in the TEST KEY | mislabelled row looks like | a good model predicts | scored against the key as |
+|---|---|---|---|
+| **commission** (confuser labelled pond) | not a pond | **0** | **FALSE NEGATIVE** |
+| **omission** (real pond labelled non-pond) | a pond | **1** | **FALSE POSITIVE** |
+
+> **So the domain-confuser asymmetry inflates our FN pile, not our FP pile -- and the FN pile is the
+> SMALL one (17 against 27).** Under the *old*, wrong cell (FN 27 > FP 17) this argument would have
+> looked beautifully confirmatory, and I would very likely have written it up as one. The swap inverts
+> it: **the observed asymmetry runs AGAINST the direction the domain argument predicts.** That is a
+> negative for the hypothesis as posed, and it is exactly the kind of thing the corrected cell is for.
+
+Magnitudes, so this is not just a sign argument. With `n = 333`, roughly 166 true positives and 167 true
+negatives, and our own accuracy on each side around 0.90, the number of *manufactured* errors at a key
+noise rate `r` is about `150 * r` on each side:
+
+| key noise rate | manufactured FPs (omission) | manufactured FNs (commission) | share of our 27 FPs | share of our 17 FNs |
+|---|---|---|---|---|
+| 2.0% | ~3 | ~3 | 11% | 18% |
+| **3.4%** (Northcutt base rate) | **~5** | **~5** | **19%** | **29%** |
+| 5.0% | ~7.5 | ~7.5 | 28% | 44% |
+
+**At the literature base rate, key noise explains at most about a fifth of our false positives and
+about a third of our misses. It cannot be the story.** And it explains proportionally *more* of the
+smaller pile, which is the opposite of a useful finding.
+
+### (iii) The bound this DOES buy, and it is worth having: the noisy-key F1 ceiling
+
+An oracle that predicts the *truth* perfectly still loses points against a noisy key. At symmetric rate
+`r` the oracle's cell is `TP = P - commission`, `FP = omission`, `FN = commission`:
+
+| key noise rate | oracle cell | **oracle F1** |
+|---|---|---|
+| 2.0% | TP 177, FP 3, FN 4 | **0.98061** |
+| **3.4%** | TP 175, FP 5, FN 6 | **0.96953** |
+| 5.0% | TP 172, FP 8, FN 9 | **0.95291** |
+
+> **This closes a lane we might otherwise have leaned on in the report.** Even at a *generous* 5% key
+> noise the ceiling is F1 0.953, and the leader is at ~0.918. **Test-key label noise does not explain
+> the leader's gap over us and cannot be offered as an excuse for it.** There is ~0.036 F1 between us
+> and the leader that sits strictly below the noise ceiling and is therefore genuinely reachable by
+> *someone*. State that plainly; it is the honest version of Sec 3.3's retraction and it removes the
+> "we are at the annotation ceiling" comfort story.
+
+### (iv) The channel that DOES have the right sign, and it is a different channel
+
+There is a second, entirely separate route from the same asymmetry, and it is the one with teeth. It
+runs through the **training set**, not the key:
+
+```
+commission noise in TRAIN  ->  train rows labelled 1 that are actually rice paddies / salt pans
+                           ->  the model learns an OVER-INCLUSIVE pond concept
+                           ->  at test time it fires on confusers
+                           ->  FALSE POSITIVES, and a realized positive rate above the truth.
+```
+
+**That is precisely the error signature the corrected cell shows: FP 27 vs FN 17 (1.6:1), and a realized
+public positive rate of 0.5736 against a true 0.5435.** And it is a *non-trivial* prediction, because
+we train at prevalence 0.4023 and deploy at 0.5435 -- naively we should *under*-predict, and we do not.
+
+> **So the asymmetry hypothesis is not dead. It changes channel.** The confuser asymmetry does not mean
+> "our FPs are secretly correct" (Q4.6.2(ii) kills that); it means **"our FPs are real, and a
+> commission-biased training set is the mechanism that manufactured them."** That version has a
+> predicted sign -- **cleaning helps** -- where Q4 had to leave it ambiguous, and the prediction it
+> makes about the LB cell is *confirmed* by the corrected cell rather than assumed from it.
+
+**Legality checkpoint, and it is urgent.** The corrected cell hands us a direction: *we over-predict.*
+Any proposal of the form "so make the model more conservative" is **prevalence pinning wearing a third
+hat** -- an LB-derived quantity setting a knob, prong (b), the exact violation this project deleted six
+scores over. The commission hypothesis is legal **only** because it was derived from the domain
+literature (train-only reasoning, Q4.1(b), written before the cell was corrected) and *predicts* the
+over-prediction. Confirming a prediction is legal; tuning to a target is not. **The moment any knob is
+sized to reduce the FP count, the whole thing is void.** Write that sentence into the report next to
+the cell; a reviewer who sees us discover FP > FN and then ship something more conservative will
+otherwise assume the worst, and would be right to.
+
+### (v) THE KILL: the detector is blind in exactly the regime where the payoff is large
+
+Now put Q4.6.2(iv) together with Q4.2's caveat about the class-conditional-noise assumption, which I
+raised and then did not follow through.
+
+**Proposition (detector blindness under systematic noise). [DERIVED]** Every detector on my Q4.2 list --
+confident learning, AUM, small-loss/co-teaching, ELR, JTT -- computes a statistic of the form *"the
+model, trained without this row, disagrees with this row's label."* Let the noise be instance-dependent
+and supported on a feature-space region `R` (the confuser manifold). Two regimes:
+
+- **Random / atypical noise (the CCN idealization).** A flipped row is an isolated contradiction to its
+  neighbourhood. It can only be fitted by memorization, and Arpit et al. (ICML 2017, arXiv:1706.05394)
+  is exactly the statement that memorization comes late and does not generalize. So the *out-of-fold*
+  prediction on that row follows the clean neighbourhood and **disagrees with the noisy label**.
+  Detector power is high. This is the regime every one of those papers is benchmarked in.
+- **Systematic, feature-clustered noise (`R` = the confusers, our regime by hypothesis).** The flipped
+  rows are *not* isolated: they are a coherent sub-population with mutual support. A learner with the
+  capacity to represent `R` fits them **as signal, and it generalizes across folds**. The out-of-fold
+  prediction on a confuser row therefore **agrees with its noisy label**. **Detector power on `R`
+  collapses toward zero.**
+
+> **Detector power is highest exactly where the noise is random, and lowest exactly where it is
+> systematic. The systematic component is the one with the domain argument behind it. So the
+> instrument's sensitivity is ANTI-CORRELATED with the noise we have actual reason to believe exists.**
+
+This is not a refinement of the CCN caveat, it reverses its practical import. In Q4.2 I wrote that CL
+"will still rank suspicious rows usefully; only its noise-*rate* estimate is untrustworthy." **That is
+wrong for feature-clustered noise: the ranking is what fails, because the flagged set systematically
+excludes `R`.** Correct that line.
+
+**The dichotomy, which is the finding:**
+
+| regime | can the detector see it? | payoff from cleaning it |
+|---|---|---|
+| random / CCN | **yes** | **negligible** -- see the arithmetic below |
+| systematic / confuser-clustered | **no** | potentially large |
+
+> **Cleaning pays off only in the regime where our instruments are blind, and our instruments work only
+> in the regime where the payoff is negligible.** That single sentence is the strongest form of the Q4
+> negative, it is a *mechanism* rather than an effect-size complaint, and it is the version I would put
+> in the report.
+
+### (vi) The arithmetic on the visible regime, so the negative rests on numbers too
+
+At the Northcutt base rate, commission-mislabelled train positives number `0.034 * 731 = ~25 rows`,
+1.4% of the 1817-row training set. Two channels:
+
+- **Prior channel:** removing 25 positives moves the train prior 0.4023 -> `706/1792 = 0.3940`, a -0.8pp
+  shift, i.e. a logit intercept move of `log(0.3940/0.6060) - log(0.4023/0.5977) = -0.0439`. **Affine.
+  Theorem 1 annihilates it exactly.** (Q4.3 got this right and it survives the swap unchanged.)
+- **Shape channel, extrapolated from the only measurements anyone reports:** AUM removes **17%** of
+  training data for a **1.6%** absolute test-error improvement (WebVision50); 13% -> 1.2% (CIFAR100).
+  Linear in removal fraction, `1.4% / 17% * 1.6% = 0.13%` absolute, which on 1030 test rows is
+  **1.4 rows total across both error types, i.e. about 0.45 public rows.**
+
+**Against a bar of 11 public FPs (~34 test-wide), the visible-regime effect is 0.45 public rows. The
+shortfall is a factor of ~25, and that is before noting that AUM's headline numbers come from datasets
+with 20-40% noise where the removal fraction is 12x ours.** Stated as leverage: we would need cleaning
+1.4% of training labels to eliminate ~40% of all our false positives -- a leverage of ~29x -- where the
+best-documented measurement in the literature shows leverage of about **0.09x**.
+
+**Verdict on Q4.6.2, and I am willing to be this blunt about my own strongest remaining candidate:**
+
+1. The specific claim put to me -- *some of our 27 FPs are correctly-classified rows with wrong labels*
+   -- is **refuted by the direction of the arrow**. The confuser mechanism is commission, and commission
+   in the key manufactures **false negatives**. (Q4.6.2(ii))
+2. The asymmetry nevertheless **does** acquire a predicted sign through a *different* channel --
+   commission in **train** producing an over-inclusive model -- and that prediction is **confirmed** by
+   the corrected cell (FP > FN, realized rate above true). This is a genuine strengthening of Q4 and it
+   is the one part of this section I would defend hard. (Q4.6.2(iv))
+3. **But the sign is worth nothing, because the payoff and the observability are mutually exclusive.**
+   (Q4.6.2(v)) And in the observable regime the effect is ~25x below the bar. (Q4.6.2(vi))
+4. So the Q4 recommendation is **UNCHANGED -- do not ship, do write it up -- but the reason is now
+   much better.** Q4 declined on an ambiguous sign and a small effect. Q4.6 declines on a *structural*
+   argument: the instrument cannot see the thing worth cleaning. **That is a report-grade negative and
+   it is worth more than the ambiguous version it replaces.**
+
+## Q4.6.3 -- Q4.3's "direction problem" under the swap: the conclusion INVERTS, in which class carries the risk
+
+Q4.3 argued: *"The rows a model-based detector will flag are concentrated on positives the model scores
+low -- the same set you are trying to recover. Removing them deletes boundary-defining minority
+instances and recall falls."* Every clause of that is conditioned on the recall framing. Re-derive it.
+
+A disagreement detector produces **two** flag types, and Q4.3 only considered the first:
+
+| flag type | what it is | contains (good to delete) | contains (catastrophic to delete) |
+|---|---|---|---|
+| **(i)** `y=1`, scored low | positives the model rejects | **commission errors** -- confusers annotated as ponds | **H3 censored true ponds** -- real ponds whose drain event fell outside the window |
+| **(ii)** `y=0`, scored high | negatives the model likes | omission errors -- real ponds annotated non-pond | **the confuser exemplars themselves** -- the only rows teaching the model that a salt pan is not a pond |
+
+Now read the two columns against the corrected cell:
+
+- **Type (ii) is the dangerous direction, and Q4.3 never mentioned it.** Deleting flagged `y=0` rows
+  removes precisely the negatives that sit on the pond boundary. The model then has nothing left
+  contradicting "anything pond-shaped is a pond", becomes **more** over-inclusive, and **false positives
+  rise** -- our dominant, 27-row error mode. Three things make this worse than the old worry: it acts on
+  the **larger** error pile; the deleted rows carry the discriminative information the domain literature
+  says is already scarce; and there are 1086 negatives, so a detector run at a fixed flag rate produces
+  1.49x as many type-(ii) flags as type-(i) flags before any model effect.
+- **Type (i) is now the LESS dangerous direction.** It was Q4.3's whole warning. Under the commission
+  hypothesis its "good to delete" component -- confuser rows annotated as ponds -- is the *dominant*
+  hypothesized noise mode, so the mixture is more favourable than Q4.3 assumed.
+
+> **So Q4.3's specific warning inverts: deleting flagged positives is the safer half and deleting
+> flagged negatives is the reckless half. Q4.3 argued the exact opposite.** Its *general* lesson
+> survives and is strengthened: cleaning is not class-neutral, the risk is entirely in the
+> `x`-dependent, non-affine reshaping of the decision function, and that is exactly the channel
+> Theorem 1 cannot annihilate. That paragraph in Q4.3 was right and should be kept verbatim; only the
+> class it points at changes.
+
+**The tempting move, and why we must not make it.** The above licenses an *asymmetric* cleaning rule --
+*delete flagged `y=1` rows only, never flagged `y=0` rows* -- and that rule now has a defensible
+train-only prior behind it (the domain literature says commission dominates). It is the strongest
+concrete version of Q4 that survives everything above.
+
+**We still should not ship it, and the reason is an integrity reason rather than a technical one.** The
+rule reduces predicted positives. We now know, from the leaderboard, that we over-predict. Whatever
+order we actually reasoned in, **the corrected cell landed before the rule was written, so the
+pre-registration prong (b) requires cannot honestly be claimed.** A reviewer reading the commit
+timestamps will see LB information available upstream of a knob whose direction happens to match the
+LB's diagnosis. The correct move is to **disclose the ordering and decline**, not to run it and argue.
+This is the same failure the prevalence pin was, one abstraction layer up, and the only defence against
+it is to name it before someone else does.
+
+## Q4.6.4 -- The protocol, revised: R3 becomes the decisive experiment and R4 becomes directional
+
+Q4.4's R1-R6 stand, with three changes forced by Q4.6.2(v).
+
+**R3 (revised) -- inject STRUCTURED noise, not just random noise. This is now the whole experiment.**
+The original R3 flips a uniformly random 5% of labels and measures detector recall against them. Under
+the blindness proposition that control measures the detector on the *easy* regime and will return a
+flattering operating characteristic that does not transfer to the noise we actually care about. **A
+control that only exercises the regime where the instrument works is not a control.** Run both arms:
+
+```
+ARM A (random, the old R3):   flip a uniform random 5% of the 1817 training labels.
+ARM B (structured, new):      k-means (k=8, seeded) on per-row temporal summary statistics
+                              (per-band median / min / max over the 12 months -- MODEL-FREE);
+                              take the cluster C with the highest label entropy, i.e. the most
+                              pond/non-pond-mixed cluster, which is the confuser cluster by
+                              construction; flip 5% of the dataset's labels ALL INSIDE C and ALL
+                              in the 0 -> 1 direction, to mimic commission.
+REPORT for each arm:          detector recall on the known flips, and FPR on the untouched rows.
+```
+
+> **Prediction, stated before the run so it can fail: `recall(ARM B) << recall(ARM A)`, and quite
+> possibly `recall(ARM B)` at or below the untouched-row FPR, i.e. no power at all.** If that is what
+> comes out, the cleaning lane closes **on a measurement of our own instrument** rather than on an
+> argument, and it closes for every detector in the family at once, because they all share the
+> disagreement statistic. Cost: two extra training runs, **zero submissions**. Against Sec 8.3's rule
+> -- *"if a gate's control does not return the value arithmetic guarantees, every number it prints is
+> void"* -- this is the control, and it is the single highest-value cheap thing left in Q4.
+
+**R4 (revised) -- the class-symmetry table is now a DIRECTIONAL test, and its old decision rule is
+backwards.** Q4.4 said: *"if the skew toward the class you under-recall exceeds ~3:1, treat that as a
+positive finding of circularity."* Under the swap there is no under-recalled class, and the commission
+hypothesis makes a **positive prediction**: flags should skew toward **`y=1`** rows. Circularity makes
+the *same* prediction whenever the model's OOF errors skew that way, so **R4 on its own cannot separate
+the two** -- it never could, and under the old cell that was hidden. The table must be crossed with R2:
+
+| transformer flags skew | independent detector flags skew | reading |
+|---|---|---|
+| `y=1` | `y=1` | **evidence about the DATA** -- two inductive biases agree; commission hypothesis supported |
+| `y=1` | flat or `y=0` | **evidence about the MODEL** -- circularity; report as a null |
+| flat | flat | no detectable asymmetry; the commission hypothesis is not supported at this sample size |
+
+**R7 (new) -- model-free corroboration.** Report what fraction of the flagged rows fall inside ARM B's
+high-entropy cluster `C`, against the base rate. `C` is defined by k-means on raw temporal statistics
+with no model involvement, so an over-representation of flags inside `C` is **independent** evidence
+that the flags track the confuser manifold rather than the transformer's idiosyncrasies. This is the
+cheapest possible answer to "you deleted the rows your own model dislikes" and it costs one k-means.
+
+## Q4.6.5 -- Revised verdict table for Q4 (supersedes Q4.5)
+
+| question | answer after the correction |
+|---|---|
+| Is the noise real? | **Unchanged: very likely, ~2-5%.** Base rate 3.4% + domain confusers + published SOTA of F1~0.85 at that discrimination *with* data we lack |
+| Is it class-asymmetric? | **The literature predicts COMMISSION-dominant** (confusers annotated as ponds). Which is `y=1` noise in train, and `FN`-manufacturing noise in the test key |
+| Do we know some of the 27 FPs are correctly-classified rows with wrong labels? | **No -- the arrow runs the other way.** Commission noise in the key manufactures **false negatives**, and the FN pile is the small one. The claim as posed is refuted |
+| Does the asymmetry give cleaning a predicted sign? | **Yes, through a different channel: commission in TRAIN -> over-inclusive model -> false positives.** That mechanism predicts our exact signature (FP:FN = 1.6:1, realized 0.5736 vs true 0.5435), and the prediction is confirmed |
+| Then does cleaning help? | **In principle yes; in practice no.** Payoff is large only for systematic, feature-clustered noise, and every available detector is provably blind on exactly that set because the model fits it as signal and it generalizes out-of-fold |
+| What does it buy in the visible regime? | ~0.45 public rows, against a bar of 11. **~25x short** |
+| Does key noise explain the leader's gap? | **No.** Even at 5% key noise the oracle F1 ceiling is 0.953 and the leader is at ~0.918. ~0.036 F1 is genuinely reachable |
+| What is the bar, exactly? | **9 recovered FNs or 11 suppressed FPs of 333** = ~34 FP suppressions test-wide = **eliminating ~40% of all our false positives** |
+| Is an FN worth the same as an FP? | **No: `2/F1 - 1 = 1.268`.** One recovered miss is worth 1.27 suppressed false alarms |
+| Ship it? | **No, and now for a structural reason rather than an effect-size reason** |
+| Write it up? | **Yes, and it is a better section than before.** The dichotomy in Q4.6.2(v) plus the ARM-A/ARM-B control in R3 is a genuine methodological contribution and costs zero submissions |

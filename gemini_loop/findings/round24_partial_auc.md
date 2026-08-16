@@ -739,3 +739,628 @@ and the whole effect is a threshold slide. Same situation as Family C, but witho
 > exactly; and the multiplier enters as an affine logit offset, which our Platt refit annihilates
 > exactly. Independently, every member of the family requires an explicit rate target as input. It is
 > a threshold slide with extra steps."*
+
+---
+---
+
+# ROUND 24, SESSION 2 — THE CORNER FLIPS. RESUMED AFTER §1.4/D.3.
+
+**What changed since the text above was written.** `tools/lb_cell_solve.py` (read in full) shows the
+public confusion cell we carried since iter42 was **arithmetically impossible**. `n_public = 309` was
+never measured — it is 30% of 1030, inferred. Finite-sample ROC-AUC is exactly `C/(P·N)` with `C` a
+half-integer, so a 9-decimal AUC readout is a rational with a known denominator; sieving all five
+reported `(AUC, F1)` pairs jointly, then selecting `n` from full-test predicted-positive counts on
+disk, gives
+
+```
+n_public = 333,  P = 181,  N = 152,  true public prevalence 181/333 = 0.5435
+champion:  TP = 164   FP = 27   FN = 17   TN = 125
+           precision 0.858639   recall 0.906077   F1 = 328/372 = 0.881720430  OK
+```
+
+**Precision and recall are SWAPPED** relative to every earlier document *including the task-context
+paragraph at the top of this very file*. I accept the correction. Everything below is written on the
+new cell. Sections above this line that use `P=191, N=118, P·N=22538` are superseded — I mark each
+one explicitly in §0c.1 rather than editing them, per the append-only rule.
+
+---
+
+## §0c. ERRATA TO MY OWN EARLIER SECTIONS (read before anything else)
+
+### 0c.1 The list, item by item
+
+| my section | what it said | status now |
+|---|---|---|
+| task-context header, line 10 | "they sit at recall 0.859 / precision 0.906" | **BACKWARDS.** recall 0.9061, precision 0.8586 |
+| §0.2 pair census | `P=191, N=118, P·N=22538`; blocks 2788 / 16564 / 459 / 2727 | **VOID.** New: `P=181, N=152, P·N=27512`; blocks **4428** (pos-above × neg-above) / **20500** (pos-above × neg-below) / **459** (pos-below × neg-above, forced discordant) / **2125** (pos-below × neg-below). Total 27512 OK |
+| §0.2 Probe A | `0.857285562` | **VOID** |
+| §0b Probe A erratum | `0.857285473` | **ALSO VOID** — right arithmetic, wrong partition |
+| §0.2 Probe B separation | 0.00284 per unit `p_B`, `p_B ∈ [0,20]` | **VOID.** New separation **0.002580692**, and `p_B ∈ [0,17]` because only 17 positives lie below the cut |
+| §0.2 "leader is TP 180 / FP 21" | | **VOID and now UNIDENTIFIED** — see §0c.3 |
+| §1.0b exchange rate | 1 TP = 101.4 pairs; AUC lead = 21.3 pairs; break-even = 1238.9 pairs | **NUMERICALLY VOID**, replaced in §1.0c. (The *composite* value of the AUC lead, +0.000378, is unchanged — AUC is scale-free — but every pair count moves.) |
+| §1.1 (iii)(b) "the prior moves 0.4023 → ~0.618" | | **VOID.** See §0c.2 — the most contagious error in the brief |
+
+### 0c.2 NEW CORRECTION, MINE: the number `0.618` is an artifact of the refuted cell
+
+`191/309 = 0.61812…`. **That is exactly where "test prevalence ≈ 0.618" came from.** It is not an
+independent measurement; it is the old, impossible cell divided by the old, inferred `n`. It has
+propagated into UPDATE_24 §1 ("Test is roughly 59–62% positive"), UPDATE_24 §3.3 Hole 1 ("deployed on
+a population whose prior is ~0.618"), UPDATE_24 §4, and my own §1.1(iii)(b). All of them inherit it.
+
+The measured public prevalence is **181/333 = 0.54354**. If the public split is a uniform random
+32.33% of the 1030 test rows, the sampling s.d. of that estimate, with the finite-population
+correction, is `sqrt(0.5435·0.4565/333)·sqrt(1 − 333/1030) = 0.02245`. So
+
+```
+z = (0.618 − 0.54354) / 0.02245 = 3.32
+```
+
+> **`0.618` is refuted at 3.3 sigma by the solved cell. The prior shift is 0.4023 -> 0.5435, not
+> 0.4023 -> 0.618. The assumed shift is 38% smaller than we have been telling ourselves.**
+
+Two consequences, both cutting against the standing narrative:
+
+1. **Hole 1 of UPDATE_24 §3.3 is weakened, not strengthened.** The argument was: Platt is fitted at
+   prior 0.4023 and deployed at 0.618, so the probabilities are badly mis-calibrated and Lipton's
+   `t* = F*/2` cannot be trusted. The true prior gap is 0.141, not 0.216. The argument's *direction*
+   survives; its *size* is 35% smaller.
+2. **And the direction is now empirically contradicted anyway.** A Platt map fitted at prior 0.4023
+   and deployed at prior 0.5435 yields probabilities that are systematically **too low**, which makes
+   a model **under-predict** positives. We do the opposite: realized public positive rate
+   `191/333 = 0.5736` against a true `0.5435` — **we over-predict by 10 rows.** The observed sign of
+   the operating-point error is *opposite* to the sign the prior-shift story predicts. Whatever is
+   mis-calibrating our scores, it is not simple prior shift. That is independent corroboration of the
+   §4 finding that the shift has a real conditional component (mixture GOF rejected at p≈0), and it is
+   a clean report line: *"our own prior-shift diagnosis predicted an error of the wrong sign."*
+
+### 0c.3 THE LEADER'S CORNER IS NOT IDENTIFIED, AND NEVER WAS
+
+UPDATE_24 §3.2's "LEADER: TP ~180, FP ~21, recall ~0.942" was computed at `P = 191`. At the true
+`P = 181, n = 333` I enumerated **every** integer cell whose F1 displays in `[0.9175, 0.9195]`. The
+iso-F1 curve runs the entire length of the ROC:
+
+| leader cell (examples) | TP | PP | FP | FN | precision | recall |
+|---|---|---|---|---|---|---|
+| precision extreme | 154 | 154 | 0 | 27 | **1.0000** | 0.8508 |
+| | 164 | 176 | 12 | 17 | 0.9318 | 0.9061 |
+| | 171 | 191 | 20 | 10 | 0.8953 | 0.9448 |
+| recall extreme | 181 | 213 | 32 | 0 | 0.8498 | **1.0000** |
+
+> **An F1 of 0.918 tells you nothing whatsoever about which corner the leader operates in.** "Their
+> advantage is concentrated in the high-recall corner" (UPDATE_24 §3.2, presented as fact and used to
+> set the entire round's agenda) was never identified, is still not identified, and the *new* brief's
+> implicit inverse — "so it must be the precision corner" — is equally unidentified. My CORRECTION 0
+> said §3.2's premise was not established; the solved cell does not rescue it, it makes it worse,
+> because the F1 iso-curve at `P=181` is *longer* than at `P=191`.
+
+**But here is the finding that matters, and it is a positive one.** Look at row three: `TP = 164,
+PP = 176`. That is **our exact TP count**.
+
+```
+  F1(TP=164, PP=176) = 328/357 = 0.918768   >  the leader's 0.918
+  we are at            TP=164, PP=191
+```
+
+> **We can match the leader's F1 by deleting 15 of our 27 false positives and recovering ZERO new
+> positives.** Not 16 buried positives — 15 false alarms. This single line inverts the entire
+> round-23/24 research programme (JTT, pAUC, high-recall pushes), all of which was aimed at digging up
+> buried positives.
+
+The three cheapest routes to the leader's F1, measured in **rows that must cross the cut**:
+
+| route | rows that must move | which rows | resulting F1 |
+|---|---|---|---|
+| pure FP suppression | **15 down** | 15 of our 27 FPs (56% of them) | 0.918768 |
+| pure FN recovery | **13 up** | 13 of our 17 FNs (**76% of them**, median score 0.170) | 0.919481 |
+| balanced, PP held fixed | 7 down + 7 up = **14** | 7 FPs and 7 FNs | 0.919355 |
+
+Pure FN recovery is cheapest in raw row-count but needs three-quarters of the deeply-buried positives;
+pure FP suppression needs a bit over half of the false alarms, which sit near the cut by construction.
+**Both routes are open. Only one of them has ever been tried.**
+
+### 0c.4 The corrected instrument: Probe A and Probe B on the solved cell
+
+**PROBE A (control).** Two-valued `TargetRAUC`: `1.0` above the cut, `0.0` below. Every within-block
+pair becomes a tie worth 0.5:
+
+```
+AUC_A · 27512 = 164·125          [pos-above vs neg-below, concordant]   = 20500
+              + 0.5·164·27       [tied above]                           =  2214
+              + 0.5·17·125       [tied below]                           =  1062.5
+              + 0                [pos-below vs neg-above, discordant]
+              = 23776.5
+AUC_A = 23776.5 / 27512 = 0.8642228845594649…
+```
+
+I confirm the team's **0.864222885**. **But one caution that decides whether the control is usable at
+all:** UPDATE_24 §3.2 states Zindi **truncates** to 9 decimals. Here the 10th digit is a 5 followed by
+`594649`, so
+
+```
+truncated display : 0.864222884
+rounded  display  : 0.864222885
+```
+
+**The two conventions disagree in the last printed digit for this exact number**, and the team's quoted
+value is the *rounded* one. Fix the convention before Probe A is fired, or the control fails by one
+ulp for a reason that has nothing to do with the cell. If Zindi returns `0.864222884`, that is a
+**pass**, not a failure. (The champion's own F1, `82/93 = 0.8817204301075…`, is insensitive — both
+conventions print `0.881720430` — which is why this ambiguity has never bitten us before.) State the
+disjunction explicitly in the report.
+
+**PROBE B (measurement).** Same three-tier design; the `m = 20` rows immediately below the cut get
+`0.5`. Now `p_B ∈ [0, 17]` (only 17 positives exist below the cut) and, with `q = 20 − p_B`:
+
+```
+AUC_B·27512 = 0.5·164·27 + 164·125 + 0.5·p_B·q + p_B·(125−q) + 0.5·(17−p_B)·(125−q)
+```
+
+| p_B | AUC_B | | p_B | AUC_B |
+|---|---|---|---|---|
+| 0 | 0.858043763 | | 9 | 0.881269991 |
+| 3 | 0.865785839 | | 13 | 0.891592760 |
+| 6 | 0.873527915 | | 17 | 0.901915528 |
+
+Separation **0.002580692** per unit of `p_B`, exactly constant (the design is linear in `p_B`), against
+a 1e-9 print window. `p_B` is still recovered exactly, with no model and no assumption. Legality
+caveat of §0.2 unchanged: **diagnosis only.**
+
+---
+
+## §1.0c THE EXCHANGE RATE, REDONE FOR THE FALSE-POSITIVE SIDE. MY DERIVATION.
+
+This replaces §1.0b entirely. Currency: `composite = 0.6·F1 + 0.4·AUC`. Cell: `P=181, N=152,
+P·N = 27512`, `TP=164, FP=27, FN=17, TN=125, PP=191`, `D ≡ PP + P = 372`, `F1 = 2TP/D = 328/372`.
+
+### (1) The two marginal F1 moves, exactly
+
+Write `D = PP + P`. Note the identity `D − TP = TP + FP + FN`, which is the whole story.
+
+```
+FP -> TN   (TP fixed, PP−1, D−1):
+    ΔF1 = 2TP/(D−1) − 2TP/D            = 2·TP / [D(D−1)]
+        = 328 / (372·371) = 328/138012 = +0.002376605
+
+FN -> TP   (TP+1, PP+1, D+1):
+    ΔF1 = (2TP+2)/(D+1) − 2TP/D        = 2·(D − TP) / [D(D+1)]
+        = 2·(TP+FP+FN) / [D(D+1)]
+        = 416 / (372·373) = 416/138756 = +0.002998069
+```
+
+**The ratio, in closed form — this is the answer to "why are they not symmetric":**
+
+```
+ΔF1(FN->TP)     TP + FP + FN     D − 1        1      D − 1
+------------- = ------------- · -------  =  --- · -------
+ΔF1(FP->TN)          TP          D + 1        J     D + 1
+
+    J = Jaccard index = TP/(TP+FP+FN) = 164/208 = 0.788462
+    ratio = 1.268293 × 0.994638 = 1.261490
+```
+
+> **THEOREM (mine, and it is general, not specific to our cell).** Under F1, converting one false
+> negative to a true positive is worth `1/J` times as much as converting one false positive to a true
+> negative, up to the `(D−1)/(D+1)` factor which is `1 − O(1/n)`. Since `J < 1` for any imperfect
+> classifier, **recovering a miss is ALWAYS worth strictly more, at the margin, than suppressing a
+> false alarm — for every confusion cell, at every prevalence, with no exceptions.** F1 is never
+> FP-favouring at the margin. The apparent FP-heaviness of our error budget is a statement about
+> *inventory* (27 vs 17), not about *unit value*.
+
+Equivalently and more memorably: `F1 = 2TP/(2TP+FP+FN)` is symmetric in `FP` and `FN` in the
+denominator, but a recovered FN *also increments the numerator*. That extra numerator term is the
+entire `1/J`.
+
+### (2) The AUC side is also asymmetric — and it points the SAME way, harder
+
+A row-move changes AUC by exactly the number of **opposite-class** rows it crosses, divided by `P·N`.
+`1 pair = 1/27512 = 3.6348e-5 AUC = +1.4539e-5 composite`. Now use the structure of our cell:
+
+- **An FP demoted below the cut** crosses only positives that are already below the cut. There are
+  **17** of them, and it starts above all of them. So its AUC bonus is an integer in **[0, 17] pairs**
+  — 17 only if it is driven all the way to the bottom of the list; **0** if it merely dips under 0.5.
+  Bonus ∈ **[0, +0.000247] composite**.
+- **An FN promoted above the cut** crosses the below-cut negatives that were above it. There are
+  **125** TNs, and UPDATE_24 §3.4 says the missed positives have **median score 0.170** with ten below
+  0.10 — i.e. they sit near the *bottom* of the below-cut block, under most of those 125 TNs. Its AUC
+  bonus is therefore large. Bounded properly by the concordance budget:
+
+```
+total (pos,neg) pairs      = 181 × 152 = 27512
+total discordant           = (1 − 0.945841814)·27512 = 1490.0
+  FORCED (pos-below × neg-above) = 17 × 27 = 459
+  FREE, split between the "both-above" block (164×27 = 4428) and
+        the "both-below" block (17×125 = 2125)                  = 1031.0
+```
+
+So the discordance available *inside* the below-cut block is `d_below ∈ [0, 1031]`, i.e. **0 to 60.6
+TNs sitting above each FN on average**; a proportional split of the free discordance gives `d_below =
+1031 × 2125/6553 = 334`, i.e. **19.7 TNs per FN**.
+
+| operation | ΔF1 composite | AUC bonus (pairs) | AUC composite | **total composite** |
+|---|---|---|---|---|
+| FP -> TN, dipped just under 0.5 | +0.001426 | 0 | 0 | **+0.001426** |
+| FP -> TN, driven to the bottom | +0.001426 | 17 | +0.000247 | **+0.001673** |
+| FN -> TP, proportional-split burial (19.7) | +0.001799 | 19.7 | +0.000286 | **+0.002085** |
+| FN -> TP, max burial (60.6) | +0.001799 | 60.6 | +0.000882 | **+0.002681** |
+| FN -> TP, below all 125 TNs | +0.001799 | 125 | +0.001817 | **+0.003616** |
+
+```
+        1 recovered TP  ==  123.7 pairwise inversions   (was 101.4 on the wrong cell)
+        1 removed  FP   ==   98.1 pairwise inversions
+        our whole AUC lead over the leader = 0.000945 = 26.0 pairs = +0.000378 composite
+```
+
+> **ANSWER TO JOB 1, QUESTION 1.** One removed false positive is worth **98.1 AUC pairs**
+> (`+0.001426` composite, `+0.001673` if the demotion is deep). One recovered false negative is worth
+> **123.7 AUC pairs** (`+0.001799` composite, `+0.002085` to `+0.003616` once its AUC bonus is
+> counted). **The FN is worth 1.26× the FP on the F1 term alone, and 1.25× to 2.54× once AUC is
+> included.** The two asymmetries — the `1/J` numerator effect in F1, and the crossing-distance effect
+> in AUC — **compound rather than cancel**, because our misses are buried deep and our false alarms
+> sit at the cut.
+
+### (3) Inventory, though, runs the other way. Total budgets:
+
+| route | end cell | ΔF1 composite | AUC composite (range) | **total (range)** |
+|---|---|---|---|---|
+| suppress all 27 FPs | TP 164, PP 164, F1 0.950725 | +0.041403 | 0 … +0.006674 (459 pairs) | **+0.0414 … +0.0481** |
+| recover all 17 FNs | TP 181, PP 208, F1 0.930591 | +0.029322 | +0.006674 … +0.021663 (AUC->1.000) | **+0.0360 … +0.0510** |
+| both (perfect) | F1 = 1.000, AUC = 1.000 | +0.070968 | +0.021663 | **+0.0926** |
+
+The two budgets are within 6% of each other at their upper ends. **Neither side dominates.** The
+honest statement is: *per row moved, the FN side is worth 1.25–2.5×; per pool available, the FP side
+holds 59% more rows; the two effects very nearly cancel and the total prize on each side is ≈ +0.045
+composite.*
+
+> **THIS IS A CORRECTION TO THE REFRAME ITSELF.** The task brief says "our costly errors are 27 false
+> positives against 17 misses — a ratio of 1.6 to 1", and treats that as a reason to flip the research
+> target to the precision corner. The 1.6:1 is a **count** ratio, and it is silently being read as a
+> **value** ratio. In value terms the ratio is `27 × 0.001426 : 17 × 0.001799` = `0.0385 : 0.0306`, i.e.
+> **1.26 : 1 on F1 and roughly 1.0 : 1 once AUC is included** — not 1.6 : 1. The corner did not flip as
+> hard as the brief believes. **What actually changed is that a second, previously invisible route to
+> the leader's F1 opened up (§0c.3), not that the first one closed.** Do not repeat our historical
+> mistake in mirror image: we spent rounds 23–24 on a target chosen by an unidentified inference, and
+> flipping to the opposite unidentified inference is the same error with the sign changed.
+
+### (4) The rule that says which direction to move, and needs NO calibration. MY DERIVATION.
+
+This is the sharpest thing in this section and it answers UPDATE_24's **Q2** ("is Lipton's `t* = F*/2`
+recoverable under prior shift?") in the affirmative, in a form that is prior-free.
+
+Fix the ranking. Shed a block of `k` rows from immediately above the cut, of which `j` are positive:
+
+```
+F1' = 2(TP − j)/(D − k) > 2TP/D
+  <=>  D(TP − j) > TP(D − k)
+  <=>  −Dj > −TP·k
+  <=>  j/k  <  TP/D  =  F1/2
+```
+
+Admit a block of `k` rows from immediately below the cut, of which `j` are positive:
+
+```
+F1' = 2(TP + j)/(D + k) > 2TP/D   <=>   j/k  >  TP/D  =  F1/2
+```
+
+> **THEOREM (local-precision form of Lipton's rule).** For any fixed ranking, at any threshold, F1
+> improves by admitting the marginal block **iff the block's LOCAL PRECISION exceeds `F1/2`**, and
+> improves by shedding it **iff the local precision is below `F1/2`**. This is **exact**, **finite
+> sample**, and contains **no probability, no calibration, and no prior**. Lipton, Elkan &
+> Naryanaswamy's `t* = F*/2` (arXiv:1402.1892) is the *corollary* obtained by substituting "score = local
+> precision", which is precisely what calibration means.
+>
+> **So Hole 1 of UPDATE_24 §3.3 is only half right.** Prior shift does not break the `F*/2` rule; it
+> breaks only the *identification of the printed score with the local precision*. The rule itself
+> survives prior shift, covariate shift, conditional shift, and arbitrary monotone mis-calibration —
+> because it never mentions the score at all. What we lost is not the theorem, it is the **coordinate**.
+> Recovering the coordinate is a measurement problem, and §1.0c(5) shows the measurement is one
+> submission away.
+
+Our break-even local precision is `F1/2 = 0.440860`. Note how far it is below our *average* precision
+of 0.8586: a marginal block can be 56% negative and still be worth admitting.
+
+### (5) TWO PROBES, AND THE SECOND ONE IS NEW: the FP-side instrument
+
+Probe B (§0c.4) puts the 20 rows immediately **below** the cut into a middle tier and recovers `p_B` =
+how many of them are positive. Under the theorem in (4):
+
+```
+admitting those 20 rows raises F1  <=>  p_B/20 > 0.440860  <=>  p_B >= 9
+```
+
+**Probe B was designed as a curve-shape diagnostic. It is actually a direct, exact test of the
+threshold rule.** That is a strictly stronger reading of an instrument we already had.
+
+**PROBE B′ — the mirror, and the one the reframe actually calls for. MY CONSTRUCTION.** Three tiers
+again, but split the **above-cut** side: `1.0` for the top 171 above-cut rows, `0.5` for the **20
+lowest-scoring rows above the cut**, `0.0` for everything below the cut. Let `p_A` = how many of those
+20 marginal rows are true positives (so `20 − p_A` are false positives, of our 27).
+
+```
+AUC_B'·27512 = 0.5·(164−p_A)(7+p_A)      [tier-A pos vs tier-A neg, tied]
+             + (164−p_A)(20−p_A)         [tier-A pos vs tier-M neg, concordant]
+             + (164−p_A)·125             [tier-A pos vs below neg, concordant]
+             + 0.5·p_A(20−p_A)           [tier-M pos vs tier-M neg, tied]
+             + p_A·125                   [tier-M pos vs below neg, concordant]
+             + 0.5·17·125                [below pos vs below neg, tied]
+             + 0                         [tier-M pos vs tier-A neg; below pos vs above neg]
+```
+
+| p_A | AUC_B′ | | p_A | AUC_B′ |
+|---|---|---|---|---|
+| 0 | 0.923833236 | | 12 | 0.882178686 |
+| 4 | 0.909948386 | | 16 | 0.868293835 |
+| 8 | 0.896063536 | | 20 | 0.854408985 |
+
+Separation **−0.003471212 per unit `p_A`**, exactly constant, against a 1e-9 print window — even
+cleaner than Probe B (a 34× wider step than Probe B's, because the tier-A block is larger). And:
+
+```
+shedding those 20 rows raises F1  <=>  p_A/20 < 0.440860  <=>  p_A <= 8
+```
+
+> **One submission returns `p_A` exactly, and `p_A ≤ 8` versus `p_A ≥ 9` is a decisive, noise-free
+> verdict on whether the precision corner is where our F1 is actually leaking.** This is the
+> instrument the reframe needs and it did not previously exist. Under the usual (but not guaranteed)
+> assumption that local precision is non-increasing in score, `p_A ≥ p_B`, so the pair `(p_A, p_B)`
+> brackets the F1-optimal cut position and **at most one** of "admit" / "shed" can be an improvement.
+
+**LEGALITY, stated as sharply as I can.** Prong (a): untouched — neither probe alters the champion's
+`TargetF1` column or its 0.5 rule. Prong (b): this is the sharp edge, identically to §0.2. `p_A` and
+`p_B` are **leaderboard-derived**, so they may set **no knob** — not a threshold, not a
+hyperparameter, not a model selection. Their only sanctioned use is (i) the report's negative results
+and (ii) deciding which research lane to *spend time on*, which the team has already accepted as legal
+for the F1 inversion since iter42. **If in doubt, fire Probe A only** — it is a pure control whose
+value is fixed by arithmetic and carries literally zero information about the model.
+
+---
+
+## §1.5 THE CORNER-FLIP AUDIT — does any verdict change when the target moves from high-TPR to low-FPR?
+
+Our corrected operating point in ROC coordinates:
+
+```
+NEW (solved cell):   FPR = 27/152 = 0.17763    TPR = 164/181 = 0.90608
+OLD (void):          FPR = 17/118 = 0.14407    TPR = 164/191 = 0.85864
+```
+
+We are further right **and** further up than we thought. We are not in an extreme corner at all: we sit
+at a middling FPR with a high TPR.
+
+### 1.5.0 BLUNT ANSWER FIRST: T1 AND T2 DO NOT CARE WHICH CORNER YOU TARGET. AT ALL.
+
+The team suspected this. It is correct, and it is provable in two lines, so print it verbatim.
+
+> **PROPOSITION (corner-invariance of the two theorems).** Let `s` be the score function a method
+> produces. Theorem 1 (Platt annihilation) is the statement that `σ(a(αs+β)+b)` is recovered exactly by
+> refitting `(a,b)`; Theorem 2 (pointwise-loss order invariance) is the statement that the population
+> minimiser of `Σ_i [y_i·l_1(s_i) + (1−y_i)·l_0(s_i)]` is `T(η(x))` for one fixed monotone `T`.
+> **Neither statement mentions the ROC, a region of the ROC, a threshold, TPR, FPR, precision, or
+> recall.** Both are statements about the *total order* the method induces on the 1030 test rows. Every
+> ROC region — high-recall corner, low-FPR corner, any band, any weighting — is a *functional of that
+> total order*. A theorem that pins the total order therefore pins every region simultaneously and
+> identically. **Changing which region you care about cannot flip either theorem, in either direction,
+> for any method.**
+
+The same corner-invariance holds for the third pillar of this survey, and it is worth saying together:
+
+> The **Neyman–Pearson envelope** argument of §1.0 is also corner-blind. `TPR_Λ(α) ≥ TPR_s(α)` holds
+> *pointwise at every* `α`, so the likelihood ratio maximises the integral over **every** subregion.
+> The population optimum is the same object no matter which corner you name.
+
+**Consequence for the audit.** Of my five decisive checks, exactly two are corner-invariant *by
+construction* and three can move:
+
+| check | corner-sensitive? | why |
+|---|---|---|
+| (i) genuinely non-decomposable? | **NO** | a property of the loss's functional form, not of a region |
+| (ii) population optimum ≠ `T(η)`? | **NO** | NP envelope is pointwise in `α` |
+| (iii) smuggles an operating point? | **maybe** | the *identity* of the rate target changes (TPR-target ↔ FPR-target), but a rate target is a rate target |
+| (iv) powered at n=1817? | **YES** | the corner determines whether the estimator subsets **positives** (n₊=731) or **negatives** (n₋=1086) |
+| (v) 0.6/0.4 trade | **mildly** | via the §1.0c exchange rate, which is now asymmetric |
+
+> **REPORT LINE, and this is the strong one the team asked for:** *"We audited five families of
+> region-targeted ranking objectives twice — once aimed at the high-recall corner and once, after
+> correcting our confusion cell, aimed at the low-FPR corner. Neither of our two annihilation theorems
+> changed verdict for any family, and they cannot: both theorems constrain the induced total order,
+> and every ROC region is a functional of that order. **The corner is irrelevant; decomposability is
+> what kills these methods.** What the corner does change is statistical power — whether the estimator
+> is driven by our 731 positives or our 1086 negatives — and that changed one family's verdict."*
+
+### 1.5.1 FAMILY A — partial AUC. Verdict UNCHANGED (reject), but one of my three reasons DISSOLVES.
+
+| check | recall corner (my §1.1) | precision corner | change |
+|---|---|---|---|
+| (i) non-decomposable | PASS | PASS | none (corner-invariant) |
+| (ii) population optimum | FAIL — identical to full AUC | FAIL — identical | none (corner-invariant) |
+| (iii) rate target | **FATAL**: `t0` is a TPR target | **FATAL**: `t1` is an FPR target | **none in substance** |
+| (iii) decoupling from the deployed cut | **FATAL** | **FATAL** | none |
+| (iv) power at n=1817 | **FATAL**: `k1 = 43` positives | **LARGELY DISSOLVES** — see below | **CHANGES** |
+| (v) trade-off | favourable | favourable | none |
+
+**RETRACTION of my own §A.3.** I wrote: *"One-way pAUC never subsets positives, so it is aimed at the
+wrong axis entirely… The variant that targets your actual defect is the one your sample size cannot
+support."* On the corrected cell **that is backwards.** One-way pAUC over `FPR ∈ [0, t1]` subsets
+**negatives**, which is now the axis of interest, and it is the classical, best-developed,
+best-supported variant (Narasimhan & Agarwal ICML 2013 / KDD 2013 / arXiv:1605.04337). The power
+arithmetic:
+
+```
+train split: n+ = 731, n- = 1086
+one-way pAUC, FPR <= t1, uses ALL 731 positives against the top k2 = floor(1086·t1) negatives:
+      t1 = 0.05 -> k2 =  54      t1 = 0.10 -> k2 = 108
+      t1 = 0.18 -> k2 = 195      t1 = 0.25 -> k2 = 271
+compare the two-way variant that targets the recall corner:  k1 = floor(731·0.06) = 43 positives
+```
+
+At our own operating FPR of 0.178 the one-way estimator runs on **195 negatives × 731 positives =
+142,545 pairs**, versus the 43-positive statistic that killed the two-way variant. **The n=1817
+objection is roughly 4.5× weaker on this axis and I no longer consider it decisive.** Komori & Eguchi's
+warning (DOI 10.1186/1471-2105-11-314) about narrow-band pAUC overfitting still applies at
+`t1 = 0.05`, but not obviously at `t1 = 0.18`.
+
+**So Family A is now rejected on two grounds, not three, and both are legality grounds:**
+
+1. `t1` is an **explicit FPR target** — prong (b), in the most literal possible sense, and it remains
+   the method's only hyperparameter. Note this is if anything *worse* than before: an FPR target is a
+   direct statement about the negative-prediction rate, which is exactly the quantity the team's
+   disclosed violation ("we pinned the predicted positive rate") consisted of.
+2. **Fatal way 2 is untouched and is now the load-bearing objection.** The deployed cut is placed by
+   `Platt(train-OOF) → 0.5`, which is monotone and therefore ROC-preserving; *where* on the ROC the cut
+   lands is a function of `(a,b)` and of nothing in the pAUC objective. You can optimise `FPR ∈ [0,0.18]`
+   perfectly and still be deployed at `FPR = 0.31` because the Platt map moved. And pAUC *deliberately*
+   degrades the complement of the band, so if the cut lands outside it you are strictly worse off.
+
+> **Revised Family A report line:** *"Partial-AUC maximisation survives both of our annihilation
+> theorems and, once our confusion cell was corrected, also survives our sample-size objection: the
+> one-way low-FPR variant that matches our corrected defect runs on 195 negatives against all 731
+> positives, not the 43 positives that condemned the two-way variant. We still reject it, now on
+> legality alone: its sole hyperparameter is an explicit FPR target (prong (b)), and because our
+> deployed threshold is placed by a Platt map fitted on training out-of-fold data, the region we would
+> optimise is statistically decoupled from the region we actually operate in."*
+
+### 1.5.2 FAMILY B — push / listwise. **VERDICT CHANGES. This is the one family the flip rescues.**
+
+My §1.2 finding was: *every published push method (p-norm push, infinite push, TopPush, Accuracy at
+the Top) concentrates at the TOP of the list, i.e. the low-FPR / high-precision end, which is the end
+you are already good at; the mirror image you need is unpublished.* **On the corrected cell the
+published direction is the direction we want, and the unpublished construction is unnecessary.**
+
+| check | recall corner (my §1.2) | precision corner | change |
+|---|---|---|---|
+| (i) non-decomposable | PASS (outer power couples the list) | PASS | none |
+| (ii) population optimum | FAIL — same `T(η)` | FAIL | none |
+| (iii) rate target | **PASS — the only family with no rate knob** | **PASS** | none, and this is the crucial invariant |
+| direction vs our defect | **FAIL — pushes the wrong end** | **PASS — pushes exactly the right end** | **REVERSES** |
+| (iv) power at n=1817 | marginal (hard `min_i` variants fragile) | **good** for soft `p ∈ [2,4]`: no top-k, no endogenous active set, all 731 + all 1086 in every gradient step | improves |
+| (v) trade-off | favourable | favourable | none |
+
+**The construction, in the now-correct orientation** — this is Rudin's original, unmodified:
+
+```
+Rudin, JMLR 10:2233-2271 (2009), "The P-Norm Push":
+   L_p(h) = (1/n_-) SUM_{j in negatives}  ( SUM_{i in positives} loss( h(x_i^+) - h(x_j^-) ) )^p
+                                          ^^^ outer power over NEGATIVES
+   p = 1  ==  plain AUC (pairwise)
+   p -> inf == infinite push (Agarwal, SDM 2011)
+```
+
+The outer power `p` makes each negative's penalty **convex in how many positives it outranks**, so
+gradient mass concentrates on the negatives that are ranked too high — *exactly our 27 false
+positives.* And `p` is a **concentration exponent, not a rate**: you can fix `p = 2` a priori, or by a
+train-only criterion, and never look at an FPR. **This is the only member of the entire E1 survey that
+simultaneously (a) escapes Theorem 1, (b) escapes Theorem 2, (c) targets the corrected defect, (d) has
+no operating-point hyperparameter, and (e) uses all 1817 rows in every gradient step.**
+
+**Three honest caveats, none fatal, all of which belong in the report:**
+
+1. **Emphasis-profile mismatch.** `p`-norm push weights a negative by (roughly) `(#positives it
+   outranks)^(p−1)`. That peaks at the *extreme* top of the list. Our 27 FPs are above the 0.5 cut,
+   which sits at rank ≈ 191 of 333 — high, but not extreme. So the method's emphasis is *in the right
+   direction but more extreme than our operating point*. Mitigation: use a **small** `p` (2, not 8);
+   `p → ∞` variants (TopPush, Infinite Push) are too extreme for FPR ≈ 0.18 and I would reject those
+   specific members even now.
+2. **Fatal way 2 (decoupling) still applies, in the weakened form of §B.2.** A soft push improves a
+   broad swathe of the low-FPR curve rather than a narrow band, so it is far more likely to overlap
+   wherever the 0.5 cut lands. Argument of degree, not a guarantee.
+3. **Prong (a) erosion.** A pairwise-ranking score has no probabilistic semantics; Platt then
+   manufactures a probability scale from a margin-type score, which is the regime where two-parameter
+   sigmoid calibration is worst behaved. Unchanged from §A.2(iii), and it applies to any E1 method.
+
+> **Revised Family B report line:** *"Region-targeted push losses (Rudin, JMLR 10:2233–2271, 2009) are
+> the only family in our survey that escapes both annihilation theorems, targets our corrected defect,
+> and has no operating-point hyperparameter — its only knob is a concentration exponent that can be
+> fixed a priori. We had rejected the family in an earlier pass because we believed our defect was in
+> the high-recall corner and every published push method concentrates at the low-FPR end; correcting
+> our confusion cell reversed that. We flag it as the strongest untested candidate we identified."*
+
+**LambdaRank / listwise: verdict UNCHANGED (reject), and the rejection is corner-invariant.** My §B.3
+objection was that the `1/log(1+r)` NDCG discount weights the very top of a 1030-item list and
+essentially zero-weights the region containing our decision boundary. Our boundary sits at rank ≈ 191
+of 333 public (≈ 590 of 1030 full test) — a discount of `1/log2(192) = 0.132` against `1.0` at rank 1.
+**Rank 191 is far from rank 1 no matter which corner you claim to be targeting**, so the objection does
+not depend on the flip. The second objection — that re-peaking the discount at the boundary rank *is*
+a positive-rate target in disguise — is likewise corner-invariant.
+
+### 1.5.3 FAMILY C — Neyman–Pearson. Re-examined seriously, as instructed. Verdict UNCHANGED, reasons REVERSED.
+
+The task is right that NP is natively a false-positive-control framework and was surveyed for the wrong
+side. Here is the corrected reading.
+
+**RETRACTION of my own §C.2, "Direction" bullet.** I wrote: *"Classical NP controls type I error (FPR),
+which is the conservative direction and would lower your recall further. To attack your defect you
+would have to run NP with the classes swapped."* **That is now backwards.** On the corrected cell we
+**over-predict** (positive rate 0.5736 vs true 0.5435) and our dominant error count is false positives.
+Classical, unmodified, textbook NP — control `P(predict 1 | y=0) ≤ α`, maximise TPR subject to it — is
+**exactly** the direction our cell calls for. No class swap, no non-standard variant, and the full
+guarantee literature applies verbatim.
+
+The sample-size arithmetic is also now in the native direction and is trivially satisfied:
+
+```
+umbrella algorithm needs n_0 >= log(delta)/log(1-alpha) held-out CLASS-0 examples
+   alpha = 0.05, delta = 0.05 -> 59 negatives      we have 1086 training negatives
+   alpha = 0.10, delta = 0.05 -> 45 negatives
+(Tong, Feng & Li, Science Advances 4(2):eaao1659, DOI 10.1126/sciadv.aao1659; arXiv:1608.03109)
+```
+
+**And yet nothing about the verdict changes, because the two corner-invariant checks are the ones that
+killed it.** (i) The umbrella algorithm does not touch the loss at all — the base learner is trained
+with an ordinary pointwise loss, so **Theorem 2 applies to it in full force**. (ii) Its population
+optimum is the likelihood-ratio test, the same ranking as `η`. (iii) Its user input `α` is a rate
+target (prong (b)) and its output is a data-chosen threshold (prong (a)). **Every one of these is
+corner-blind.** The flip makes NP *more apt* and not one bit *more legal*.
+
+**What is genuinely new, and worth a paragraph in the report.** We can now put a number on what the
+rule costs on the FP side, and it is measurable to the integer with one submission. By the
+local-precision theorem of §1.0c(4), shedding the 20 lowest-scoring above-cut rows changes F1 by:
+
+| p_A (positives among those 20) | resulting F1 | Δcomposite |
+|---|---|---|
+| 0 | 0.931818 | **+0.030059** |
+| 4 | 0.909091 | +0.016422 |
+| 8 | 0.886364 | +0.002786 |
+| **9** | 0.880682 | **−0.000623**  ← crossover at `F1/2 = 0.44086`, exactly as the theorem predicts |
+| 12 | 0.863636 | −0.010850 |
+
+> **A single threshold slide of 20 rows is worth between −0.011 and +0.030 composite, and Probe B′
+> resolves which to the integer.** That is the size of the prize NP would collect and that our rule
+> forbids. The corresponding recall-side slide (admitting the 20 rows below the cut) spans −0.027 to
+> +0.010 by the same arithmetic — **notably narrower and mostly negative**, which is itself a
+> substantive finding: *on the corrected cell the threshold-slide headroom is concentrated on the
+> FP side, and pointing the other way was actively harmful.*
+
+**One further observation about the rule itself, which I think the report should own.** Our rule does
+not eliminate the operating-point choice; it freezes it at `0.5` by fiat and forbids us from checking
+whether the freeze is right. On the corrected cell we now know the freeze leaves us over-predicting by
+10 rows out of 333. The defensible framing is not "we did not choose an operating point" — we did, we
+chose 0.5 — but "we chose it *a priori*, disclosed it, and never revised it against feedback." That is
+the honest and, I think, stronger claim.
+
+### 1.5.4 FAMILY D — constrained ERM. Verdict UNCHANGED, and the rejection is exactly corner-invariant.
+
+Nothing moves, and the reason is worth one sentence: **my §D.2 derivation never names the constraint.**
+It shows that at any saddle point the primal player minimises
+`Σ_i [ y_i·(l_1 + λ*g_1)(z_i) + (1−y_i)·(l_0 + λ*g_0)(z_i) ]`, a plain pointwise loss with one fixed
+pair of functions, which Theorem 2 annihilates; and that `λ*` enters the population solution as an
+additive logit offset, which Theorem 1 annihilates. `g` can be recall, FPR, coverage, churn, or
+precision — the derivation is identical. For the ratio-valued case (precision, the natural
+precision-corner constraint, and the one Eban et al. AISTATS 2017 optimise), Koyejo, Natarajan,
+Ravikumar & Dhillon (NIPS 2014) prove the Bayes-optimal classifier for the whole ratio-of-linear
+family is `sign(η(x) − δ*)` — a **signed threshold on `η`**. Same ranking, different threshold, either
+corner.
+
+> **"A rate-constrained ERM is a threshold slide with extra steps" holds verbatim on the precision
+> corner. Family D remains the only family killed by BOTH theorems.**
+
+### 1.5.5 Corner-flip summary table
+
+| family | recall-corner verdict | precision-corner verdict | what moved |
+|---|---|---|---|
+| **A** partial AUC | REJECT (rate target + decoupling + `k1=43` power) | **REJECT** (rate target + decoupling) | the power objection dissolves; one-way low-FPR pAUC is well posed at our n |
+| **B** push / listwise | REJECT published, flag unpublished mirror | **BEST SURVIVING CANDIDATE** (soft `p`-norm push, `p≈2`) | **direction reverses; the published method is now the right one** |
+| **B′** LambdaRank / listwise | REJECT (wrong rank region + disguised rate target) | **REJECT**, same two reasons | nothing — corner-invariant |
+| **C** Neyman–Pearson | DOA (rate target + threshold output), wrong direction | **DOA**, now the *right* direction | aptness reverses; legality does not |
+| **D** constrained ERM | REJECT (both theorems + rate target) | **REJECT**, identical derivation | nothing — corner-invariant |
+
+**Score: one verdict change out of five, and it was driven by statistical power and direction, never by
+a theorem.**

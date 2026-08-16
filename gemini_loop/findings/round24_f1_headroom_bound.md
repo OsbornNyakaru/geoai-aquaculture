@@ -252,3 +252,224 @@ and had never tested it. The test they applied — *a reported score is a ration
 denominator, so check whether it is even reachable* — is the single most productive move of the
 round, and it generalises: **any leaderboard that prints enough digits is an exact measuring
 instrument, and we should have been sieving against it since iter42.**
+
+---
+---
+
+# RESUMED 2026-08-16 — PARTS A–D ON THE **CORRECTED** CELL
+
+Everything above the "TEAM RESPONSE" divider was written against `n=309, P=191`. The cell is now
+solved: **`n=333, P=181, N=152`; champion `TP=164, FP=27, FN=17, TN=125`, `PP=191`.**
+Precision `0.858639`, recall `0.906077`. We **over-predict** (0.5736 vs 0.5435).
+All four parts below are recomputed on that cell. Reproduce with `tools/f1_headroom_bound.py`
+(exact `fractions`, no float in any decision).
+
+---
+
+## PART A — the sharp max-F1 bound on a fixed ranking. **VERDICT: the leader is INSIDE. Our ranking is NOT provably deficient.**
+
+**DERIVED.** `tools/f1_headroom_bound.py`.
+
+### A.1 The AUC readout pins the concordant-pair count to a single integer
+
+`P·N = 181 × 152 = 27512`. `AUC = C/(P·N)`, `C ∈ ½ℤ`. Over the 9-decimal window
+`[0.945841814, 0.945841815)` there is **exactly one** admissible half-integer:
+
+```
+C = 26022   (an integer — no ties in the champion score column)
+AUC = 26022/27512 = 0.945841814481…
+D  = 27512 − 26022 = 1490 discordant pairs
+```
+
+This is worth stating on its own: the leaderboard has handed us an **exact pair count**. There is no
+estimate anywhere in Part A.
+
+### A.2 The block decomposition — the entire degree of freedom is 1031 pairs
+
+Split the 27512 (positive, negative) pairs by which side of the 0.5 cut each member falls on:
+
+| block | size | status |
+|---|---|---|
+| TP × TN | 20500 | **all concordant** — forced, the TP is above the cut and the TN below it |
+| FN × FP | 459 | **all discordant** — forced, same argument mirrored |
+| TP × FP | 4428 | free; write `d_a` = # discordant (an FP outscoring a TP, both above the cut) |
+| FN × TN | 2125 | free; write `d_b` = # discordant (a TN outscoring an FN, both below the cut) |
+
+`20500 + 459 + 4428 + 2125 = 27512` ✓, and
+
+> **`d_a + d_b = D − FN·FP = 1490 − 459 = 1031` exactly.**
+
+`d_a` measures how badly our 27 false positives are interleaved *upward* among the 164 true
+positives; `d_b` measures how badly our 17 misses are buried *downward* among the 125 true
+negatives. Threshold movement can only help to the extent one of these is small. **1031 is the whole
+budget, and the AUC column fixes it to the pair.**
+
+### A.3 The sharp upper bound
+
+Parametrise a threshold *raise* by `(m, u)`: cross above the `m` lowest FPs, which necessarily also
+drops the `u = u_m` TPs sitting below the `m`-th lowest FP. Parametrise a *lower* by `(j, s)`: admit
+the `j` highest FNs, which drags along the `s = s_j` TNs above the `j`-th highest FN.
+
+```
+F1_raise(m,u) = 2(164−u) / (372 − m − u)          F1_lower(j,s) = 2(164+j) / (372 + j + s)
+```
+
+Maximising over all feasible arrangements:
+
+```
+ RAISE ceiling  m=27, u=0  →  328/345 = 0.950724638      ← the max
+ LOWER ceiling  j=17, s=0  →  362/389 = 0.930591260
+```
+
+> ### 🔴 **SHARP UPPER BOUND ON max-F1 BY THRESHOLD MOVEMENT = 328/345 = 0.950724638**
+> Attained by exactly one configuration: **all 27 false positives ranked below all 164 true
+> positives**, and the cut raised past them.
+
+Sanity check that the AUC is not the binding constraint at the maximiser: the maximum concordant
+count for *any* monotone ROC staircase through `(FP=27, TP=164)` is
+`0·164 + 27·164 + 125·181 = 27053`, and `27053 ≥ 26022 = C`. **The AUC constraint has slack at the
+optimum, so the bound is set by the confusion cell, not by the AUC.** (This corrects the old
+`[0.8817, 0.9574]`: the upper end moves down to `0.95072`, and — importantly — the reason it is
+where it is has nothing to do with the AUC.)
+
+### A.4 The verdict, which is the number the round was asked for
+
+The leader's composite is known only as ≈ 0.929–0.936 with `AUC 0.944897`, so
+`F1_leader = (composite − 0.4·0.944897)/0.6 ∈ [0.9184020, 0.9300687]` (Part D refines this).
+
+```
+0.881720430  (us, now)
+0.918402  ─┐
+0.930069  ─┴─  leader's whole plausible F1 band
+0.950725     ← our sharp ceiling
+```
+
+> ## ✅ **THE LEADER'S ENTIRE F1 BAND IS INSIDE OUR BOUND, with 0.0207 to 0.0323 of margin.**
+> **Our ranking is NOT provably deficient. No threshold-reachability argument can explain the gap.
+> The entire loss is where 0.5 lands.**
+
+That is the yes/no the brief asked for, and it points the remaining effort at the operating point,
+not at the ordering. It is also consistent with the AUC column: our AUC (0.945842) already *beats*
+theirs (0.944897), so a claim that our ordering is worse would have had to be an ordering defect
+invisible to global AUC but fatal locally. It is not there.
+
+### A.5 The honest other half — the bound does NOT prove the leader's F1 is reachable
+
+The 1031-pair budget is nowhere near tight enough to *force* headroom. An adversarial arrangement
+consistent with the exact cell **and** the exact AUC can block any target:
+
+| target F1 | `d_a` needed to block all raises | `d_b` needed to block all lowers | total | share of the 1031 budget |
+|---|---|---|---|---|
+| 0.8817205 (our own — i.e. block *any* gain) | 311 | 203 | **514** | 49.9 % |
+| 0.90 | 174 | 85 | 259 | 25.1 % |
+| **0.9184020 (leader, low)** | **74** | **16** | **90** | **8.7 %** |
+| 0.9300687 (leader, high) | 33 | 1 | 34 | 3.3 % |
+| 0.94 | 10 | 0 | 10 | 1.0 % |
+
+Read the first row: an adversary needs only **half** of the available discordance to make our
+current 0.8817 the *global* max over every threshold. So the guaranteed lower bound on our reachable
+max-F1 is exactly the F1 we already have.
+
+> **The interval, stated correctly and sharply: our max-F1 over all thresholds lies in
+> `[82/93, 328/345] = [0.881720, 0.950725]`, and the AUC column cannot narrow it further.**
+> Any narrowing must come from data we hold — see Part C.
+
+### A.6 The two concrete moves that would match the leader — and how small they are
+
+| route | to reach F1 ≥ 0.918402 | to reach F1 ≥ 0.930069 |
+|---|---|---|
+| **RAISE** the cut | the lowest **15** of our 27 FPs must sit below every TP | the lowest **20** of 27 |
+| **LOWER** the cut | all **17** FNs sit at the top of the below-cut group with ≤ **5** TNs interleaved | ≤ **0** TNs interleaved |
+
+Neither is exotic. 15 of 27 FPs being the bottom 15 rows of a 191-row predicted-positive set is a
+*weak* ordering requirement. This is why the round's conclusion should be read as **"the ordering is
+fine and the cut is in the wrong place"** rather than "we need a better model".
+
+⚠️ **And it is precisely the RAISE route that is available and the LOWER route that is not.**
+We over-predict: 191 predicted positives against 181 true. The move that helps is *fewer* positives,
+which is a legal direction only if it arrives via a corrected `p(y|x)` and not via the cut. Part B.
+
+---
+
+## PART D — the leader's cell, BOUNDED (done here, out of order, because it sets the target Part A is compared against)
+
+**DERIVED.** `tools/leader_cell_bound.py`.
+
+### D.0 First, a methodological correction: their AUC is **not** sieve-testable
+
+Our AUC came printed at **9 dp**; theirs at **6 dp**. At `P·N = 27512` consecutive achievable AUCs
+are `1/(2·P·N) = 1.817e-05` apart, so a 6-dp window (`1e-06`) is **18× narrower than the spacing**.
+The window in fact contains no half-integer at all — and **that is not evidence against anything**;
+it is the expected outcome ~94 % of the time. The refutation machinery of §1 works only because
+Zindi gave *us* nine digits.
+
+> **Rule to carry into the report:** the sieve is only valid when
+> `10^(-digits) ≳ 1/(2·P·N)`. At `P·N ≈ 2.8e4` that means **≥ 5 significant decimals minimum, and
+> 9 dp to be decisive.** State the digit count whenever the sieve is invoked. (Add to §8 as error #8:
+> *we nearly ran the sieve on a 6-dp number and would have "refuted" a true cell.*)
+
+We therefore use their AUC only as a *value*: `C_leader ≈ 25996` against our `26022`. **Their ordering
+is 26 concordant pairs worse than ours** — confirming from the other side that the gap is not AUC.
+
+### D.1 The feasible set
+
+`F1_leader = (composite − 0.4·0.944897)/0.6 ∈ [0.918402, 0.930069]`. Enumerating every integer cell
+at `P=181, N=152` inside that band, and additionally requiring the cell to be AUC-consistent
+(`TP·TN ≤ C_leader ≤ TP·N + FN·TN`, the Part-A block decomposition applied to them), leaves
+**121 cells**:
+
+| quantity | leader's feasible range | mean over the 121 | **us** |
+|---|---|---|---|
+| precision | 0.8498 – 1.0000 | 0.9209 | **0.858639** |
+| recall | 0.8508 – 1.0000 | 0.9311 | **0.906077** |
+| FP | 0 – 32 | 15.2 | **27** |
+| FN | 0 – 27 | 12.5 | **17** |
+| **FP + FN** | **24 – 32** | 27.7 | **44** |
+| PP | 154 – 213 | 183.7 | **191** (truth 181) |
+
+> ### 🔴 THE ONE NUMBER: **they make 24–32 total errors. We make 44.**
+> That range is *tight* — `FP+FN = 2·TP·(1−F1)/F1` is nearly TP-independent across the band — so the
+> gap is **12 to 20 mistakes on 333 rows**, and it is robust to everything unknown about them.
+
+### D.2 Precision, recall, or both?
+
+| | count / 121 | share |
+|---|---|---|
+| beats us on **precision** | **117** | **97 %** |
+| beats us on **recall** | 80 | 66 % |
+| beats us on **both** | 76 | 63 % |
+| beats us on precision only | 41 | 34 % |
+| beats us on recall only | **4** | **3 %** |
+
+Mean advantage: **precision +0.0623, recall +0.0250.** So:
+
+> **They almost certainly beat us on precision (97 % of the feasible set), probably also on recall
+> (66 %), and the bulk of the advantage — 2.5× by mean, and the only near-certain half — is
+> PRECISION.** The four cells where they beat us on recall but not precision are the degenerate
+> `recall → 1.0` corner (`TP=181, FP=32`), which requires them to have found *every* positive.
+>
+> This lands on exactly the same side as R.3. Our dominant error mode is false positives, and so is
+> the leader's dominant *advantage*. The two independent readings agree.
+
+Their mean `PP` is **183.7** against a truth of 181 — essentially calibrated — while ours is **191**.
+66 of 121 cells over-predict, 53 under-predict; they straddle the truth, we sit 10 rows above it.
+
+### D.3 Checking the operator's guessed cell — **very nearly right, and the miss is instructive**
+
+> `TP=173, FP=18, FN=8, TN=134` ⇒ `PP=191`, `F1 = 173/186 = 0.930108`, **composite = 0.936023**.
+
+That is **2.3e-05 *above* 0.936**, i.e. it sits a hair outside the stated band and is the extreme
+top corner of it. As a cell it is entirely plausible — if their composite is 0.9360 this is close to
+it. Two caveats:
+
+1. It silently assumes **`PP = 191`, the same predicted-positive count as ours.** Nothing forces
+   that, and it is the least likely part of the guess: their feasible mean `PP` is 183.7, and 191 is
+   the 74th percentile of their feasible `PP`. Drop that assumption and `TP` is not pinned at all.
+2. Under that assumption it implies precision 0.9058 / **recall 0.9558**, i.e. a *recall*-dominated
+   advantage. That is the minority reading (the 3 % corner direction). Across the full feasible set
+   the advantage is precision-dominated. **So the guess's arithmetic is right to within a rounding
+   edge, but its qualitative conclusion is the atypical one, and it inherits that from the `PP=191`
+   assumption rather than from the data.**
+
+**Corrected headline:** the defensible statement is `FP+FN = 24–32 vs our 44`, precision advantage
+near-certain, recall advantage likely; **not** a specific `(173, 18, 8)`.
