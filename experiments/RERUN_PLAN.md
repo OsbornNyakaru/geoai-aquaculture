@@ -119,6 +119,12 @@ Once the bundles are local, the questions Agent A had to leave open become arith
 2. Run `src/calibration.py::assert_pool_sane` on the live tcons pool. It trips on the *replay* at
    +24 rows past the widened member envelope. Does it trip on the real thing? This is the first
    test of that guard against data it was not calibrated on.
+
+   **Pass `--guard warn` when pooling tcons.** `calibrated_pool` defaults to `guard="raise"`, so a
+   default `seed_average.py` invocation would *abort* on exactly the artifact S2 needs — the tcons
+   pool is the case the guard exists to refuse. `tools/seed_average.py` now takes
+   `--guard {raise,warn}`, defaulting to `raise` so the safe behaviour stays the default everywhere
+   else. This round is the one place it is overridden, and it is overridden out loud.
 3. Pick the member with the highest **OOF AUC** — and only OOF AUC. Recommendation 3 says delete OOF
    F1 and the offline composite from the selection path because they are anti-predictive
    (ρ = −0.420, P = 0.017). Record what each of the three criteria *would* have picked, before any

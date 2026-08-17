@@ -90,6 +90,12 @@ def main() -> None:
     ap.add_argument("--name", default=None, help="output name; default <variant>_seedavg")
     ap.add_argument("--preds-dir", default=None)
     ap.add_argument("--prevalence-target", type=float, default=None)
+    ap.add_argument("--guard", choices=["raise", "warn"], default="raise",
+                    help="operating-point guard (src/calibration.py::assert_pool_sane). 'raise' "
+                         "(default) refuses to write a pool whose realized positive rate escapes "
+                         "its members' range -- the ARM T failure. 'warn' logs and writes anyway; "
+                         "use ONLY for deliberate diagnostics, e.g. the post-competition re-run "
+                         "that exists to test whether the guard's verdict is correct.")
     args = ap.parse_args()
 
     cfg = load_config()
@@ -143,7 +149,8 @@ def main() -> None:
     # level difference, collapsing the positive rate onto the train prior. See calibrated_pool().
     log.info("")
     log.info("=== LEGAL POOL: per-seed calibration, then probability average ===")
-    p_pooled, pdiag = calibrated_pool([(y, o, t) for o, t in zip(raw_oof, raw_test)])
+    p_pooled, pdiag = calibrated_pool([(y, o, t) for o, t in zip(raw_oof, raw_test)],
+                                      guard=args.guard)
     target_f1 = (p_pooled >= 0.5).astype(int)
     target_rauc = p_pooled
     log.info("POOLED: %d seeds | test pos-rate %.4f (train prior %.4f)",
