@@ -72,6 +72,44 @@ dies.** That single missing step is why this round is necessary at all. The note
 Rough cost: 25 runs × 5 folds × 60 epochs. Minutes each on a T4; transduct is slower because the
 1030 test rows join every batch. Budget ~2 h on GPU. Set the Colab runtime to GPU.
 
+### Pre-flight, run locally 2026-08-17 — and one thing it found
+
+A smoke run of the exact ARM T command line confirms the plumbing: `seq input width: 25
+channels/month`, `mode=legal t_star=0.5000`, bundle written. The config is sound.
+
+It also printed this, which matters more:
+
+```
+TRANSDUCTIVE GATE FAILED: submitted pos-rate 0.6223 outside [0.50, 0.62]
+DO NOT SUBMIT THIS ARM; halve lambda_u / alpha and rerun.
+```
+
+That gate predates all of this analysis, and applying it to the *known* iter41 cells is the finding:
+
+| artifact | predicted positives / 1030 | pos-rate | gate `[0.50, 0.62]` |
+|---|---|---|---|
+| `tcons_s13` | 575 | 0.5583 | **PASS** |
+| `tcons_s42` | 601 | 0.5835 | **PASS** |
+| `tcons` 5-seed pool | 643 | 0.6243 | **FAIL** |
+
+**Both members pass. Only the pool fails.** So we already owned an instrument that isolated the
+defect to the *pooled artifact*, months before `assert_pool_sane` existed — and it is an independent
+confirmation of the operating-point-escape thesis, arrived at from a completely different direction.
+The iter41 error is now stateable in one line: **the gate correctly condemned the pool, and we
+responded by killing the arm** — discarding two members that both passed it, one of which was our
+best public score of all 91 and the other our best private.
+
+(The 0.6223 in the smoke run itself is not evidence about the full runs — smoke is a 300-row
+subsample at `K=1, R=1`. The full members landed at 0.5583 and 0.5835.)
+
+**Consequence for S2, stated in advance rather than discovered later:** `tcons_seedavg10` will
+probably trip this gate again and print `DO NOT SUBMIT THIS ARM`. We upload it anyway, deliberately.
+Testing whether that verdict was right *is* the experiment, and this is an unofficial slot with
+nothing at stake. If the gate fires and the pool underperforms its members again, two independent
+instruments have now been validated. If it fires and the pool scores well, the band `[0.50, 0.62]`
+is too tight and both instruments need widening. Either way we learn something; overriding it
+silently would have taught us nothing.
+
 ## 2. Offline adjudication — still zero slots
 
 Once the bundles are local, the questions Agent A had to leave open become arithmetic:

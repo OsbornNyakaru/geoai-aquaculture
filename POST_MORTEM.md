@@ -183,6 +183,13 @@ opposite sign without checking where the mass sits.
 > the train prior (0.397–0.403) while test runs at 0.55–0.60, so the OOF operating point is right by
 > construction.
 
+**And we already owned an instrument that said so.** The transductive gate in `src/seq_model.py`
+refuses any arm whose realized positive rate leaves `[0.50, 0.62]`. Applied to the now-known iter41
+cells: `tcons_s13` 575/1030 = 0.5583 **PASS**, `tcons_s42` 601/1030 = 0.5835 **PASS**, the 5-seed
+pool 643/1030 = 0.6243 **FAIL**. Both members pass; only the pool fails. The gate isolated the defect
+to the *pooled artifact* months before `assert_pool_sane` existed, from a completely different
+direction — and we responded by killing the **arm**, discarding two members that both passed it.
+
 **We had the right diagnosis and still discarded the wrong thing — but the recoverable loss was
 selection, not pooling.** `tcons_s42` was the highest public score of all 91 submissions and we did
 not designate it; `tcons_s13` was the highest private. The plain Zindi default (best public) beats
