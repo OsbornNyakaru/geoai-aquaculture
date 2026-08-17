@@ -1,0 +1,261 @@
+# Post-mortem — GeoAI Aquaculture Pond Identification Challenge (FAO / ITU)
+
+**Final: rank 120 of 500, private 0.910686008.** Winner 0.956900206. Gap 0.046214.
+
+Captured on 2026-08-17 from the closed competition, after the private leaderboard was revealed.
+Everything below is measured, not recalled. Sources:
+
+| artifact | what it is |
+|---|---|
+| `experiments/zindi_submissions_final.tsv` | all **91** of our submissions — Zindi id, timestamp, **the CSV filename we uploaded**, finalist flag, public/private composite, and the AUC and F1 sub-columns for each |
+| `experiments/zindi_final_leaderboard_top75.tsv` | final board ranks 1–75 plus our row, with the same four score columns per team |
+| `tools/post_mortem.py` | reproduces every number in this document (`python tools/post_mortem.py`) |
+
+---
+
+## 0. The scoreboard
+
+Two finalists **were** designated: `submission_champion_dualpolmix10_regimematch.csv` (public
+0.910446704 → private 0.910686008) and `submission_champion_archblend4.csv` (0.899642643 →
+0.908829923). The first one scored.
+
+| selection rule | private | finish |
+|---|---|---|
+| **what we scored** | **0.910686** | **~#120** |
+| Zindi default — best public, designate nothing | 0.913674 | ~#108 |
+| oracle over our own 91 | 0.920818 | ~#79 |
+| our global AUC + median top-75 team's local ranking | 0.924961 | #64 |
+| our global AUC + 1st place's F1 | 0.943422 | #20 |
+| our F1 + 1st place's AUC | 0.924164 | #67 |
+| 1st place | 0.956900 | #1 |
+
+Read that table as three separate failures of very different sizes: selection cost ~12 places,
+our own best-vs-chosen cost ~41, and the model cost the remaining ~78.
+
+---
+
+## 1. Five things we now know for certain
+
+### 1.1 The public/private split — solved exactly, and we had it wrong for 42 iterations
+
+The half-integer AUC sieve (`tools/lb_cell_solve.py`), run against **both** columns at once with
+`n_pub + n_prv = 1030` as a hard constraint, returns exactly **one** surviving solution:
+
+```
+n_pub = 333  P_pub = 181  (prevalence 0.5435)
+n_prv = 697  P_prv = 379  (prevalence 0.5438)
+overall test prevalence = 560/1030 = 0.5437
+```
+
+Two long-standing repo assumptions die here:
+
+- **`n_public = 309` (30% of 1030) was wrong.** It was inferred, never read, and it propagated into
+  every confusion-cell diagnosis from iter42 onward. Round 24 caught and corrected it on the last
+  day; this is the independent confirmation.
+- **"test pos-rate ~0.65" was wrong.** The truth is **0.5437**. Of our prevalence estimators, BBSE
+  (0.559) was the closest and MLLS (0.578) second — and we *retired both* at iter41 in favour of a
+  graph estimator reading 0.59, the worst of the three. `REPORT.md` §5.4 already retracted that
+  choice; the exact number now confirms it.
+
+Our realized positive rate was 0.5736 public / 0.5854 private against a true 0.5437. **We
+over-predicted by about 4 points, ~40 rows.**
+
+### 1.2 The composite formula is exactly 0.6·F1 + 0.4·AUC
+
+Verified on 182 independent triples (91 submissions × 2 splits); max residual 8e-10. No hidden
+term. We had fitted this on 5 rows.
+
+### 1.3 The gap to first place is 71% F1, 29% AUC
+
+```
+us   AUC 0.950158  F1 0.884371  composite 0.910686
+1st  AUC 0.983854  F1 0.938931  composite 0.956900
+gap  0.046214 = 0.013478 from AUC (29%) + 0.032736 from F1 (71%)
+```
+
+### 1.4 The F1 deficit is **local ranking**, not calibration — H_shape, in the high-precision corner
+
+This is the finding that matters most, and it settles a question the repo argued about for 24
+rounds without evidence.
+
+Take every team whose **private AUC is within 0.005 of ours** — an equally good global ranking — and
+invert their private confusion cell (each inversion is *unique* on n=697, P=379, so these are exact,
+not estimates):
+
+| rank | team | AUC_prv | F1_prv | TP | PP | precision | recall | pos-rate |
+|---|---|---|---|---|---|---|---|---|
+| 49 | pmaurente | 0.945570 | 0.921438 | 346 | 372 | 0.9301 | 0.9129 | 0.5337 |
+| 45 | simonMakumi | 0.950192 | 0.919598 | 366 | 417 | 0.8777 | 0.9657 | 0.5983 |
+| 56 | tw_zent | 0.949038 | 0.916230 | 350 | 385 | 0.9091 | 0.9235 | 0.5524 |
+| 61 | Mutombwa | 0.952515 | 0.908163 | 356 | 405 | 0.8790 | 0.9393 | 0.5811 |
+| 71 | lesleygrin | 0.947313 | 0.906702 | 345 | 382 | 0.9031 | 0.9103 | 0.5481 |
+| 68 | mwarsssss | 0.950013 | 0.906005 | 347 | 387 | 0.8966 | 0.9156 | 0.5552 |
+| 75 | Nayal_17 | 0.951801 | 0.901660 | 353 | 404 | 0.8738 | 0.9314 | 0.5796 |
+| **120** | **us** | **0.950158** | **0.884371** | **348** | **408** | **0.8529** | **0.9182** | **0.5854** |
+
+Median peer F1 at our AUC: 0.908163. Ours: 0.884371. **−0.024**, worth −0.0143 composite and ~56
+places — from an equally good global ranking.
+
+**And it is not the operating point.** Restrict to peers predicting within ±15 of our 408 positives:
+
+- Mutombwa: PP 405 (−3 predictions) → TP 356 (**+8** true positives)
+- Nayal_17: PP 404 (−4) → TP 353 (**+5**)
+- simonMakumi: PP 417 (+9) → TP 366 (**+18**)
+
+At the *same* operating point they capture ~6 more real ponds than we do. Since global AUC is
+identical, their discordant pairs sit deep in the list where nothing is decided, and ours straddle
+the boundary. Our ranking is fine on average and **bad exactly where the 0.5 cut falls.**
+
+Two direct consequences for the record:
+
+- `REPORT.md` §3.2 asserted the leader's advantage lived in the **high-recall** corner and §3.3
+  proved that unidentified. The answer is **H_shape, high-precision corner** — the mirror. Round 24
+  flipped to the FP side on the final day and was right, with no time to act.
+- Round 24's partial-AUC survey rejected families A–D. It was the right *family* aimed at the wrong
+  *corner*. That work is reusable, not wasted.
+
+### 1.5 Our compliance stance was correct and cost us nothing
+
+Verbatim from the competition Evaluation page:
+
+> "Setting a probability threshold is strictly forbidden. Your binary target should be based on the
+> default threshold of 0.5."
+
+So `compliance_mode='legal'` was right, and the F1 gap is **not** explained by rivals tuning
+thresholds while we refused. Note also that the top finishers over-predict *more* than we do
+(#1 pos-rate 0.5839, #8 0.6212 vs our 0.5854) and still beat us on precision. Nothing here would
+have been fixed by moving the cut.
+
+---
+
+## 2. Five things we did wrong
+
+### 2.1 We killed the arm that produced both our best public and our best private entry
+
+```
+submission_tcons_s42.csv           pub 0.914179 (our best ever)   prv 0.913674  (#7 of 91)
+submission_tcons_s13.csv           pub 0.908873                   prv 0.920818  (BEST of 91)
+submission_champion_tcons_seedavg5 pub 0.893752                   prv 0.901721
+
+member mean  prv 0.917246   AUC 0.939190   F1 0.902618
+5-seed pool  prv 0.901721   AUC 0.940650   F1 0.875769
+pooling gain     -0.015525  =  +0.000584 AUC   -0.016109 F1
+```
+
+ARM T (the `Var_k(logit)` cross-view penalty aimed at the unlabeled test rows) was written off at
+iter41 as a single-seed mirage. **It wasn't** — both seeds held up on private.
+
+The iter41 log diagnosed the mechanism *correctly*: "pooled AUC sits BETWEEN its members' so the
+RANKING pooled normally, but pooled F1 is BELOW BOTH members' → the OPERATING POINT moved… per-seed
+Platt slopes diverge." Private confirms every word — pooled AUC is fine (+0.0006), the entire
+−0.0155 is F1.
+
+**We had the right diagnosis and discarded the wrong thing.** The broken component was
+`calibrated_pool`: averaging *probabilities* across seeds whose Platt slopes differ puts the 0.5 cut
+in the wrong place. Averaging in **rank space**, or refitting **one** Platt on the pooled logit,
+fixes it and changes nothing else. Instead we deleted the arm. Cost: our best private score.
+
+### 2.2 We spent five weeks inside the noise band
+
+| week of | subs | best public | best private | running best private |
+|---|---|---|---|---|
+| 2026-07-06 | 12 | 0.877994 | 0.891984 | 0.891984 |
+| 2026-07-20 | 24 | 0.898566 | 0.905704 | 0.905704 |
+| 2026-07-27 | 7 | 0.899643 | 0.908830 | 0.908830 |
+| 2026-08-03 | 20 | 0.913263 | 0.919608 | 0.919608 |
+| 2026-08-10 | 27 | 0.914179 | 0.920818 | 0.920818 |
+| 2026-08-17 | 1 | 0.894899 | 0.904150 | 0.920818 |
+
+Week 1 reached 0.892. Seventy-nine further submissions bought **+0.029**. The sd of the
+public→private shift is **0.0121**, and the private range across five seeds of one fixed config is
+**0.0134**:
+
+```
+amix_s{13,17,31,37,42}   prv 0.897874 - 0.911317  (range 0.0134)
+teacher_perm_s{13,42}    prv 0.896412 - 0.916310  (range 0.0199)
+tcons_s{13,42}           prv 0.913674 - 0.920818  (range 0.0071)
+```
+
+Almost every A/B we adjudicated after week 1 was smaller than the seed range of a single config.
+The repo's own protocol note said the combined SE was ≈0.012 — we wrote it down and then ignored it.
+
+### 2.3 Public leaderboard reliability — good on ranking, useless at the top
+
+```
+composite  pearson 0.9807  spearman 0.9341
+AUC        pearson 0.9905  spearman 0.9789
+F1         pearson 0.9669  spearman 0.8648
+private is +0.012 higher than public on average (the private slice is the easier one)
+```
+
+But where it mattered: **overlap of our public top-5 with our private top-5 was 1 of 5.** Our
+public #1 fell to private #7; our private #1 was only public #7; `jtt_lam5` went public #8 →
+private #32. The public board ranked the field well and the *tip* of the field not at all.
+
+### 2.4 The finalist choice lost to doing nothing
+
+We designated two members of the **same champion family** (`dualpolmix10_regimematch` and
+`archblend4`). Had we designated nothing, Zindi's default — our best public entry — would have
+scored 0.913674 and ~#108, twelve places better. `top-5 by public, take the best` would have
+returned 0.919608, ~#82.
+
+The second slot was spent on a hedge that was correlated with the first and 0.011 worse on public.
+A genuinely decorrelated second pick (a different model family — `tcons`, `c_perm_meanmin`,
+`teacher_perm`) would have paid.
+
+### 2.5 Roughly a sixth of the submission budget bought nothing
+
+Of 91 uploads: 87 distinct filenames, 8 uploads were re-uploads of 4 files, and 12 uploads share an
+exact (public, private) score pair with another upload — byte-equivalent decisions under a new name.
+
+---
+
+## 3. What to do differently next time
+
+1. **Read platform facts; never infer them.** `n_public = 309` was a guess that survived 42
+   iterations and corrupted every confusion-cell diagnosis downstream. Any number used in reasoning
+   must be read off the platform or *derived with proof*. `tools/lb_cell_solve.py` does the derivation
+   for any AUC+F1 competition — run it in week 1, not on the last day.
+
+2. **Establish the noise floor before chasing anything.** Five seeds of the baseline, offline, day
+   one. Publish the sd. Then pre-commit: *no lane is adjudicated on a delta smaller than 2 sd.* We
+   computed SE ≈ 0.012 and then spent a month resolving 0.006 differences.
+
+3. **Optimize the metric's actual geometry.** 60% of the score was F1 at a *frozen* 0.5 cut. That
+   depends only on the ordering of the top ~55% of rows and where probabilities sit relative to 0.5.
+   Global AUC — 40% — is dominated by pairs that never touch the decision. Make **precision@k and
+   F1@0.5 the primary offline metric from day 1**, with AUC secondary. Concretely: the partial-AUC /
+   ranking-loss family from round 24, aimed at the **high-precision** corner.
+
+4. **When an ensemble underperforms its members, fix the ensembler.** Pool in rank space by default;
+   probability-averaging is only valid when the members share a calibration scale. Add an automatic
+   assertion: if `pooled_F1 < min(member_F1)` while `pooled_AUC ≈ mean(member_AUC)`, the pooler is
+   broken, not the arm.
+
+5. **Finalist policy, decided in advance.** Slot 1 = best public, always (it beat us here). Slot 2 =
+   the best entry from the most *decorrelated* model family, chosen by prediction correlation, never
+   a second variant of slot 1. Designate a week before the deadline and only revise upward.
+
+6. **Keep every prevalence estimator; never retire one because a newer one flatters you.** BBSE and
+   MLLS were the two closest to the truth and we dropped both for the estimator that agreed with our
+   prior.
+
+7. **Read the room.** Ranks 3, 5, 6 and 7 posted *byte-identical* F1 on both splits (public cell
+   TP=173/PP=191, private TP=364/PP=397) with *different* AUC columns — four independent teams
+   producing the same binary label set. A shared public approach existed and we never went looking
+   for it. Zindi publishes winning solutions after code review (due **7 Sept 2026**); the Chat tab
+   was live the whole time.
+
+---
+
+## 4. What went right, and should be kept
+
+- **The integrality sieve.** Recovering the exact confusion cell from a 9-decimal leaderboard
+  readout, for zero submissions, is a genuinely reusable instrument. It solved the split exactly
+  here and it caught our own 42-iteration error.
+- **The discipline of writing the diagnosis down.** The iter41 pooling entry was precise enough
+  that, five weeks later, private data confirmed it word for word. The failure was in the response,
+  not the analysis — and that is only visible because the analysis was recorded.
+- **Compliance.** Verified against the live rules page, held all the way, and confirmed correct.
+  35% of the final standing is code review; nothing here jeopardises it.
+- **Reproducibility.** Every submission is named, seeded, and traceable to a config.
