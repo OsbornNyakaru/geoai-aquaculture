@@ -16,12 +16,18 @@ Under a HARD 0.5 cut the sharpness loss is not cosmetic: it moves the realized p
 which IS the entire TargetF1 column. Averaging preserves rank (AUC fine) but can compress the
 pooled distribution so the fixed cut lands in the wrong place.
 
-THE CASE THIS WAS BUILT TO ADJUDICATE (iteration 41, ARM T)
-    tcons members  F1 0.9013 and 0.8975   ->  pooled F1 0.8718   (BELOW BOTH)
-    tcons members AUC 0.9334 and 0.9259   ->  pooled AUC 0.9267  (normally BETWEEN)
+THE CASE THIS WAS BUILT TO ADJUDICATE (iteration 41, ARM T) -- public leaderboard column
+    tcons members  F1 0.9013 and 0.8975   ->  pooled F1 0.8718   (BELOW BOTH OBSERVED)
+    tcons members AUC 0.9334 and 0.9259   ->  pooled AUC 0.9267  (BETWEEN, as normal)
 That is the canonical underconfidence-after-averaging signature: the ranking pooled fine, the
 operating point did not. ARM T holds our two highest F1 values ever and was discarded on the
 strength of that pooled number. If the combiner caused it, we killed a working method.
+    Caveat kept explicit: the pool had FIVE seeds and only two were ever submitted, so "below
+    both members" is verified against 40% of the membership. The excursion is far too large to
+    be a membership-composition effect, but the literal claim covers two of five.
+
+ADJUDICATED 2026-08-17 (competition closed, private revealed): the combiner did NOT cause it.
+See the second falsified prediction below, and gemini_loop/findings/postmortem_pooling.md.
 
 A PREDICTION MADE HERE AND IMMEDIATELY FALSIFIED -- recorded because the correction is the point.
     The first draft of this file predicted the defect would bite "only where member Platt slopes
@@ -31,10 +37,30 @@ A PREDICTION MADE HERE AND IMMEDIATELY FALSIFIED -- recorded because the correct
     in both settings, while B beat A in both (+0.039 and +0.031 F1).
     The real mechanism is simpler and GENERIC: an arithmetic mean of independently-noisy
     probabilities is shrunk toward the members' centre of mass, so the pooled distribution is
-    narrower than any member's and a FIXED 0.5 cut catches fewer rows. It needs no slope
+    narrower than any member's and a FIXED 0.5 cut lands somewhere else. It needs no slope
     heterogeneity -- only independent member noise, which is what multi-seed pooling IS.
     Consequence: this is NOT merely an ARM T diagnostic. If it reproduces on real bundles it is a
     live defect on the CHAMPION pool too.
+
+A SECOND PREDICTION MADE HERE AND ALSO FALSIFIED -- the sign, and then the whole claim.
+    (i) THE SIGN WAS BACKWARDS. The paragraph above used to end "...and a FIXED 0.5 cut catches
+    FEWER rows." Ground truth from the revealed private leaderboard says the opposite: the tcons
+    pool predicted PP=434 positives on private against member PP of 395 and 407, i.e. it caught
+    27-39 MORE rows, and 643 of 1030 across the whole test set against member totals of 575 and
+    601. Compression moves the realized rate toward the pooled score's own centre of mass; our
+    mass sits ABOVE 0.5 (every artifact we ever shipped realized pos-rate 0.55-0.62), so
+    compression pushes rows UP across the cut. The pool OVER-predicts. Sign corrected 2026-08-17.
+    (ii) THE CLAIM ITSELF DOES NOT REPRODUCE. Measured on every family still on disk -- dpa x5,
+    amix x10, teacher_perm x5, jtt x3, presto x2, 25 member bundles -- combiner A's pooled OOF
+    F1@0.5 is ABOVE every member in all three seed families and inside the member range in the
+    two heterogeneous ones. It is never below. And combiners A, "geometric mean of odds", and B
+    land within TWO rows of each other out of 1030 in every family; on dpa and amix they are
+    bit-identical at 605 and 606 positives. The CHAMPION pool was not defective, and swapping the
+    combiner would have changed the submitted binary column by 0-2 rows. See
+    gemini_loop/findings/postmortem_pooling.md, Results 2 and 3.
+    What IS real, and is now guarded in src/calibration.py::assert_pool_sane(), is the pooled
+    operating point escaping the members' own realized-positive-rate range. tcons overshot by
+    ~24 rows past a widened member envelope; nothing on disk overshoots by more than 2.
     The ledger's +0.0055..+0.0061 pooling gains do not argue against this, and citing them as a
     rebuttal (as the first draft did) was a category error: those measured POOL vs SINGLE MEMBER,
     not combiner A vs combiner B. Pooling can be worth +0.006 and still be leaving more on the
@@ -197,7 +223,10 @@ def main() -> None:
     # ---- the two combiners ----
     log.info("")
     log.info("=== COMBINER A (CURRENT): per-member Platt -> average PROBABILITIES ===")
-    pa, da = calibrated_pool([(y, o, t) for o, t in zip(raw_oof, raw_test)], log_each=False)
+    # guard="warn": this tool EXISTS to inspect a suspect pool, so a raise would defeat it.
+    # Everything that writes a submission keeps the default guard="raise".
+    pa, da = calibrated_pool([(y, o, t) for o, t in zip(raw_oof, raw_test)], log_each=False,
+                             guard="warn")
     sa = _report("pooled", y, da["p_oof_pooled"], pa)
 
     log.info("")

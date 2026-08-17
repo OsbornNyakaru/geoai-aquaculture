@@ -137,7 +137,112 @@ def platt_calibrate(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray
     return (lr.predict_proba(z_oof)[:, 1], lr.predict_proba(z_test)[:, 1], slope)
 
 
-def calibrated_pool(members, log_each: bool = True) -> Tuple[np.ndarray, Dict]:
+class PoolingDefect(RuntimeError):
+    """A pool that ranks like its members but decides unlike them. See assert_pool_sane()."""
+
+
+# Widening applied to the members' realized-positive-rate envelope before the pool is judged
+# to have escaped it. max(sd of the member rates, POS_RATE_FLOOR). The floor keeps a family
+# whose members happen to agree to within a couple of rows from tripping on rounding.
+POS_RATE_FLOOR = 0.005
+
+
+def assert_pool_sane(y, member_oof_cal, member_test_cal, pooled_oof, pooled_test,
+                     on_defect: str = "raise") -> Dict:
+    """FAIL LOUDLY when a pool ranks like its members but DECIDES unlike them.
+
+    WHY. Under a literal 0.5 cut, F1 is 60% of the metric and is a function of WHERE the cut
+    lands, while AUC is a function of the ORDER alone. A pool can therefore average the order
+    perfectly and still move the operating point off the end of its own members' range -- and
+    every diagnostic we habitually look at (AUC, member agreement, pooling "gain") stays green
+    while it happens. That is exactly what killed ARM T in iteration 41: the tcons 5-seed pool
+    predicted 643 positives of 1030 against member counts of 575 and 601, bought 4 extra true
+    positives with ~40 extra false ones, and lost 0.0161 F1 with its AUC still inside the member
+    range. We read the pooled composite, concluded the arm was a single-seed mirage, and
+    discarded the arm that held our best public AND best private submission of all 91.
+
+    TWO CHECKS, both label-free on test and train-only on OOF.
+
+    (1) RANK-OK-BUT-DECISION-BAD, on OOF. pooled F1@0.5 below EVERY member's while pooled AUC
+        sits INSIDE the member range. This is the signature the post-mortem was asked to guard.
+        Honest limitation, measured: on all five families on disk the calibrated OOF positive
+        rate is pinned to the train prior (0.397-0.403 against a train prior of 0.4023) while
+        the TEST rate is 0.55-0.60. On OOF the operating point is right by construction, so
+        this check is structurally weak -- it never fired on any healthy family, but there is
+        no local evidence that it would have fired on tcons either. It is cheap and it is a
+        true positive when it fires; it is not the load-bearing check.
+
+    (2) OPERATING-POINT ESCAPE, on test. The pooled realized positive rate must lie inside the
+        members' own realized range, widened by max(sd of the member rates, POS_RATE_FLOOR).
+        This uses NO test labels and NO knowledge of the true prevalence -- only the members'
+        own outputs -- so it is legal to run before any submission. This is the check that
+        would have caught ARM T.
+
+    CALIBRATION OF (2), STATED PLAINLY. The tolerance was chosen with the ARM T case in view,
+    which is fitting a threshold to one positive example and must be read as such. What
+    defends it is the margin, not the fit: on the five families on disk the pool overshoots
+    its member envelope by 0 rows (dpa, amix, teacher_perm, jtt) and 2 rows (presto, whose two
+    members agree to within 3 rows), while the tcons pool overshoots by ~24 rows beyond the
+    widened envelope. There is an order of magnitude between the null cases and the positive
+    one, so the verdict does not depend on where in that gap the line is drawn.
+
+    `on_defect` is "raise" (default) or "warn". Returns the diagnostics either way.
+    """
+    y = np.asarray(y)
+    m_f1 = [f1_at(y, o, 0.5) for o in member_oof_cal]
+    m_auc = [_auc(y, o) for o in member_oof_cal]
+    m_rate = [float((np.asarray(t) >= 0.5).mean()) for t in member_test_cal]
+    p_f1, p_auc = f1_at(y, pooled_oof, 0.5), _auc(y, pooled_oof)
+    p_rate = float((np.asarray(pooled_test) >= 0.5).mean())
+    n_test = len(np.asarray(pooled_test))
+
+    tol = max(float(np.std(m_rate, ddof=1)) if len(m_rate) > 1 else 0.0, POS_RATE_FLOOR)
+    lo_r, hi_r = min(m_rate) - tol, max(m_rate) + tol
+
+    faults = []
+    if p_f1 < min(m_f1) and min(m_auc) <= p_auc <= max(m_auc):
+        faults.append(
+            f"RANK-OK-BUT-DECISION-BAD: pooled OOF F1@0.5 {p_f1:.6f} is BELOW every member "
+            f"({min(m_f1):.6f}..{max(m_f1):.6f}) while pooled OOF AUC {p_auc:.6f} sits INSIDE "
+            f"the member range ({min(m_auc):.6f}..{max(m_auc):.6f}). The pool averaged the "
+            f"ORDER fine and moved the OPERATING POINT.")
+    if not (lo_r <= p_rate <= hi_r):
+        over = (p_rate - hi_r) if p_rate > hi_r else (p_rate - lo_r)
+        faults.append(
+            f"OPERATING-POINT ESCAPE: pooled test positive rate {p_rate:.4f} "
+            f"({int(round(p_rate*n_test))} of {n_test}) is outside the members' own range "
+            f"[{min(m_rate):.4f}, {max(m_rate):.4f}] widened by {tol:.4f} -> "
+            f"[{lo_r:.4f}, {hi_r:.4f}]; overshoot {over:+.4f} "
+            f"({int(round(over*n_test)):+d} rows). A pool is supposed to sit BETWEEN its "
+            f"members, not past them.")
+
+    diag = {"member_oof_f1": m_f1, "member_oof_auc": m_auc, "member_test_pos_rate": m_rate,
+            "pooled_oof_f1": p_f1, "pooled_oof_auc": p_auc, "pooled_test_pos_rate": p_rate,
+            "pos_rate_tol": tol, "faults": faults}
+
+    if faults:
+        msg = ("POOLING GUARD TRIPPED -- do NOT submit this pool without deciding, on the "
+               "record, that the pool is right and its members are wrong:\n  * "
+               + "\n  * ".join(faults)
+               + "\n  Remedies that keep the 0.5 cut literal: submit the members individually, "
+                 "or pool in a space that does not move the level. Note (measured 2026-08-17 on "
+                 "5 families) that arithmetic-probability, geometric-odds and pool-then-calibrate "
+                 "all land within 2 rows of each other, so swapping the combiner is NOT a "
+                 "remedy -- the escape means the members disagree about the level, and that is "
+                 "a modelling fact, not an averaging artefact.")
+        if on_defect == "raise":
+            raise PoolingDefect(msg)
+        log.warning("%s", msg)
+    return diag
+
+
+def _auc(y, p) -> float:
+    from sklearn.metrics import roc_auc_score
+    return float(roc_auc_score(np.asarray(y), np.asarray(p)))
+
+
+def calibrated_pool(members, log_each: bool = True,
+                    guard: str = "raise") -> Tuple[np.ndarray, Dict]:
     """Pool several models by averaging their INDIVIDUALLY CALIBRATED probabilities.
 
     `members` is an iterable of (y_oof, p_oof, p_test) triples.
@@ -157,19 +262,36 @@ def calibrated_pool(members, log_each: bool = True) -> Tuple[np.ndarray, Dict]:
     member on the common, meaningful probability scale that rank-averaging was a proxy for --
     then average those probabilities. Level is preserved, members remain commensurable, and
     a single vector serves both columns.
+
+    MEASURED 2026-08-17, so nobody re-litigates the combiner. On all five member families still
+    on disk (dpa x5, amix x10, teacher_perm x5, jtt x3, presto x2) this arithmetic pool, a
+    geometric mean of odds, and pool-then-calibrate produce realized positive counts within TWO
+    rows of each other out of 1030, and the pooled OOF F1 is above every member in the three
+    seed families. There is no combiner defect here. What CAN go wrong is the pool's operating
+    point escaping its members' range -- see assert_pool_sane(), which every call runs.
+
+    `guard` is "raise" (default), "warn", or "off". Diagnostic tools that deliberately study a
+    defective pool should pass "warn"; nothing that writes a submission should.
     """
     cal_test, cal_oof, slopes = [], [], []
+    y_ref = None
     for i, (y_m, oof_m, test_m) in enumerate(members):
         o_cal, t_cal, slope = platt_calibrate(y_m, oof_m, test_m)
         cal_test.append(t_cal)
         cal_oof.append(o_cal)
         slopes.append(slope)
+        if y_ref is None:
+            y_ref = np.asarray(y_m)
         if log_each:
             log.info("  member %d: Platt slope=%.3f | its own test pos-rate %.3f",
                      i, slope, float((t_cal >= 0.5).mean()))
     p_test = np.vstack(cal_test).mean(axis=0)
     p_oof = np.vstack(cal_oof).mean(axis=0)
-    return p_test, {"p_oof_pooled": p_oof, "slopes": slopes, "n_members": len(slopes)}
+    out = {"p_oof_pooled": p_oof, "slopes": slopes, "n_members": len(slopes)}
+    if guard != "off" and len(cal_oof) > 1:
+        out["guard"] = assert_pool_sane(y_ref, cal_oof, cal_test, p_oof, p_test,
+                                        on_defect=guard)
+    return p_test, out
 
 
 def calibrate_legal(y_oof: np.ndarray, p_oof: np.ndarray, p_test: np.ndarray

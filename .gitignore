@@ -26,6 +26,8 @@ geoai-aquaculture-code.zip
 # OS
 .DS_Store
 Thumbs.db
+# Word/Excel lock files left behind while a .docx is open
+~$*
 
 # Vendored third-party source + pretrained weights (fetched deterministically by
 # tools/fetch_presto.py at a pinned SHA with a checksum gate). Not committed: 3.3 MB binary,

@@ -260,12 +260,19 @@ def pooling_bug(d: pd.DataFrame) -> None:
         print()
         print("  On PRIVATE, exactly as iter41 diagnosed on public: the pooled AUC is fine -- the")
         print("  ranking averages normally -- and the entire loss is F1, i.e. the operating point.")
-        print("  The variance penalty compresses logits, per-seed Platt slopes diverge, and")
-        print("  averaging PROBABILITIES across differently-scaled seeds lands the 0.5 cut in the")
-        print("  wrong place. Averaging in RANK space, or refitting one Platt on the pooled logit,")
-        print("  fixes it and touches nothing else. We had the diagnosis and discarded the arm.")
-        print(f"  Cost: {d.prv.max():.6f} was sitting in that lane -- our best private score, and")
-        print("  the two seeds held up on private, so it was never a single-seed mirage.")
+        print("  The pool did not rank worse and did not lose true positives: it gained 4 TP and a")
+        print("  point of recall, and bought them with 27-39 extra FALSE positives (PP 434 against")
+        print("  member PP 395 and 407). At a true prevalence of 0.5437 those extras are almost all")
+        print("  wrong, so the whole -0.0161 is a PRECISION loss with the ranking intact.")
+        print()
+        print("  RETRACTED 2026-08-17 (see gemini_loop/findings/postmortem_pooling.md): this section")
+        print("  used to claim rank-space averaging or one pooled Platt refit 'fixes it'. Measured on")
+        print("  all five families on disk, those three combiners land within 2 rows of 1030 of each")
+        print("  other -- bit-identical on dpa and amix. Swapping the combiner would have changed our")
+        print("  submitted binary column by 0-2 rows. The combiner was never the recoverable loss.")
+        print(f"  The loss was SELECTION: {d.prv.max():.6f} was sitting in that lane and we judged the")
+        print("  arm by its pooled artifact, discarding the members with it. Both seeds held up on")
+        print("  private, so it was never a single-seed mirage.")
 
 
 def rank_of(score: float, top: pd.DataFrame) -> str:
@@ -277,17 +284,52 @@ def rank_of(score: float, top: pd.DataFrame) -> str:
     return ">#150"
 
 
-def invert_f1(f1: float, n: int, P: int) -> tuple[int, int] | None:
-    """(TP, PP) reproducing this 9-decimal F1 on a slice of n rows with P positives."""
+def invert_f1_all(f1: float, n: int, P: int) -> list[tuple[int, int]]:
+    """EVERY (TP, PP) reproducing this 9-decimal F1 on a slice of n rows with P positives.
+
+    Returns the complete solution set, in increasing TP. Callers MUST decide what to do when
+    it has more than one element -- see invert_f1().
+
+    F1 = 2*TP/(PP+P), so for each TP the admissible PP is bracketed exactly by
+    2*TP/hi <= PP+P <= 2*TP/lo. The brackets are computed in EXACT rational arithmetic (the
+    earlier float version used a fixed +-2 window around a float estimate and could in
+    principle miss a solution near the edge, which is precisely the failure mode this function
+    exists to make visible).
+    """
     s = f"{f1:.9f}"
     lo, hi = F(s), F(s) + F(1, 10 ** 9)
     hits = []
     for TP in range(P + 1):
-        base = int(2 * TP / float(hi)) - P
-        for PP in range(max(TP, base - 2), min(n, base + 3) + 1):
+        if TP == 0:
+            if lo <= 0 < hi:
+                hits += [(0, PP) for PP in range(0, n - P + 1)]
+            continue
+        s_lo = int(2 * TP / hi) - P - 2
+        s_hi = int(2 * TP / lo) - P + 2
+        for PP in range(max(TP, s_lo), min(n, s_hi) + 1):
             if PP >= TP and PP - TP <= n - P and lo <= F(2 * TP, PP + P) < hi:
                 hits.append((TP, PP))
-    return hits[0] if len(hits) == 1 else (hits[len(hits) // 2] if hits else None)
+    return hits
+
+
+def invert_f1(f1: float, n: int, P: int) -> tuple[tuple[int, int] | None, int]:
+    """(cell, n_solutions) for this 9-decimal F1.
+
+    WARNING -- SIGNATURE CHANGED 2026-08-17, and the old behaviour was a live bug. This used to return a
+    bare (TP, PP) and, when the inversion admitted SEVERAL cells, silently returned the MEDIAN
+    candidate -- the caller had no way to learn that the answer was a guess. Measured
+    counter-examples on the real ledger: `champion_tcons_seedavg5` admits 2 public cells and
+    `teacher_perm_s13` admits 5. Uniqueness is a property of (n, P, F1), not of the method.
+
+    `cell` is the unique solution when there is exactly one, the median candidate otherwise (so
+    existing display code still has something to show), and None when there is none. `n_solutions`
+    is the length of the full set, so EVERY caller can assert uniqueness or flag the ambiguity.
+    Use invert_f1_all() when you want the whole set.
+    """
+    hits = invert_f1_all(f1, n, P)
+    if not hits:
+        return None, 0
+    return (hits[0] if len(hits) == 1 else hits[len(hits) // 2]), len(hits)
 
 
 def leaderboard(d: pd.DataFrame) -> None:
@@ -314,15 +356,21 @@ def leaderboard(d: pd.DataFrame) -> None:
     print("  THE CONTROLLED COMPARISON. Teams whose private AUC is within 0.005 of ours -- i.e.")
     print("  an equally good RANKING -- and what F1 they converted it into:")
     band = lb[(lb.auc_prv - us.auc_prv).abs() <= 0.005].copy()
+    n_ambig = 0
     for _, r in band.sort_values("f1_prv", ascending=False).iterrows():
-        cell = invert_f1(r.f1_prv, N_PRV, P_PRV)
+        cell, k = invert_f1(r.f1_prv, N_PRV, P_PRV)
         extra = ""
         if cell:
             TP, PP = cell
             extra = (f"  TP={TP:3d} PP={PP:3d} prec={TP/PP:.4f} rec={TP/P_PRV:.4f} "
                      f"posrate={PP/N_PRV:.4f}")
+            if k > 1:
+                n_ambig += 1
+                extra += f"  [!] AMBIGUOUS ({k} cells; median shown)"
         tag = "  <== us" if r["rank"] == 120 else ""
         print(f"    #{int(r['rank']):3d} {r.user:<18s} AUC {r.auc_prv:.6f}  F1 {r.f1_prv:.6f}{extra}{tag}")
+    print(f"  [inversion audit] {n_ambig} of {len(band)} rows in this band have a NON-UNIQUE "
+          f"(TP,PP); the rest are exact.")
     peers = band[band["rank"] != 120]
     if len(peers):
         lift = peers.f1_prv.median() - us.f1_prv
@@ -334,13 +382,16 @@ def leaderboard(d: pd.DataFrame) -> None:
     print()
     print("  IS IT THE CUT, OR WHAT SITS ABOVE IT? Restrict to peers whose predicted-positive")
     print("  count is within +-15 of ours (408), i.e. the SAME operating point, and compare TP:")
-    ours = invert_f1(us.f1_prv, N_PRV, P_PRV)
+    ours, k_ours = invert_f1(us.f1_prv, N_PRV, P_PRV)
+    assert k_ours == 1, (f"our own private cell is NOT uniquely determined ({k_ours} solutions); "
+                         "the operating-point comparison below would be built on a guess")
     for _, r in band[band["rank"] != 120].iterrows():
-        cell = invert_f1(r.f1_prv, N_PRV, P_PRV)
+        cell, k = invert_f1(r.f1_prv, N_PRV, P_PRV)
         if cell and abs(cell[1] - ours[1]) <= 15:
+            warn = f"  [!] {k} cells" if k > 1 else ""
             print(f"    #{int(r['rank']):3d} {r.user:<18s} PP={cell[1]:3d} TP={cell[0]:3d}   "
                   f"(us PP={ours[1]}, TP={ours[0]}: {cell[0] - ours[0]:+d} true positives "
-                  f"for {cell[1] - ours[1]:+d} predictions)")
+                  f"for {cell[1] - ours[1]:+d} predictions){warn}")
     print("  -> the deficit SURVIVES matching the operating point. It is not where 0.5 lands; it")
     print("     is that our top-400 contains ~6 fewer real ponds. Global AUC is identical, so their")
     print("     discordant pairs sit DEEP in the list where nothing is decided and ours straddle the")
@@ -350,12 +401,14 @@ def leaderboard(d: pd.DataFrame) -> None:
     print()
     print("  TRUE PRIVATE PREVALENCE is 379/697 = %.4f. Realised positive rates:" % (P_PRV / N_PRV))
     for _, r in lb.head(8).iterrows():
-        cell = invert_f1(r.f1_prv, N_PRV, P_PRV)
+        cell, k = invert_f1(r.f1_prv, N_PRV, P_PRV)
         if cell:
+            warn = f"  [!] NON-UNIQUE ({k} cells)" if k > 1 else ""
             print(f"    #{int(r['rank']):3d} {r.user:<18s} posrate {cell[1]/N_PRV:.4f}  "
-                  f"prec {cell[0]/cell[1]:.4f}  rec {cell[0]/P_PRV:.4f}")
-    cell = invert_f1(us.f1_prv, N_PRV, P_PRV)
+                  f"prec {cell[0]/cell[1]:.4f}  rec {cell[0]/P_PRV:.4f}{warn}")
+    cell, k = invert_f1(us.f1_prv, N_PRV, P_PRV)
     if cell:
+        assert k == 1, f"our own private cell is non-unique ({k} solutions)"
         print(f"    #120 {'forge (us)':<18s} posrate {cell[1]/N_PRV:.4f}  "
               f"prec {cell[0]/cell[1]:.4f}  rec {cell[0]/P_PRV:.4f}")
 
