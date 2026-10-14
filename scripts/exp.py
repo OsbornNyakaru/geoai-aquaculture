@@ -211,14 +211,36 @@ def write_results_md() -> None:
     (EXP / "RESULTS.md").write_text("\n".join(lines) + "\n")
 
 
+def _remote_state() -> dict[str, str]:
+    """What the runs repo says about each submitted run: crash / done / running with seed progress. {} if offline."""
+    from huggingface_hub import hf_hub_download
+
+    try:
+        api = _hf()
+        files = set(api.list_repo_files(RUNS_REPO, repo_type="dataset"))
+    except Exception:  # noqa: BLE001 - status still works offline
+        return {}
+    out = {}
+    for exp in {f.split("/")[1] for f in files if f.startswith("runs/") and f.count("/") >= 2}:
+        if f"runs/{exp}/result.json" in files:
+            r = json.loads(Path(hf_hub_download(RUNS_REPO, f"runs/{exp}/result.json", repo_type="dataset",
+                                                force_download=True)).read_text())
+            out[exp] = f"{r.get('status', '?'):9s}" + (f" ({r['error'].strip().splitlines()[-1][:80]})" if r.get("error") else "")
+        elif f"runs/{exp}/claim.json" in files:
+            seeds = sum(f.startswith(f"runs/{exp}/") and f.endswith(".npz") for f in files)
+            out[exp] = f"running   ({seeds} seed-phases uploaded)"
+    return out
+
+
 def cmd_status(a) -> None:
     done = {r["exp"]: r for r in jsonl(RESULTS)}
     scored = {}
     for x in jsonl(LB):
         scored.setdefault(x["file"].split("_")[0], []).append(x)
+    remote = _remote_state()
     for p in sorted(SPECS.glob("EXP-*.json")):
         s, r = spec(p.stem), done.get(p.stem)
-        state = ("pulled   " if r else "queued   " if s.get("submitted") else "not run  ")
+        state = ("pulled   " if r else remote.get(p.stem, "queued   ") if s.get("submitted") else "not run  ")
         lb = "; ".join(f"{x['file'].split('_', 1)[1][:-4]} {x.get('private') or x['public']}" for x in scored.get(p.stem, []))
         print(f"{p.stem}  {state} {s['description']}" + (f"  [Zindi: {lb}]" if lb else ""))
     b = best()
