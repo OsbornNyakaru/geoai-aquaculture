@@ -57,6 +57,41 @@ def _():
 
 
 @app.cell
+def _(importlib, mo, sys):
+    # molab does not install the header's dependencies into the kernel (2026-10-14: no lightgbm, no catboost,
+    # numpy 2.4.6 / pandas 3.0.3), so install whatever is missing. numpy and pandas are left as molab has them:
+    # swapping them under a running kernel breaks pickling to the worker processes. Features were checked
+    # identical under numpy 1.26/pandas 2.2 and numpy 2.4.6/pandas 3.0.3.
+    import shutil
+    import subprocess
+    from importlib.util import find_spec as _find_spec
+
+    REQUIRED = {"lightgbm": "lightgbm==4.7.0", "catboost": "catboost==1.2.10", "xgboost": "xgboost==3.3.0",
+                "sklearn": "scikit-learn==1.9.0", "scipy": "scipy", "joblib": "joblib>=1.4",
+                "huggingface_hub": "huggingface_hub>=0.35"}
+    _missing = [spec for mod, spec in REQUIRED.items() if _find_spec(mod) is None]
+    _err = ""
+    if _missing:
+        _cmd = ([shutil.which("uv"), "pip", "install", "--python", sys.executable, *_missing] if shutil.which("uv")
+                else [sys.executable, "-m", "pip", "install", "-q", *_missing])
+        _p = subprocess.run(_cmd, capture_output=True, text=True)
+        _err = "" if _p.returncode == 0 else _p.stderr[-1500:]
+        importlib.invalidate_caches()
+    deps_versions = {}
+    for _m in ("numpy", "pandas", *REQUIRED):
+        try:
+            deps_versions[_m] = importlib.import_module(_m).__version__
+        except Exception:
+            deps_versions[_m] = None
+    deps_ok = all(deps_versions[m] for m in REQUIRED)
+    mo.md(f"Packages: **{'ready' if deps_ok else 'MISSING'}**"
+          + (f" (installed {', '.join(_missing)})" if _missing else "") + " · "
+          + ", ".join(f"{k} {v}" for k, v in deps_versions.items())
+          + (f"\n\n```\n{_err}\n```" if _err else ""))
+    return deps_ok, deps_versions
+
+
+@app.cell
 def _(mo):
     mo.md("""
     # GeoAI aquaculture — experiment runner
@@ -86,7 +121,7 @@ def _(data_repo_input, hf_token_input, mo, os, runs_repo_input):
     GITHUB_REPO = "OsbornNyakaru/geoai-aquaculture"
     # The frozen harness: autoresearch/prepare.py must hash to this or the runner refuses.
     PREPARE_SHA256 = "d5b76b4ba743e34fe926f95ad5816722dda181c5e3ea49c639a30a5ddf0c44ea"
-    RUNNER_VERSION = "2026-10-14a"
+    RUNNER_VERSION = "2026-10-14b"
 
     from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download
 
@@ -333,8 +368,9 @@ def _(mo, os):
 
 
 @app.cell
-def _(data_ok, idle_input, jobs_input, mo, run_btn, run_queue, watch_switch):
+def _(data_ok, deps_ok, idle_input, jobs_input, mo, run_btn, run_queue, watch_switch):
     mo.stop(not run_btn.value, mo.md("_Press **Run queue** to start._"))
+    mo.stop(not deps_ok, mo.callout(mo.md("Packages are missing: see the Packages line above."), kind="danger"))
     mo.stop(not data_ok, mo.callout(mo.md("Data is missing: check the token and the data repo above."), kind="danger"))
     _lines = []
 
