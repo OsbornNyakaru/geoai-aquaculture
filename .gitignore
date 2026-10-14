@@ -1,35 +1,31 @@
-# Data and caches (only supplied data allowed; keep raw out of VCS too)
-data/cache/
-data/raw/*.csv
-data/raw/*.pdf
+# Competition data stays out of this PUBLIC repository (Zindi terms): private Hugging Face datasets instead
+data/
+submissions/
+experiments/runs/
+*.zip
+*.npz
+*.npy
+.env
 
 # Python
 __pycache__/
 *.pyc
-*.pyo
+.pytest_cache/
 .ipynb_checkpoints/
-.venv/
+.venv*/
 venv/
+catboost_info/
 
-# Experiment log is untracked (per autoresearch convention); keep the header via results.tsv.example if needed
-experiments/results.tsv
+# marimo / molab
+__marimo__/
+runner_work/
 
-# Submissions + preds bundles can be large / iterative (regenerated on Colab)
-submissions/*.csv
-submissions/preds/
-data/submissions/
-
-# Run log + retired code zip (superseded by git pull)
+# competition-era leftovers
 logs_full.txt
-geoai-aquaculture-code.zip
+vendor/
+archive/experiments/results.tsv
 
-# OS
+# OS / Office
 .DS_Store
 Thumbs.db
-# Word/Excel lock files left behind while a .docx is open
 ~$*
-
-# Vendored third-party source + pretrained weights (fetched deterministically by
-# tools/fetch_presto.py at a pinned SHA with a checksum gate). Not committed: 3.3 MB binary,
-# and the fetch is reproducible from the pin.
-vendor/

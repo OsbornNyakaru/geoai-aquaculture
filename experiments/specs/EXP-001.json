@@ -1,0 +1,74 @@
+{
+  "exp": "EXP-001",
+  "hypothesis": null,
+  "description": "3rd-place reproduction (zinmori v9): masking, 316 features, GBDT x3, Platt, Saerens, 3 pseudo-label rounds; reference private 0.947",
+  "parent": null,
+  "changed": [],
+  "config": {
+    "model": "gbdt3",
+    "seeds": [
+      42,
+      123,
+      456,
+      789,
+      1337,
+      2024,
+      7,
+      99
+    ],
+    "features": {
+      "perm": false
+    },
+    "pl": [
+      [
+        0.9,
+        0.1
+      ],
+      [
+        0.85,
+        0.15
+      ],
+      [
+        0.8,
+        0.2
+      ]
+    ],
+    "prior": "saerens",
+    "blend_step": 0.05,
+    "params": {
+      "lgb": {
+        "n_estimators": 1200,
+        "learning_rate": 0.01,
+        "max_depth": 6,
+        "scale_pos_weight": 1.5,
+        "min_child_samples": 15,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0
+      },
+      "cb": {
+        "iterations": 1200,
+        "learning_rate": 0.01,
+        "depth": 6,
+        "auto_class_weights": "Balanced",
+        "l2_leaf_reg": 5,
+        "bagging_temperature": 0.5,
+        "subsample": 0.8
+      },
+      "xgb": {
+        "n_estimators": 1200,
+        "learning_rate": 0.01,
+        "max_depth": 6,
+        "scale_pos_weight": 1.5,
+        "min_child_weight": 5,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0
+      },
+      "early_stopping": 50
+    }
+  },
+  "created": "2026-10-14T07:04:23+00:00"
+}
